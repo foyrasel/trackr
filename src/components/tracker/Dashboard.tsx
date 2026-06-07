@@ -74,6 +74,12 @@ const CATEGORY_ICONS: Record<string, React.ReactNode> = {
 export default function Dashboard({ refreshTrigger }: DashboardProps) {
   const [data, setData] = useState<AnalyticsData | null>(null)
   const [loading, setLoading] = useState(true)
+  const [mounted, setMounted] = useState(false)
+
+  // Mark as mounted after first client render to avoid hydration mismatch
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   const fetchAnalytics = useCallback(async () => {
     try {
@@ -90,10 +96,11 @@ export default function Dashboard({ refreshTrigger }: DashboardProps) {
   }, [])
 
   useEffect(() => {
-    fetchAnalytics()
-  }, [fetchAnalytics, refreshTrigger])
+    if (mounted) fetchAnalytics()
+  }, [fetchAnalytics, refreshTrigger, mounted])
 
-  if (loading) {
+  // Show loading skeleton until mounted (avoids hydration mismatch from Date/fetch)
+  if (loading || !mounted) {
     return (
       <div className="space-y-4">
         {[1, 2, 3].map((i) => (

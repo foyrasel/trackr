@@ -27,3 +27,24 @@ Stage Summary:
 - BDT (Bangladeshi Taka) currency support
 - Transaction CRUD with filtering and deletion
 - Responsive mobile-first design
+
+---
+Task ID: 2
+Agent: Main Agent
+Task: Fix hydration mismatch error
+
+Work Log:
+- Identified root cause: checkSpeechSupport() returned false on server (no window) but true on client browser, causing server/client HTML mismatch
+- Also identified that Dashboard, InsightsPanel, and TransactionList used Date/fetch during render that could differ between server and client
+- Fixed VoiceInput: replaced module-level checkSpeechSupport() with mounted state + requestAnimationFrame-based detection after mount
+- Fixed Dashboard: added mounted state, fetch only after mount, show loading skeleton until client-side ready
+- Fixed InsightsPanel: same mounted guard pattern
+- Fixed TransactionList: same mounted guard pattern
+- All components now render identical skeleton/loading states on server and first client paint, then update after hydration
+- Passed ESLint checks (no setState-in-effect, no ref-during-render violations)
+- Agent Browser verified: zero hydration errors on load, navigation, and full interaction cycle
+
+Stage Summary:
+- Hydration error fully resolved
+- All 4 main components use mounted state guard pattern
+- Zero console errors on initial load and during interaction
