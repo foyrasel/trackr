@@ -72,3 +72,34 @@ Stage Summary:
 - Language toggle in both voice and text input modes
 - All quick-fill examples available in both languages
 - Fallback parser handles Bangla digits and keywords
+
+---
+Task ID: 4
+Agent: Main Agent
+Task: Improve Bangla recognition + Add average vs current expense chart
+
+Work Log:
+- Improved VoiceInput: switched from bn-BD to bn-IN (better speech model), enabled continuous mode for longer utterances
+- Added maxAlternatives=3 for better recognition confidence
+- Added retry logic when recognition fails to start
+- Added "speak slowly" hints in Bangla (ধীরে ও স্পষ্টভাবে কথা বলুন) during active listening
+- Added network error handling with Bangla message
+- Improved AI categorization: added preprocessor for common Bangla misrecognition (খরোচ→খরচ, ব্যতন→বেতন)
+- Expanded Bangla keyword mapping with common speech recognition artifacts
+- Added support for Bangla number words: "5 শ"=500, "5 হাজার"=5000, "1 লাখ"=100000
+- Added 3 more Bangla examples for imperfect recognition in AI system prompt
+- Updated analytics API: added averageMonthlyExpense, avgCategoryBreakdown, avgClassificationBreakdown
+- Added "This Month vs Average" summary card with color-coded diff badge (red=overspending, green=saving)
+- Added "Average vs Current Month" grouped bar chart comparing Needs/Wants/Ego/Savings/Debt
+- Added "Category: Current vs Average" horizontal grouped bar chart
+- Added placeholder card when no historical data exists ("Keep tracking for 2+ months")
+- Seeded April and May 2026 data for demo purposes
+- Passed ESLint checks
+- Agent Browser verified: both avg vs current charts render correctly
+
+Stage Summary:
+- Bangla recognition improved: bn-IN locale, continuous mode, retry logic, speak-slowly hints
+- AI handles imperfect Bangla recognition with correction map and expanded keyword mapping
+- Average vs Current Month comparison chart fully functional
+- Category-level comparison chart (current vs average) added
+- Color-coded spending diff indicator on dashboard
