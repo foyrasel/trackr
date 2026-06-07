@@ -48,3 +48,27 @@ Stage Summary:
 - Hydration error fully resolved
 - All 4 main components use mounted state guard pattern
 - Zero console errors on initial load and during interaction
+
+---
+Task ID: 3
+Agent: Main Agent
+Task: Add Bangla (Bengali) voice recognition support
+
+Work Log:
+- Updated VoiceInput: added language prop ('en' | 'bn'), language toggle UI, recognition.lang set to 'bn-BD' for Bangla
+- Default language set to 'bn' (Bangla) since this is a Bangladesh-focused app
+- Bangla UI text added: status messages, error messages, hints in Bangla script
+- Updated AI categorization route: comprehensive Bangla keyword mapping (টাকা, খরচ, আয়, বাজার, ভাড়া, রিকশা, etc.)
+- AI system prompt now includes 8 Bangla examples and 2 Banglish examples
+- Fallback parser updated: Bangla digit conversion (১২৩→123), লাখ (lakh) multiplier, Bangla keyword detection
+- Updated AddTransaction: language toggle in both voice and text modes, Bangla quick-fill examples
+- Toast messages localized to Bangla when language is 'bn'
+- Passed ESLint checks
+- Agent Browser verified: Bangla input "বাজারে ৫০০ টাকা খরচ" correctly categorized as Groceries/Need/৳500
+
+Stage Summary:
+- Full Bangla (bn-BD) voice recognition via Web Speech API
+- AI understands Bangla, English, and Banglish (mixed) input
+- Language toggle in both voice and text input modes
+- All quick-fill examples available in both languages
+- Fallback parser handles Bangla digits and keywords

@@ -31,13 +31,15 @@ export async function POST(request: NextRequest) {
         {
           role: 'system',
           content: `You are a financial transaction parser for a Bangladesh-focused expense tracker (currency: BDT/Taka). 
-          
+
+You support BOTH English and Bangla (Bengali) input. Users may speak in either language or a mix of both (Banglish).
+
 Given a user's voice or text input about a spending or income, extract and categorize the transaction.
 
 You MUST respond with ONLY a valid JSON object (no markdown, no explanation) with these fields:
 - "type": "expense" or "income"
 - "amount": number (the monetary amount, just the number)
-- "description": string (a clean description of the transaction)
+- "description": string (a clean description in the SAME language the user used)
 - "category": string (must be one of: ${[...CATEGORIES.expense, ...CATEGORIES.income].join(', ')})
 - "spendingType": string (must be one of: ${SPENDING_TYPES.join(', ')}) - default "cash" if not mentioned
 - "classification": string (for expenses, must be one of: ${CLASSIFICATIONS.join(', ')}; for income, use "income")
@@ -49,16 +51,47 @@ Classification guide:
 - "savings": Money saved or invested (savings account, investments, emergency fund contributions)
 - "debt": Debt repayment (loan EMI, credit card payments, borrowed money repayment)
 
-If the user says "taka" or "৳", that's BDT currency.
-If the user says "from cash", spendingType should be "cash".
-If the user says "from debit/card", spendingType should be "debit" or "credit".
-If spending method is not mentioned, default to "cash".
+Bangla keyword mapping:
+- টাকা/টাকার = taka/currency (BDT)
+- খরচ/খরচা = expense/spent
+- আয়/বেতন/সালারি = income/salary
+- বাজার/মুদি/গ্রোসারি = groceries
+- ভাড়া/বাসা ভাড়া = rent
+- পরিবহন/রিকশা/বাস/সিএনজি = transport
+- বিদ্যুৎ/গ্যাস/পানি/ইউটিলিটি = utilities
+- চিকিৎসা/ডাক্তার/ওষুধ = healthcare
+- শিক্ষা/পড়াশোনা = education
+- বিনোদন/মুভি = entertainment
+- কেনাকাটা/শপিং = shopping
+- নগদ/ক্যাশ = cash
+- ডেবিট কার্ড = debit
+- ক্রেডিট কার্ড = credit
+- ঋণ/লোন/কর্জ = debt/loan
+- সঞ্চয়/সেভিংস = savings
+- প্রয়োজন = need
+- বিলাস = want/ego
 
-Examples:
+English examples:
 - "Spent 500 taka on groceries from cash" → {"type":"expense","amount":500,"description":"Groceries","category":"Groceries","spendingType":"cash","classification":"need"}
 - "Income: 50000 salary from job" → {"type":"income","amount":50000,"description":"Monthly salary","category":"Salary","spendingType":"cash","classification":"income"}
 - "Paid 2000 for Netflix subscription" → {"type":"expense","amount":2000,"description":"Netflix subscription","category":"Subscriptions","spendingType":"cash","classification":"want"}
-- "Bought iPhone 15 Pro Max for 180000 on credit" → {"type":"expense","amount":180000,"description":"iPhone 15 Pro Max","category":"Shopping","spendingType":"credit","classification":"ego"}`
+- "Bought iPhone 15 Pro Max for 180000 on credit" → {"type":"expense","amount":180000,"description":"iPhone 15 Pro Max","category":"Shopping","spendingType":"credit","classification":"ego"}
+
+Bangla examples:
+- "বাজারে ৫০০ টাকা খরচ" → {"type":"expense","amount":500,"description":"বাজারে খরচ","category":"Groceries","spendingType":"cash","classification":"need"}
+- "বাসা ভাড়া ১৫০০০ টাকা ডেবিট কার্ডে" → {"type":"expense","amount":15000,"description":"বাসা ভাড়া","category":"Rent","spendingType":"debit","classification":"need"}
+- "বেতন পেয়েছি ৫০০০০ টাকা" → {"type":"income","amount":50000,"description":"বেতন","category":"Salary","spendingType":"cash","classification":"income"}
+- "রিকশায় ১০০ টাকা" → {"type":"expense","amount":100,"description":"রিকশা ভাড়া","category":"Transport","spendingType":"cash","classification":"need"}
+- "৫০০০ টাকা সেভ করেছি" → {"type":"expense","amount":5000,"description":"সঞ্চয়","category":"Savings","spendingType":"cash","classification":"savings"}
+- "লোনের কিস্তি ৫০০০ টাকা" → {"type":"expense","amount":5000,"description":"লোনের কিস্তি","category":"Debt","spendingType":"cash","classification":"debt"}
+- "মুভিতে ৫০০ টাকা খরচ" → {"type":"expense","amount":500,"description":"মুভিতে খরচ","category":"Entertainment","spendingType":"cash","classification":"want"}
+- "আইফোন কিনলাম ১ লাখ টাকায় ক্রেডিটে" → {"type":"expense","amount":100000,"description":"আইফোন","category":"Shopping","spendingType":"credit","classification":"ego"}
+
+Banglish (mixed) examples:
+- "bazar e 500 taka khoroche" → {"type":"expense","amount":500,"description":"বাজারে খরচ","category":"Groceries","spendingType":"cash","classification":"need"}
+- "basha bhara 15000 debit e" → {"type":"expense","amount":15000,"description":"বাসা ভাড়া","category":"Rent","spendingType":"debit","classification":"need"}
+
+IMPORTANT: For Bangla numbers (১, ২, ৩...), convert to standard digits (1, 2, 3...). For "লাখ" multiply by 100000.`
         },
         {
           role: 'user',
@@ -117,18 +150,51 @@ function extractBasicInfo(text: string): {
   spendingType: string
   classification: string
 } {
-  const isIncome = /income|salary|earned|received|got paid/i.test(text)
+  // Check for income keywords in both English and Bangla
+  const isIncome = /income|salary|earned|received|got paid|আয়|বেতন|পেয়েছি|সালারি/i.test(text)
   
-  // Try to extract amount
-  const amountMatch = text.match(/(\d[\d,]*\.?\d*)/)
-  const amount = amountMatch ? parseFloat(amountMatch[1].replace(/,/g, '')) : 0
+  // Try to extract amount - support both English and Bangla digits
+  let amount = 0
+  
+  // First try English digits
+  const englishMatch = text.match(/(\d[\d,]*\.?\d*)/)
+  if (englishMatch) {
+    amount = parseFloat(englishMatch[1].replace(/,/g, ''))
+  }
+  
+  // If no English digits, try Bangla digits
+  if (amount === 0) {
+    const banglaDigitMap: Record<string, string> = {
+      '০': '0', '১': '1', '২': '2', '৩': '3', '৪': '4',
+      '৫': '5', '৬': '6', '৭': '7', '৮': '8', '৯': '9',
+    }
+    const banglaText = text.replace(/[০-৯]/g, (d) => banglaDigitMap[d] || d)
+    const banglaMatch = banglaText.match(/(\d[\d,]*\.?\d*)/)
+    if (banglaMatch) {
+      amount = parseFloat(banglaMatch[1].replace(/,/g, ''))
+    }
+  }
+  
+  // Check for "লাখ" (lakh = 100,000)
+  if (/লাখ|lakh/i.test(text) && amount > 0 && amount < 100) {
+    amount = amount * 100000
+  }
+
+  // Simple Bangla category detection
+  let category = 'Other'
+  if (/বাজার|মুদি|গ্রোসারি|bazar|grocerie/i.test(text)) category = 'Groceries'
+  else if (/ভাড়া|bhara|rent/i.test(text)) category = 'Rent'
+  else if (/রিকশা|বাস|সিএনজি|পরিবহন|transport|rickshaw/i.test(text)) category = 'Transport'
+  else if (/বিদ্যুৎ|গ্যাস|পানি|utilities|bill/i.test(text)) category = 'Utilities'
+  else if (/ডাক্তার|ওষুধ|চিকিৎসা|doctor|health/i.test(text)) category = 'Healthcare'
+  else if (/বেতন|salary|salar/i.test(text)) category = 'Salary'
   
   return {
     type: isIncome ? 'income' : 'expense',
     amount,
     description: text,
-    category: isIncome ? 'Other' : 'Other',
-    spendingType: /debit/i.test(text) ? 'debit' : /credit/i.test(text) ? 'credit' : 'cash',
+    category,
+    spendingType: /debit|ডেবিট/i.test(text) ? 'debit' : /credit|ক্রেডিট/i.test(text) ? 'credit' : 'cash',
     classification: isIncome ? 'income' : 'need',
   }
 }

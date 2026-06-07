@@ -13,8 +13,25 @@ interface AddTransactionProps {
   onTransactionAdded: () => void
 }
 
+const BANGLA_EXAMPLES = [
+  'বাজারে ৫০০ টাকা খরচ',
+  'বাসা ভাড়া ১৫০০০ টাকা',
+  'বেতন পেয়েছি ৫০০০০ টাকা',
+  'রিকশায় ১০০ টাকা',
+  '৫০০০ টাকা সেভ করেছি',
+]
+
+const ENGLISH_EXAMPLES = [
+  'Spent 200 taka on transport',
+  'Paid 15000 rent from debit',
+  'Income 50000 salary',
+  'Bought groceries for 800 taka cash',
+  '500 taka on coffee',
+]
+
 export default function AddTransaction({ onTransactionAdded }: AddTransactionProps) {
   const [inputMode, setInputMode] = useState<'voice' | 'text'>('voice')
+  const [language, setLanguage] = useState<'en' | 'bn'>('bn') // Default to Bangla for Bangladesh
   const [textInput, setTextInput] = useState('')
   const [isProcessing, setIsProcessing] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
@@ -47,16 +64,20 @@ export default function AddTransaction({ onTransactionAdded }: AddTransactionPro
       
       if (data.fallback) {
         toast({
-          title: 'AI Unavailable',
-          description: 'Using basic categorization. AI will improve suggestions when available.',
+          title: language === 'bn' ? 'AI অনুপলব্ধ' : 'AI Unavailable',
+          description: language === 'bn' 
+            ? 'সাধারণ শ্রেণীবিভাগ ব্যবহার হচ্ছে।' 
+            : 'Using basic categorization. AI will improve suggestions when available.',
           variant: 'default',
         })
       }
     } catch (error) {
       console.error('Error processing input:', error)
       toast({
-        title: 'Error',
-        description: 'Failed to process your input. Please try again or enter manually.',
+        title: language === 'bn' ? 'ত্রুটি' : 'Error',
+        description: language === 'bn' 
+          ? 'আপনার ইনপুট প্রক্রিয়া করা যায়নি। আবার চেষ্টা করুন।' 
+          : 'Failed to process your input. Please try again or enter manually.',
         variant: 'destructive',
       })
     } finally {
@@ -78,7 +99,9 @@ export default function AddTransaction({ onTransactionAdded }: AddTransactionPro
       }
 
       toast({
-        title: data.type === 'income' ? '💰 Income Added!' : '💸 Expense Recorded!',
+        title: data.type === 'income' 
+          ? (language === 'bn' ? '💰 আয় যোগ হয়েছে!' : '💰 Income Added!') 
+          : (language === 'bn' ? '💸 খরচ রেকর্ড হয়েছে!' : '💸 Expense Recorded!'),
         description: `৳${data.amount.toLocaleString()} - ${data.description}`,
       })
 
@@ -88,8 +111,10 @@ export default function AddTransaction({ onTransactionAdded }: AddTransactionPro
     } catch (error) {
       console.error('Error saving transaction:', error)
       toast({
-        title: 'Error',
-        description: 'Failed to save transaction. Please try again.',
+        title: language === 'bn' ? 'ত্রুটি' : 'Error',
+        description: language === 'bn' 
+          ? 'লেনদেন সংরক্ষণ করা যায়নি।' 
+          : 'Failed to save transaction. Please try again.',
         variant: 'destructive',
       })
     } finally {
@@ -101,6 +126,8 @@ export default function AddTransaction({ onTransactionAdded }: AddTransactionPro
     setCategorizedData(null)
     setTextInput('')
   }
+
+  const examples = language === 'bn' ? BANGLA_EXAMPLES : ENGLISH_EXAMPLES
 
   return (
     <div className="space-y-6">
@@ -116,7 +143,7 @@ export default function AddTransaction({ onTransactionAdded }: AddTransactionPro
             }`}
           >
             <Mic className="w-4 h-4" />
-            Voice
+            {language === 'bn' ? 'ভয়েস' : 'Voice'}
           </button>
           <button
             onClick={() => setInputMode('text')}
@@ -127,7 +154,7 @@ export default function AddTransaction({ onTransactionAdded }: AddTransactionPro
             }`}
           >
             <Type className="w-4 h-4" />
-            Text
+            {language === 'bn' ? 'টেক্সট' : 'Text'}
           </button>
         </div>
       </div>
@@ -135,14 +162,32 @@ export default function AddTransaction({ onTransactionAdded }: AddTransactionPro
       {/* Voice Input */}
       {inputMode === 'voice' && !categorizedData && (
         <div className="py-8">
-          <VoiceInput onTranscript={handleTranscript} isProcessing={isProcessing} />
+          <VoiceInput 
+            onTranscript={handleTranscript} 
+            isProcessing={isProcessing}
+            language={language}
+            onLanguageChange={setLanguage}
+          />
           <div className="mt-6 text-center">
-            <p className="text-xs text-muted-foreground">
-              Try saying: &quot;Spent 500 taka on groceries from cash&quot;
-            </p>
-            <p className="text-xs text-muted-foreground mt-1">
-              or: &quot;Income 50000 salary from job&quot;
-            </p>
+            {language === 'bn' ? (
+              <>
+                <p className="text-xs text-muted-foreground">
+                  উচ্চারণ করুন: &quot;বাজারে ৫০০ টাকা খরচ&quot;
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  অথবা: &quot;বেতন পেয়েছি ৫০০০০ টাকা&quot;
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="text-xs text-muted-foreground">
+                  Try saying: &quot;Spent 500 taka on groceries from cash&quot;
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  or: &quot;Income 50000 salary from job&quot;
+                </p>
+              </>
+            )}
           </div>
         </div>
       )}
@@ -153,13 +198,40 @@ export default function AddTransaction({ onTransactionAdded }: AddTransactionPro
           <CardHeader>
             <CardTitle className="text-base flex items-center gap-2">
               <Receipt className="w-5 h-5 text-emerald-500" />
-              Describe Your Transaction
+              {language === 'bn' ? 'লেনদেন বর্ণনা করুন' : 'Describe Your Transaction'}
             </CardTitle>
           </CardHeader>
           <CardContent>
+            {/* Language toggle for text mode */}
+            <div className="flex items-center gap-2 mb-3">
+              <button
+                onClick={() => setLanguage('bn')}
+                className={`px-3 py-1 rounded-full text-xs font-medium transition-all ${
+                  language === 'bn'
+                    ? 'bg-emerald-500 text-white'
+                    : 'bg-muted text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                বাংলা
+              </button>
+              <button
+                onClick={() => setLanguage('en')}
+                className={`px-3 py-1 rounded-full text-xs font-medium transition-all ${
+                  language === 'en'
+                    ? 'bg-emerald-500 text-white'
+                    : 'bg-muted text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                English
+              </button>
+            </div>
+
             <div className="flex gap-2">
               <Input
-                placeholder="e.g., Spent 500 taka on groceries from cash"
+                placeholder={language === 'bn' 
+                  ? 'যেমন: বাজারে ৫০০ টাকা খরচ' 
+                  : 'e.g., Spent 500 taka on groceries from cash'
+                }
                 value={textInput}
                 onChange={(e) => setTextInput(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleTextSubmit()}
@@ -179,13 +251,7 @@ export default function AddTransaction({ onTransactionAdded }: AddTransactionPro
               </Button>
             </div>
             <div className="mt-3 flex flex-wrap gap-2">
-              {[
-                'Spent 200 taka on transport',
-                'Paid 15000 rent from debit',
-                'Income 50000 salary',
-                'Bought groceries for 800 taka cash',
-                '500 taka on coffee',
-              ].map((example) => (
+              {examples.map((example) => (
                 <button
                   key={example}
                   onClick={() => setTextInput(example)}
