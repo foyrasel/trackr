@@ -9,7 +9,6 @@ interface VoiceInputProps {
   isProcessing: boolean
 }
 
-// Extend Window for webkitSpeechRecognition
 interface SpeechRecognitionEvent {
   results: SpeechRecognitionResultList
   resultIndex: number
@@ -19,30 +18,34 @@ interface SpeechRecognitionErrorEvent {
   error: string
 }
 
-// Check support at module level
-function checkSpeechSupport(): boolean {
-  if (typeof window === 'undefined') return false
-  return !!(window.SpeechRecognition || window.webkitSpeechRecognition)
-}
-
 export default function VoiceInput({ onTranscript, isProcessing }: VoiceInputProps) {
-  const isSupported = checkSpeechSupport()
+  // Start false on both server and client initial render to avoid hydration mismatch
+  // After mount, detect actual support
+  const [mounted, setMounted] = useState(false)
+  const [isSupported, setIsSupported] = useState(false)
   const [isListening, setIsListening] = useState(false)
   const [transcript, setTranscript] = useState('')
   const [error, setError] = useState<string | null>(null)
   const recognitionRef = useRef<SpeechRecognition | null>(null)
   const onTranscriptRef = useRef(onTranscript)
-  
-  // Keep the ref updated via effect (not during render)
+
+  // Keep the onTranscript callback ref updated
   useEffect(() => {
     onTranscriptRef.current = onTranscript
   }, [onTranscript])
 
+  // Initialize speech recognition after mount
   useEffect(() => {
-    if (!isSupported) return
-
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
-    if (!SpeechRecognition) return
+    const supported = !!SpeechRecognition
+
+    // Use a microtask to batch state updates and avoid synchronous setState warning
+    const pending = requestAnimationFrame(() => {
+      setIsSupported(supported)
+      setMounted(true)
+    })
+
+    if (!SpeechRecognition) return pending
 
     const recognition = new SpeechRecognition()
     recognition.continuous = false
@@ -89,9 +92,10 @@ export default function VoiceInput({ onTranscript, isProcessing }: VoiceInputPro
     recognitionRef.current = recognition
 
     return () => {
+      cancelAnimationFrame(pending)
       recognition.abort()
     }
-  }, [isSupported])
+  }, [])
 
   const toggleListening = useCallback(() => {
     if (!recognitionRef.current) return
@@ -111,6 +115,18 @@ export default function VoiceInput({ onTranscript, isProcessing }: VoiceInputPro
       }
     }
   }, [isListening])
+
+  // Before mount, show loading state (matches server render)
+  if (!mounted) {
+    return (
+      <div className="flex flex-col items-center gap-4">
+        <div className="w-24 h-24 rounded-full bg-muted animate-pulse flex items-center justify-center">
+          <Mic className="w-10 h-10 text-muted-foreground" />
+        </div>
+        <p className="text-sm text-muted-foreground">Loading voice input...</p>
+      </div>
+    )
+  }
 
   return (
     <div className="flex flex-col items-center gap-4">

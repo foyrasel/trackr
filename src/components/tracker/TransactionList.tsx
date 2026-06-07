@@ -55,8 +55,14 @@ const CLASSIFICATION_BADGE: Record<string, { label: string; color: string }> = {
 export default function TransactionList({ refreshTrigger }: TransactionListProps) {
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [loading, setLoading] = useState(true)
+  const [mounted, setMounted] = useState(false)
   const [filter, setFilter] = useState<string>('all')
   const [deleteId, setDeleteId] = useState<string | null>(null)
+
+  // Mark as mounted after first client render to avoid hydration mismatch
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   const fetchTransactions = useCallback(async () => {
     try {
@@ -74,8 +80,8 @@ export default function TransactionList({ refreshTrigger }: TransactionListProps
   }, [filter])
 
   useEffect(() => {
-    fetchTransactions()
-  }, [fetchTransactions, refreshTrigger])
+    if (mounted) fetchTransactions()
+  }, [fetchTransactions, refreshTrigger, mounted])
 
   const handleDelete = async () => {
     if (!deleteId) return
@@ -97,7 +103,8 @@ export default function TransactionList({ refreshTrigger }: TransactionListProps
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
   }
 
-  if (loading) {
+  // Show loading skeleton until mounted (avoids hydration mismatch from Date/fetch)
+  if (loading || !mounted) {
     return (
       <div className="space-y-3">
         {[1, 2, 3].map((i) => (
