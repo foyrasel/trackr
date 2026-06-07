@@ -1,12 +1,14 @@
 'use client'
 
 import React, { useState, useRef, useEffect, useCallback } from 'react'
-import { Mic, MicOff, Loader2 } from 'lucide-react'
+import { Mic, MicOff, Loader2, Languages } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 
 interface VoiceInputProps {
   onTranscript: (text: string) => void
   isProcessing: boolean
+  language: 'en' | 'bn'
+  onLanguageChange: (lang: 'en' | 'bn') => void
 }
 
 interface SpeechRecognitionEvent {
@@ -18,9 +20,13 @@ interface SpeechRecognitionErrorEvent {
   error: string
 }
 
-export default function VoiceInput({ onTranscript, isProcessing }: VoiceInputProps) {
+const LANG_CONFIG = {
+  en: { code: 'en-US', label: 'English', hint: 'Listening in English...' },
+  bn: { code: 'bn-BD', label: 'বাংলা', hint: 'বাংলায় শুনছি...' },
+}
+
+export default function VoiceInput({ onTranscript, isProcessing, language, onLanguageChange }: VoiceInputProps) {
   // Start false on both server and client initial render to avoid hydration mismatch
-  // After mount, detect actual support
   const [mounted, setMounted] = useState(false)
   const [isSupported, setIsSupported] = useState(false)
   const [isListening, setIsListening] = useState(false)
@@ -28,18 +34,26 @@ export default function VoiceInput({ onTranscript, isProcessing }: VoiceInputPro
   const [error, setError] = useState<string | null>(null)
   const recognitionRef = useRef<SpeechRecognition | null>(null)
   const onTranscriptRef = useRef(onTranscript)
+  const languageRef = useRef(language)
 
-  // Keep the onTranscript callback ref updated
+  // Keep refs updated
   useEffect(() => {
     onTranscriptRef.current = onTranscript
   }, [onTranscript])
+
+  useEffect(() => {
+    languageRef.current = language
+    // Update recognition language if already created
+    if (recognitionRef.current) {
+      recognitionRef.current.lang = LANG_CONFIG[language].code
+    }
+  }, [language])
 
   // Initialize speech recognition after mount
   useEffect(() => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
     const supported = !!SpeechRecognition
 
-    // Use a microtask to batch state updates and avoid synchronous setState warning
     const pending = requestAnimationFrame(() => {
       setIsSupported(supported)
       setMounted(true)
@@ -50,7 +64,7 @@ export default function VoiceInput({ onTranscript, isProcessing }: VoiceInputPro
     const recognition = new SpeechRecognition()
     recognition.continuous = false
     recognition.interimResults = true
-    recognition.lang = 'en-US'
+    recognition.lang = LANG_CONFIG[languageRef.current].code
 
     recognition.onresult = (event: SpeechRecognitionEvent) => {
       let finalTranscript = ''
@@ -76,9 +90,13 @@ export default function VoiceInput({ onTranscript, isProcessing }: VoiceInputPro
     recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
       console.error('Speech recognition error:', event.error)
       if (event.error === 'not-allowed') {
-        setError('Microphone access denied. Please allow microphone access.')
+        setError(languageRef.current === 'bn' 
+          ? 'মাইক্রোফোন অ্যাক্সেস অস্বীকৃত। অনুগ্রহ করে মাইক্রোফোন অ্যাক্সেস দিন।' 
+          : 'Microphone access denied. Please allow microphone access.')
       } else if (event.error === 'no-speech') {
-        setError('No speech detected. Please try again.')
+        setError(languageRef.current === 'bn' 
+          ? 'কোনো কথা শোনা যায়নি। আবার চেষ্টা করুন।' 
+          : 'No speech detected. Please try again.')
       } else {
         setError(`Speech recognition error: ${event.error}`)
       }
@@ -107,14 +125,18 @@ export default function VoiceInput({ onTranscript, isProcessing }: VoiceInputPro
       setError(null)
       setTranscript('')
       try {
+        // Ensure lang is up to date before starting
+        recognitionRef.current.lang = LANG_CONFIG[language].code
         recognitionRef.current.start()
         setIsListening(true)
       } catch (err) {
         console.error('Failed to start recognition:', err)
-        setError('Failed to start voice recognition. Please try again.')
+        setError(language === 'bn' 
+          ? 'ভয়েস রিকগনিশন শুরু করা যায়নি। আবার চেষ্টা করুন।' 
+          : 'Failed to start voice recognition. Please try again.')
       }
     }
-  }, [isListening])
+  }, [isListening, language])
 
   // Before mount, show loading state (matches server render)
   if (!mounted) {
@@ -128,8 +150,37 @@ export default function VoiceInput({ onTranscript, isProcessing }: VoiceInputPro
     )
   }
 
+  const currentLang = LANG_CONFIG[language]
+
   return (
     <div className="flex flex-col items-center gap-4">
+      {/* Language Toggle */}
+      <div className="flex items-center gap-2">
+        <Languages className="w-4 h-4 text-muted-foreground" />
+        <div className="inline-flex rounded-lg border bg-card p-0.5 gap-0.5">
+          <button
+            onClick={() => onLanguageChange('en')}
+            className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${
+              language === 'en'
+                ? 'bg-emerald-500 text-white shadow-sm'
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            English
+          </button>
+          <button
+            onClick={() => onLanguageChange('bn')}
+            className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${
+              language === 'bn'
+                ? 'bg-emerald-500 text-white shadow-sm'
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            বাংলা
+          </button>
+        </div>
+      </div>
+
       {/* Microphone Button */}
       <button
         onClick={toggleListening}
@@ -164,11 +215,15 @@ export default function VoiceInput({ onTranscript, isProcessing }: VoiceInputPro
             Voice input is not supported in this browser. Please use Chrome or Edge.
           </p>
         ) : isProcessing ? (
-          <p className="text-sm text-emerald-600 font-medium">AI is processing your input...</p>
+          <p className="text-sm text-emerald-600 font-medium">
+            {language === 'bn' ? 'AI আপনার ইনপুট প্রক্রিয়া করছে...' : 'AI is processing your input...'}
+          </p>
         ) : isListening ? (
-          <p className="text-sm text-red-600 font-medium animate-pulse">Listening... Speak now</p>
+          <p className="text-sm text-red-600 font-medium animate-pulse">{currentLang.hint}</p>
         ) : (
-          <p className="text-sm text-muted-foreground">Tap to speak or type below</p>
+          <p className="text-sm text-muted-foreground">
+            {language === 'bn' ? 'ট্যাপ করে বাংলায় কথা বলুন' : 'Tap to speak or type below'}
+          </p>
         )}
       </div>
 
@@ -176,7 +231,9 @@ export default function VoiceInput({ onTranscript, isProcessing }: VoiceInputPro
       {transcript && (
         <Card className="w-full max-w-md">
           <CardContent className="p-4">
-            <p className="text-sm text-muted-foreground mb-1">You said:</p>
+            <p className="text-sm text-muted-foreground mb-1">
+              {language === 'bn' ? 'আপনি বলেছেন:' : 'You said:'}
+            </p>
             <p className="text-base font-medium">{transcript}</p>
           </CardContent>
         </Card>
