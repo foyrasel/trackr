@@ -4,7 +4,7 @@ import { NextRequest, NextResponse } from 'next/server'
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
-    const month = searchParams.get('month') // format: '2026-01'
+    const month = searchParams.get('month')
 
     const now = new Date()
     const currentMonth = month || `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
     const endDate = new Date(startDate)
     endDate.setMonth(endDate.getMonth() + 1)
 
-    // Get all transactions for the month
+    // Get all transactions for the current month
     const transactions = await db.transaction.findMany({
       where: {
         date: { gte: startDate, lt: endDate },
@@ -21,46 +21,40 @@ export async function GET(request: NextRequest) {
       orderBy: { date: 'desc' },
     })
 
-    // Separate expenses and income
     const expenses = transactions.filter(t => t.type === 'expense')
     const income = transactions.filter(t => t.type === 'income')
 
     const totalExpense = expenses.reduce((sum, t) => sum + t.amount, 0)
     const totalIncome = income.reduce((sum, t) => sum + t.amount, 0)
 
-    // 50/30/20 Breakdown (Need/Want+Ego/Savings)
     const needTotal = expenses.filter(t => t.classification === 'need').reduce((sum, t) => sum + t.amount, 0)
     const wantTotal = expenses.filter(t => t.classification === 'want').reduce((sum, t) => sum + t.amount, 0)
     const egoTotal = expenses.filter(t => t.classification === 'ego').reduce((sum, t) => sum + t.amount, 0)
     const savingsTotal = expenses.filter(t => t.classification === 'savings').reduce((sum, t) => sum + t.amount, 0)
     const debtTotal = expenses.filter(t => t.classification === 'debt').reduce((sum, t) => sum + t.amount, 0)
 
-    // Category breakdown for expenses
     const categoryBreakdown: Record<string, number> = {}
     expenses.forEach(t => {
       categoryBreakdown[t.category] = (categoryBreakdown[t.category] || 0) + t.amount
     })
 
-    // Income source breakdown
     const incomeBreakdown: Record<string, number> = {}
     income.forEach(t => {
       incomeBreakdown[t.category] = (incomeBreakdown[t.category] || 0) + t.amount
     })
 
-    // Spending type breakdown
     const spendingTypeBreakdown: Record<string, number> = {}
     expenses.forEach(t => {
       spendingTypeBreakdown[t.spendingType] = (spendingTypeBreakdown[t.spendingType] || 0) + t.amount
     })
 
-    // Daily spending trend for the month
     const dailySpending: Record<string, number> = {}
     expenses.forEach(t => {
       const day = new Date(t.date).toISOString().split('T')[0]
       dailySpending[day] = (dailySpending[day] || 0) + t.amount
     })
 
-    // Alerts / Insights
+    // Alerts
     const alerts: string[] = []
     
     if (totalIncome > 0) {
@@ -106,6 +100,41 @@ export async function GET(request: NextRequest) {
       else monthlyTrend[monthKey].expense += t.amount
     })
 
+    // Calculate average monthly expense (excluding current month)
+    const pastMonths = Object.entries(monthlyTrend)
+      .filter(([monthKey]) => monthKey !== currentMonth)
+    
+    const averageMonthlyExpense = pastMonths.length > 0
+      ? pastMonths.reduce((sum, [_, v]) => sum + v.expense, 0) / pastMonths.length
+      : 0
+
+    // Category comparison: current month vs average
+    // Get past months' category breakdown
+    const pastExpenses = allRecentTransactions.filter(t => {
+      const monthKey = new Date(t.date).toISOString().slice(0, 7)
+      return t.type === 'expense' && monthKey !== currentMonth
+    })
+
+    const pastCategoryBreakdown: Record<string, number> = {}
+    pastExpenses.forEach(t => {
+      pastCategoryBreakdown[t.category] = (pastCategoryBreakdown[t.category] || 0) + t.amount
+    })
+
+    // Average category breakdown (per month)
+    const avgCategoryBreakdown: Record<string, number> = {}
+    if (pastMonths.length > 0) {
+      Object.entries(pastCategoryBreakdown).forEach(([cat, total]) => {
+        avgCategoryBreakdown[cat] = total / pastMonths.length
+      })
+    }
+
+    // Classification comparison: current vs average
+    const pastNeed = pastExpenses.filter(t => t.classification === 'need').reduce((sum, t) => sum + t.amount, 0) / Math.max(pastMonths.length, 1)
+    const pastWant = pastExpenses.filter(t => t.classification === 'want').reduce((sum, t) => sum + t.amount, 0) / Math.max(pastMonths.length, 1)
+    const pastEgo = pastExpenses.filter(t => t.classification === 'ego').reduce((sum, t) => sum + t.amount, 0) / Math.max(pastMonths.length, 1)
+    const pastSavings = pastExpenses.filter(t => t.classification === 'savings').reduce((sum, t) => sum + t.amount, 0) / Math.max(pastMonths.length, 1)
+    const pastDebt = pastExpenses.filter(t => t.classification === 'debt').reduce((sum, t) => sum + t.amount, 0) / Math.max(pastMonths.length, 1)
+
     return NextResponse.json({
       currentMonth,
       totalExpense,
@@ -123,6 +152,15 @@ export async function GET(request: NextRequest) {
       spendingTypeBreakdown,
       dailySpending,
       monthlyTrend,
+      averageMonthlyExpense,
+      avgCategoryBreakdown,
+      avgClassificationBreakdown: {
+        need: pastNeed,
+        want: pastWant,
+        ego: pastEgo,
+        savings: pastSavings,
+        debt: pastDebt,
+      },
       alerts,
       transactionCount: transactions.length,
     })

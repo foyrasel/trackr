@@ -20,30 +20,29 @@ interface SpeechRecognitionErrorEvent {
   error: string
 }
 
+// Language configurations - try bn-IN as it often has better speech model support
 const LANG_CONFIG = {
   en: { code: 'en-US', label: 'English', hint: 'Listening in English...' },
-  bn: { code: 'bn-BD', label: 'বাংলা', hint: 'বাংলায় শুনছি...' },
+  bn: { code: 'bn-IN', label: 'বাংলা', hint: 'বাংলায় শুনছি... ধীরে কথা বলুন' },
 }
 
 export default function VoiceInput({ onTranscript, isProcessing, language, onLanguageChange }: VoiceInputProps) {
-  // Start false on both server and client initial render to avoid hydration mismatch
   const [mounted, setMounted] = useState(false)
   const [isSupported, setIsSupported] = useState(false)
   const [isListening, setIsListening] = useState(false)
   const [transcript, setTranscript] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const [retryCount, setRetryCount] = useState(0)
   const recognitionRef = useRef<SpeechRecognition | null>(null)
   const onTranscriptRef = useRef(onTranscript)
   const languageRef = useRef(language)
 
-  // Keep refs updated
   useEffect(() => {
     onTranscriptRef.current = onTranscript
   }, [onTranscript])
 
   useEffect(() => {
     languageRef.current = language
-    // Update recognition language if already created
     if (recognitionRef.current) {
       recognitionRef.current.lang = LANG_CONFIG[language].code
     }
@@ -62,28 +61,35 @@ export default function VoiceInput({ onTranscript, isProcessing, language, onLan
     if (!SpeechRecognition) return pending
 
     const recognition = new SpeechRecognition()
-    recognition.continuous = false
+    // Use continuous mode for better Bangla recognition — allows longer utterances
+    recognition.continuous = true
     recognition.interimResults = true
     recognition.lang = LANG_CONFIG[languageRef.current].code
+    // Set max alternatives to help with uncertain recognition
+    recognition.maxAlternatives = 3
+
+    let finalTranscriptAccumulator = ''
 
     recognition.onresult = (event: SpeechRecognitionEvent) => {
-      let finalTranscript = ''
       let interimTranscript = ''
 
       for (let i = event.resultIndex; i < event.results.length; i++) {
         const result = event.results[i]
         if (result.isFinal) {
-          finalTranscript += result[0].transcript
+          // Use the most confident result
+          const bestTranscript = result[0].transcript
+          finalTranscriptAccumulator += bestTranscript + ' '
+          setTranscript(finalTranscriptAccumulator.trim())
+          // Send the accumulated final transcript
+          onTranscriptRef.current(finalTranscriptAccumulator.trim())
         } else {
           interimTranscript += result[0].transcript
         }
       }
 
-      if (finalTranscript) {
-        setTranscript(finalTranscript)
-        onTranscriptRef.current(finalTranscript)
-      } else if (interimTranscript) {
-        setTranscript(interimTranscript)
+      // Show interim results as user speaks
+      if (interimTranscript) {
+        setTranscript((finalTranscriptAccumulator + interimTranscript).trim())
       }
     }
 
@@ -95,8 +101,12 @@ export default function VoiceInput({ onTranscript, isProcessing, language, onLan
           : 'Microphone access denied. Please allow microphone access.')
       } else if (event.error === 'no-speech') {
         setError(languageRef.current === 'bn' 
-          ? 'কোনো কথা শোনা যায়নি। আবার চেষ্টা করুন।' 
-          : 'No speech detected. Please try again.')
+          ? 'কোনো কথা শোনা যায়নি। ধীরে ও স্পষ্টভাবে বলুন।' 
+          : 'No speech detected. Please speak clearly and try again.')
+      } else if (event.error === 'network') {
+        setError(languageRef.current === 'bn'
+          ? 'নেটওয়ার্ক সমস্যা। ইন্টারনেট সংযোগ পরীক্ষা করুন।'
+          : 'Network error. Please check your internet connection.')
       } else {
         setError(`Speech recognition error: ${event.error}`)
       }
@@ -105,6 +115,10 @@ export default function VoiceInput({ onTranscript, isProcessing, language, onLan
 
     recognition.onend = () => {
       setIsListening(false)
+    }
+
+    recognition.onstart = () => {
+      finalTranscriptAccumulator = ''
     }
 
     recognitionRef.current = recognition
@@ -124,21 +138,40 @@ export default function VoiceInput({ onTranscript, isProcessing, language, onLan
     } else {
       setError(null)
       setTranscript('')
+      setRetryCount(0)
       try {
-        // Ensure lang is up to date before starting
         recognitionRef.current.lang = LANG_CONFIG[language].code
         recognitionRef.current.start()
         setIsListening(true)
       } catch (err) {
         console.error('Failed to start recognition:', err)
-        setError(language === 'bn' 
-          ? 'ভয়েস রিকগনিশন শুরু করা যায়নি। আবার চেষ্টা করুন।' 
-          : 'Failed to start voice recognition. Please try again.')
+        // If already started, stop and retry
+        if (retryCount < 2) {
+          setRetryCount(prev => prev + 1)
+          try {
+            recognitionRef.current.stop()
+          } catch {
+            // ignore
+          }
+          setTimeout(() => {
+            try {
+              recognitionRef.current?.start()
+              setIsListening(true)
+            } catch {
+              setError(language === 'bn' 
+                ? 'ভয়েস রিকগনিশন শুরু করা যায়নি। পেজ রিফ্রেশ করুন।' 
+                : 'Failed to start voice recognition. Please refresh the page.')
+            }
+          }, 300)
+        } else {
+          setError(language === 'bn' 
+            ? 'ভয়েস রিকগনিশন শুরু করা যায়নি। পেজ রিফ্রেশ করুন।' 
+            : 'Failed to start voice recognition. Please refresh the page.')
+        }
       }
     }
-  }, [isListening, language])
+  }, [isListening, language, retryCount])
 
-  // Before mount, show loading state (matches server render)
   if (!mounted) {
     return (
       <div className="flex flex-col items-center gap-4">
@@ -199,7 +232,6 @@ export default function VoiceInput({ onTranscript, isProcessing, language, onLan
         ) : isListening ? (
           <>
             <MicOff className="w-10 h-10" />
-            {/* Pulse animation rings */}
             <span className="absolute inset-0 rounded-full border-4 border-red-400 animate-ping opacity-30" />
             <span className="absolute inset-2 rounded-full border-2 border-red-300 animate-ping opacity-20" style={{ animationDelay: '0.3s' }} />
           </>
@@ -219,11 +251,25 @@ export default function VoiceInput({ onTranscript, isProcessing, language, onLan
             {language === 'bn' ? 'AI আপনার ইনপুট প্রক্রিয়া করছে...' : 'AI is processing your input...'}
           </p>
         ) : isListening ? (
-          <p className="text-sm text-red-600 font-medium animate-pulse">{currentLang.hint}</p>
+          <div className="space-y-1">
+            <p className="text-sm text-red-600 font-medium animate-pulse">{currentLang.hint}</p>
+            {language === 'bn' && (
+              <p className="text-[10px] text-muted-foreground">
+                ধীরে ও স্পষ্টভাবে কথা বলুন • বলা শেষে আবার ট্যাপ করুন
+              </p>
+            )}
+          </div>
         ) : (
-          <p className="text-sm text-muted-foreground">
-            {language === 'bn' ? 'ট্যাপ করে বাংলায় কথা বলুন' : 'Tap to speak or type below'}
-          </p>
+          <div className="space-y-1">
+            <p className="text-sm text-muted-foreground">
+              {language === 'bn' ? 'ট্যাপ করে বাংলায় কথা বলুন' : 'Tap to speak or type below'}
+            </p>
+            {language === 'bn' && (
+              <p className="text-[10px] text-muted-foreground">
+                ভয়েস চালু রাখতে ধীরে বলুন, বন্ধ করতে আবার ট্যাপ করুন
+              </p>
+            )}
+          </div>
         )}
       </div>
 
@@ -235,6 +281,11 @@ export default function VoiceInput({ onTranscript, isProcessing, language, onLan
               {language === 'bn' ? 'আপনি বলেছেন:' : 'You said:'}
             </p>
             <p className="text-base font-medium">{transcript}</p>
+            {isListening && (
+              <p className="text-[10px] text-muted-foreground mt-1">
+                {language === 'bn' ? 'কথা বলতে থাকুন... শেষে ট্যাপ করুন' : 'Keep speaking... tap again when done'}
+              </p>
+            )}
           </CardContent>
         </Card>
       )}
@@ -247,7 +298,6 @@ export default function VoiceInput({ onTranscript, isProcessing, language, onLan
   )
 }
 
-// Add type declarations for Web Speech API
 declare global {
   interface Window {
     SpeechRecognition: typeof SpeechRecognition
