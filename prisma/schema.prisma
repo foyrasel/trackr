@@ -14,12 +14,15 @@ model User {
   image          String?
   provider       String    @default("demo") // "google", "facebook", "demo"
   darkMode       Boolean   @default(false)
+  currency       String    @default("USD") // ISO 4217 currency code
+  currencySymbol String    @default("$") // Display symbol
   accounts       Account[]
   budgets        Budget[]
   transactions   Transaction[]
   recurringTxns  RecurringTransaction[]
   goals          Goal[]
   reminders      Reminder[]
+  lendBorrows    LendBorrow[]
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 }
@@ -119,6 +122,22 @@ model Reminder {
   frequency   String?  // "monthly", "yearly" if recurring
   isPaid      Boolean  @default(false)
   isDismissed Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model LendBorrow {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type        String   // "lend" or "borrow"
+  amount      Float    // Amount lent or borrowed
+  person      String   // Name of the person
+  description String   // Reason / note
+  date        DateTime // When the lending/borrowing happened
+  dueDate     DateTime? // When the money should be returned
+  isSettled   Boolean  @default(false) // Whether the amount has been paid back
+  settledDate DateTime? // When it was actually settled
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }
