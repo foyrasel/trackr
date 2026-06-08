@@ -13,6 +13,12 @@ export async function GET(request: NextRequest) {
     const endDate = new Date(startDate)
     endDate.setMonth(endDate.getMonth() + 1)
 
+    // Month name for display
+    const monthName = startDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+    const monthShortName = startDate.toLocaleDateString('en-US', { month: 'short' })
+    const currentYear = startDate.getFullYear()
+    const currentMonthNum = startDate.getMonth() + 1
+
     // Get all transactions for the current month
     const transactions = await db.transaction.findMany({
       where: {
@@ -80,27 +86,26 @@ export async function GET(request: NextRequest) {
       alerts.push(`Debt repayment is ${((debtTotal / totalIncome) * 100).toFixed(1)}% of income. Prioritize debt reduction.`)
     }
 
-    // Get last 6 months trend data
-    const sixMonthsAgo = new Date(now)
-    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6)
-    
-    const allRecentTransactions = await db.transaction.findMany({
-      where: {
-        date: { gte: sixMonthsAgo },
-      },
+    // Get ALL transactions for comprehensive analytics
+    const allTransactions = await db.transaction.findMany({
       orderBy: { date: 'asc' },
     })
 
-    // Monthly trend
+    // ===== MONTHLY TREND (last 12 months) =====
+    const twelveMonthsAgo = new Date(now)
+    twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12)
+    
+    const recentTransactions = allTransactions.filter(t => new Date(t.date) >= twelveMonthsAgo)
+
     const monthlyTrend: Record<string, { income: number; expense: number }> = {}
-    allRecentTransactions.forEach(t => {
+    recentTransactions.forEach(t => {
       const monthKey = new Date(t.date).toISOString().slice(0, 7)
       if (!monthlyTrend[monthKey]) monthlyTrend[monthKey] = { income: 0, expense: 0 }
       if (t.type === 'income') monthlyTrend[monthKey].income += t.amount
       else monthlyTrend[monthKey].expense += t.amount
     })
 
-    // Calculate average monthly expense (excluding current month)
+    // ===== AVERAGE MONTHLY EXPENSE (excluding current month) =====
     const pastMonths = Object.entries(monthlyTrend)
       .filter(([monthKey]) => monthKey !== currentMonth)
     
@@ -108,9 +113,8 @@ export async function GET(request: NextRequest) {
       ? pastMonths.reduce((sum, [_, v]) => sum + v.expense, 0) / pastMonths.length
       : 0
 
-    // Category comparison: current month vs average
-    // Get past months' category breakdown
-    const pastExpenses = allRecentTransactions.filter(t => {
+    // ===== PAST MONTHS CATEGORY BREAKDOWN =====
+    const pastExpenses = allTransactions.filter(t => {
       const monthKey = new Date(t.date).toISOString().slice(0, 7)
       return t.type === 'expense' && monthKey !== currentMonth
     })
@@ -135,8 +139,142 @@ export async function GET(request: NextRequest) {
     const pastSavings = pastExpenses.filter(t => t.classification === 'savings').reduce((sum, t) => sum + t.amount, 0) / Math.max(pastMonths.length, 1)
     const pastDebt = pastExpenses.filter(t => t.classification === 'debt').reduce((sum, t) => sum + t.amount, 0) / Math.max(pastMonths.length, 1)
 
+    // ===== CUMULATIVE DAILY EXPENSE DATA FOR LINE CHART =====
+    // Current month: cumulative expense by day-of-month
+    const daysInCurrentMonth = new Date(currentYear, currentMonthNum, 0).getDate()
+    const currentMonthDaily: Record<number, number> = {}
+    expenses.forEach(t => {
+      const day = new Date(t.date).getDate()
+      currentMonthDaily[day] = (currentMonthDaily[day] || 0) + t.amount
+    })
+
+    // Build cumulative data for current month
+    const currentCumulative: { day: number; cumulative: number }[] = []
+    let runningTotal = 0
+    for (let d = 1; d <= daysInCurrentMonth; d++) {
+      runningTotal += (currentMonthDaily[d] || 0)
+      currentCumulative.push({ day: d, cumulative: runningTotal })
+    }
+
+    // Average habit: cumulative daily from past months
+    // For each past month, compute cumulative daily, then average across months
+    const pastAllExpenses = allTransactions.filter(t => {
+      const tMonth = new Date(t.date).toISOString().slice(0, 7)
+      return t.type === 'expense' && tMonth !== currentMonth
+    })
+
+    // Group past expenses by month
+    const pastMonthsDaily: Record<string, Record<number, number>> = {}
+    pastAllExpenses.forEach(t => {
+      const monthKey = new Date(t.date).toISOString().slice(0, 7)
+      const day = new Date(t.date).getDate()
+      if (!pastMonthsDaily[monthKey]) pastMonthsDaily[monthKey] = {}
+      pastMonthsDaily[monthKey][day] = (pastMonthsDaily[monthKey][day] || 0) + t.amount
+    })
+
+    // Build average cumulative: for each day, average the cumulative amounts across past months
+    const avgCumulative: { day: number; cumulative: number }[] = []
+    const pastMonthKeys = Object.keys(pastMonthsDaily)
+    const maxDay = Math.max(daysInCurrentMonth, 31) // normalize to 30/31 days
+
+    if (pastMonthKeys.length > 0) {
+      // For each day number, compute average cumulative across past months
+      const avgDailyCumulative: number[] = new Array(maxDay + 1).fill(0)
+      
+      for (let d = 1; d <= maxDay; d++) {
+        let totalCumulativeAtDay = 0
+        let monthsWithData = 0
+        
+        for (const mKey of pastMonthKeys) {
+          const daysInThisMonth = new Date(
+            parseInt(mKey.split('-')[0]),
+            parseInt(mKey.split('-')[1]),
+            0
+          ).getDate()
+          
+          if (d > daysInThisMonth) continue
+          
+          // Calculate cumulative for this month up to day d
+          let cumForMonth = 0
+          for (let dd = 1; dd <= d; dd++) {
+            cumForMonth += (pastMonthsDaily[mKey][dd] || 0)
+          }
+          totalCumulativeAtDay += cumForMonth
+          monthsWithData++
+        }
+        
+        avgDailyCumulative[d] = monthsWithData > 0 ? totalCumulativeAtDay / monthsWithData : 0
+      }
+
+      for (let d = 1; d <= daysInCurrentMonth; d++) {
+        avgCumulative.push({ day: d, cumulative: Math.round(avgDailyCumulative[d]) })
+      }
+    }
+
+    // Merge for chart: [{ day, current, average }]
+    const avgVsCurrentLineData = currentCumulative.map((item) => {
+      const avgItem = avgCumulative.find(a => a.day === item.day)
+      return {
+        day: item.day,
+        current: item.cumulative,
+        average: avgItem ? avgItem.cumulative : 0,
+      }
+    })
+
+    // ===== YEARLY AVERAGES =====
+    // Group all expenses by year
+    const yearlyData: Record<number, { expense: number; income: number; months: Set<string> }> = {}
+    allTransactions.forEach(t => {
+      const year = new Date(t.date).getFullYear()
+      const monthKey = new Date(t.date).toISOString().slice(0, 7)
+      if (!yearlyData[year]) yearlyData[year] = { expense: 0, income: 0, months: new Set() }
+      yearlyData[year].months.add(monthKey)
+      if (t.type === 'expense') yearlyData[year].expense += t.amount
+      else yearlyData[year].income += t.amount
+    })
+
+    // Build yearly comparison
+    const yearlyComparison: {
+      year: number
+      label: string
+      totalExpense: number
+      totalIncome: number
+      avgMonthlyExpense: number
+      months: number
+    }[] = []
+
+    for (const [year, data] of Object.entries(yearlyData)) {
+      const numMonths = data.months.size
+      yearlyComparison.push({
+        year: parseInt(year),
+        label: parseInt(year) === currentYear ? `${year} (Current)` : year.toString(),
+        totalExpense: Math.round(data.expense),
+        totalIncome: Math.round(data.income),
+        avgMonthlyExpense: numMonths > 0 ? Math.round(data.expense / numMonths) : 0,
+        months: numMonths,
+      })
+    }
+
+    // Sort by year descending
+    yearlyComparison.sort((a, b) => b.year - a.year)
+
+    // All-time average
+    const allTimeMonths = new Set<string>()
+    let allTimeExpense = 0
+    let allTimeIncome = 0
+    allTransactions.forEach(t => {
+      const monthKey = new Date(t.date).toISOString().slice(0, 7)
+      allTimeMonths.add(monthKey)
+      if (t.type === 'expense') allTimeExpense += t.amount
+      else allTimeIncome += t.amount
+    })
+
+    const allTimeAvgMonthlyExpense = allTimeMonths.size > 0 ? Math.round(allTimeExpense / allTimeMonths.size) : 0
+
     return NextResponse.json({
       currentMonth,
+      monthName,
+      monthShortName,
       totalExpense,
       totalIncome,
       balance: totalIncome - totalExpense,
@@ -161,6 +299,14 @@ export async function GET(request: NextRequest) {
         savings: pastSavings,
         debt: pastDebt,
       },
+      // NEW: Line chart data
+      avgVsCurrentLineData,
+      // NEW: Yearly comparison
+      yearlyComparison,
+      allTimeAvgMonthlyExpense,
+      allTimeTotalExpense: Math.round(allTimeExpense),
+      allTimeTotalIncome: Math.round(allTimeIncome),
+      allTimeMonths: allTimeMonths.size,
       alerts,
       transactionCount: transactions.length,
     })

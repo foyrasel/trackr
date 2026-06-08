@@ -128,3 +128,38 @@ Stage Summary:
 - Lint passes clean
 - No runtime errors in dev log
 - All API endpoints returning 200/201
+
+---
+Task ID: 7
+Agent: Main
+Task: Add month name, average vs current line chart, yearly average comparison, improve Bangla voice
+
+Work Log:
+- Added month name display with navigation (prev/next month) to Dashboard header as a prominent green card
+- Updated analytics API to return: monthName, monthShortName, avgVsCurrentLineData (cumulative daily), yearlyComparison, allTimeAvgMonthlyExpense
+- Built Average vs Current Month LINE chart (matching user's hand-drawn picture):
+  - X-axis: Date of Month (1, 5, 10, 15, 20, 25, 30)
+  - Y-axis: Expense (cumulative)
+  - Solid green line for Current Month
+  - Dashed gray line for Average Monthly Habit
+  - Interactive tooltips, summary cards below chart
+- Added Yearly Average Comparison section with two views:
+  - Overview: All-time average card + year-by-year cards with avg monthly, total expense, total income, % change from previous year
+  - Yearly Chart: Bar chart comparing avg monthly expense across years
+- Improved Bangla voice recognition:
+  - Changed primary code from bn-IN to bn-BD (Bangladesh locale)
+  - Increased maxAlternatives from 5 to 8 for Bangla
+  - Added smart alternative selection (prioritizes results with digits/financial keywords)
+  - Added Bangla post-processing: misrecognition fixes (টগা→টাকা, খরজ→খরচ), Bangla digit conversion
+  - Increased auto-stop countdown from 15s to 20s for Bangla
+  - Increased max restart attempts from 3 to 5 for Bangla
+  - Added language-unavailable error handler with fallback
+  - Shows active language code during recording
+  - Added more Bangla voice tips
+
+Stage Summary:
+- Month name prominently displayed with prev/next navigation
+- Average vs Current Month line chart replaces the old bar chart - matches user's sketch
+- Yearly comparison shows current year, previous year, and all-time averages
+- Bangla voice recognition improved with better locale, more alternatives, smart selection, post-processing
+- Build passes clean

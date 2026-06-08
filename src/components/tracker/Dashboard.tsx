@@ -14,15 +14,20 @@ import {
   PieChart, Pie, Cell, ResponsiveContainer,
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
   AreaChart, Area,
+  LineChart, Line,
 } from 'recharts'
 import {
   TrendingUp, TrendingDown, Wallet, AlertTriangle,
-  PiggyBank, BarChart3,
+  PiggyBank, BarChart3, Calendar, ChevronLeft, ChevronRight,
+  ArrowUpRight, ArrowDownRight, Activity,
 } from 'lucide-react'
 import BalanceCards from './BalanceCards'
+import { Button } from '@/components/ui/button'
 
 interface AnalyticsData {
   currentMonth: string
+  monthName: string
+  monthShortName: string
   totalExpense: number
   totalIncome: number
   balance: number
@@ -47,6 +52,19 @@ interface AnalyticsData {
     savings: number
     debt: number
   }
+  avgVsCurrentLineData: { day: number; current: number; average: number }[]
+  yearlyComparison: {
+    year: number
+    label: string
+    totalExpense: number
+    totalIncome: number
+    avgMonthlyExpense: number
+    months: number
+  }[]
+  allTimeAvgMonthlyExpense: number
+  allTimeTotalExpense: number
+  allTimeTotalIncome: number
+  allTimeMonths: number
   alerts: string[]
   transactionCount: number
 }
@@ -71,10 +89,14 @@ const CLASSIFICATION_LABELS: Record<string, string> = {
   debt: 'Debt Repayment',
 }
 
+const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
+
 export default function Dashboard({ refreshTrigger }: DashboardProps) {
   const [data, setData] = useState<AnalyticsData | null>(null)
   const [loading, setLoading] = useState(true)
   const [mounted, setMounted] = useState(false)
+  const [selectedMonth, setSelectedMonth] = useState<string | null>(null)
+  const [yearlyView, setYearlyView] = useState<'overview' | 'yearly'>('overview')
 
   useEffect(() => {
     setMounted(true)
@@ -82,7 +104,8 @@ export default function Dashboard({ refreshTrigger }: DashboardProps) {
 
   const fetchAnalytics = useCallback(async () => {
     try {
-      const response = await fetch('/api/analytics')
+      const url = selectedMonth ? `/api/analytics?month=${selectedMonth}` : '/api/analytics'
+      const response = await fetch(url)
       if (response.ok) {
         const result = await response.json()
         setData(result)
@@ -92,7 +115,7 @@ export default function Dashboard({ refreshTrigger }: DashboardProps) {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [selectedMonth])
 
   useEffect(() => {
     if (mounted) {
@@ -100,6 +123,26 @@ export default function Dashboard({ refreshTrigger }: DashboardProps) {
       fetchAnalytics()
     }
   }, [fetchAnalytics, refreshTrigger, mounted])
+
+  const navigateMonth = (direction: -1 | 1) => {
+    const base = selectedMonth || data?.currentMonth || (() => {
+      const now = new Date()
+      return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+    })()
+    const [year, month] = base.split('-').map(Number)
+    const d = new Date(year, month - 1 + direction, 1)
+    const newMonth = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+    setSelectedMonth(newMonth)
+  }
+
+  const goToCurrentMonth = () => {
+    setSelectedMonth(null)
+  }
+
+  const isCurrentMonth = !selectedMonth || (data?.currentMonth === (() => {
+    const now = new Date()
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+  })())
 
   if (loading || !mounted) {
     return (
@@ -206,8 +249,61 @@ export default function Dashboard({ refreshTrigger }: DashboardProps) {
   const wantPercent = totalClassified > 0 ? Math.round((data.classificationBreakdown.want / totalClassified) * 100) : 0
   const egoPercent = totalClassified > 0 ? Math.round((data.classificationBreakdown.ego / totalClassified) * 100) : 0
 
+  // Yearly comparison chart data
+  const yearlyChartData = data.yearlyComparison
+    .sort((a, b) => a.year - b.year)
+    .map(y => ({
+      year: y.label,
+      avgMonthly: y.avgMonthlyExpense,
+      totalExpense: y.totalExpense,
+    }))
+
+  // Current day of month for chart reference line
+  const today = new Date()
+  const currentDayOfMonth = isCurrentMonth ? today.getDate() : new Date(parseInt(data.currentMonth.split('-')[0]), parseInt(data.currentMonth.split('-')[1]), 0).getDate()
+
   return (
     <div className="space-y-4">
+      {/* Month Navigation Header */}
+      <Card className="bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-500 text-white border-0 shadow-lg">
+        <CardContent className="p-4">
+          <div className="flex items-center justify-between">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => navigateMonth(-1)}
+              className="text-white/80 hover:text-white hover:bg-white/10 h-8 w-8 p-0"
+            >
+              <ChevronLeft className="w-5 h-5" />
+            </Button>
+            <div className="text-center">
+              <div className="flex items-center gap-2 justify-center">
+                <Calendar className="w-4 h-4 opacity-80" />
+                <h2 className="text-lg font-bold">{data.monthName}</h2>
+              </div>
+              {!isCurrentMonth && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={goToCurrentMonth}
+                  className="text-xs text-white/70 hover:text-white hover:bg-white/10 mt-0.5 h-6 px-2"
+                >
+                  Back to Current Month
+                </Button>
+              )}
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => navigateMonth(1)}
+              className="text-white/80 hover:text-white hover:bg-white/10 h-8 w-8 p-0"
+            >
+              <ChevronRight className="w-5 h-5" />
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Balance Cards - Cash, Debit, Credit */}
       <BalanceCards refreshTrigger={refreshTrigger} />
 
@@ -273,7 +369,7 @@ export default function Dashboard({ refreshTrigger }: DashboardProps) {
                   <BarChart3 className="w-5 h-5" />
                 </div>
                 <div>
-                  <p className="text-xs text-muted-foreground">This Month vs Average</p>
+                  <p className="text-xs text-muted-foreground">{data.monthShortName} vs Average Habit</p>
                   <p className="text-lg font-bold">
                     ৳{data.totalExpense.toLocaleString()}
                     <span className="text-sm font-normal text-muted-foreground mx-1">vs</span>
@@ -297,6 +393,251 @@ export default function Dashboard({ refreshTrigger }: DashboardProps) {
                 </p>
               </div>
             </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ====== AVERAGE VS CURRENT MONTH LINE CHART (like user's picture) ====== */}
+      {data.avgVsCurrentLineData.length > 0 && data.averageMonthlyExpense > 0 ? (
+        <Card className="border-2 border-blue-200 bg-gradient-to-br from-blue-50/30 to-white">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Activity className="w-4 h-4 text-blue-500" />
+              Average vs Current Month
+            </CardTitle>
+            <p className="text-xs text-muted-foreground mt-1">
+              Track your spending pace against your average monthly habit
+            </p>
+          </CardHeader>
+          <CardContent>
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart
+                  data={data.avgVsCurrentLineData}
+                  margin={{ top: 10, right: 15, left: 5, bottom: 5 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                  <XAxis
+                    dataKey="day"
+                    fontSize={11}
+                    tickFormatter={(v: number) => `${v}`}
+                    label={{ value: 'Date of Month', position: 'insideBottom', offset: -2, fontSize: 11, fill: '#6b7280' }}
+                    ticks={[1, 5, 10, 15, 20, 25, 30]}
+                  />
+                  <YAxis
+                    tickFormatter={(v: number) => `৳${(v / 1000).toFixed(0)}k`}
+                    fontSize={10}
+                    label={{ value: 'Expense', angle: -90, position: 'insideLeft', offset: 10, fontSize: 11, fill: '#6b7280' }}
+                  />
+                  <Tooltip
+                    formatter={(value: number, name: string) => [`৳${value.toLocaleString()}`, name]}
+                    labelFormatter={(label: number) => `Day ${label}`}
+                  />
+                  <Legend
+                    verticalAlign="top"
+                    height={36}
+                    formatter={(value: string) => (
+                      <span className="text-xs font-medium">{value === 'current' ? 'Current Month' : 'Average Monthly Habit'}</span>
+                    )}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="average"
+                    stroke="#94a3b8"
+                    strokeWidth={2.5}
+                    strokeDasharray="8 4"
+                    dot={false}
+                    name="average"
+                    activeDot={{ r: 4, fill: '#94a3b8' }}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="current"
+                    stroke="#10b981"
+                    strokeWidth={3}
+                    dot={false}
+                    name="current"
+                    activeDot={{ r: 5, fill: '#10b981', stroke: '#fff', strokeWidth: 2 }}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+            {/* Legend explanation below chart */}
+            <div className="mt-3 flex items-center justify-center gap-6 text-xs">
+              <div className="flex items-center gap-1.5">
+                <div className="w-6 h-0.5 bg-emerald-500 rounded" />
+                <span className="text-muted-foreground">Current Month</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <div className="w-6 h-0.5 border-t-2 border-dashed border-slate-400" />
+                <span className="text-muted-foreground">Avg Monthly Habit</span>
+              </div>
+            </div>
+            {/* Summary below chart */}
+            <div className="mt-3 grid grid-cols-2 gap-3">
+              <div className="bg-emerald-50 rounded-lg p-2.5 text-center">
+                <p className="text-[10px] text-emerald-600 font-medium">Current Month</p>
+                <p className="text-sm font-bold text-emerald-900">৳{data.totalExpense.toLocaleString()}</p>
+                <p className="text-[10px] text-emerald-600">
+                  {isCurrentMonth ? `Day ${currentDayOfMonth} of ${new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate()}` : `Full Month`}
+                </p>
+              </div>
+              <div className="bg-slate-50 rounded-lg p-2.5 text-center">
+                <p className="text-[10px] text-slate-600 font-medium">Average Habit</p>
+                <p className="text-sm font-bold text-slate-900">৳{Math.round(data.averageMonthlyExpense).toLocaleString()}</p>
+                <p className="text-[10px] text-slate-500">Per month average</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      ) : data.totalExpense > 0 ? (
+        <Card className="border-dashed border-2">
+          <CardContent className="p-6 text-center">
+            <Activity className="w-10 h-10 mx-auto text-muted-foreground mb-2" />
+            <h3 className="text-sm font-semibold mb-1">Average vs Current Month</h3>
+            <p className="text-muted-foreground text-xs">
+              Keep tracking for 2+ months to unlock the average expense comparison chart.
+            </p>
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {/* ====== YEARLY AVERAGE COMPARISON ====== */}
+      {data.yearlyComparison.length > 0 && (
+        <Card>
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Calendar className="w-4 h-4 text-violet-500" />
+                Yearly Average Comparison
+              </CardTitle>
+              <div className="flex gap-1">
+                <Button
+                  variant={yearlyView === 'overview' ? 'default' : 'ghost'}
+                  size="sm"
+                  className={`h-7 text-xs px-2.5 ${yearlyView === 'overview' ? 'bg-violet-100 text-violet-800 hover:bg-violet-200' : ''}`}
+                  onClick={() => setYearlyView('overview')}
+                >
+                  Overview
+                </Button>
+                <Button
+                  variant={yearlyView === 'yearly' ? 'default' : 'ghost'}
+                  size="sm"
+                  className={`h-7 text-xs px-2.5 ${yearlyView === 'yearly' ? 'bg-violet-100 text-violet-800 hover:bg-violet-200' : ''}`}
+                  onClick={() => setYearlyView('yearly')}
+                >
+                  Yearly Chart
+                </Button>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {yearlyView === 'overview' ? (
+              <div className="space-y-3">
+                {/* All-time Average */}
+                {data.allTimeAvgMonthlyExpense > 0 && (
+                  <div className="bg-violet-50 rounded-xl p-4 border border-violet-200">
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className="w-8 h-8 rounded-full bg-violet-100 flex items-center justify-center">
+                        <BarChart3 className="w-4 h-4 text-violet-600" />
+                      </div>
+                      <div>
+                        <p className="text-xs text-violet-600 font-medium">All-Time Average</p>
+                        <p className="text-lg font-bold text-violet-900">৳{data.allTimeAvgMonthlyExpense.toLocaleString()}<span className="text-xs font-normal text-violet-600">/month</span></p>
+                      </div>
+                    </div>
+                    <div className="flex gap-4 text-xs text-violet-600">
+                      <span>Total Expense: ৳{data.allTimeTotalExpense.toLocaleString()}</span>
+                      <span>Over {data.allTimeMonths} months</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Year by Year Cards */}
+                <div className="space-y-2">
+                  {data.yearlyComparison.map((year) => {
+                    const isCurrentYear = year.label.includes('Current')
+                    return (
+                      <div key={year.year} className={`rounded-lg p-3 border ${isCurrentYear ? 'bg-emerald-50 border-emerald-200' : 'bg-gray-50 border-gray-200'}`}>
+                        <div className="flex items-center justify-between mb-1">
+                          <div className="flex items-center gap-2">
+                            <span className="font-semibold text-sm">{year.year}</span>
+                            {isCurrentYear && (
+                              <Badge className="bg-emerald-100 text-emerald-800 border-emerald-300 text-[10px] px-1.5 py-0">Current</Badge>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-1 text-sm">
+                            {isCurrentYear ? (
+                              data.yearlyComparison.length > 1 ? (
+                                (() => {
+                                  const prevYear = data.yearlyComparison.find(y => y.year === year.year - 1)
+                                  if (prevYear && prevYear.avgMonthlyExpense > 0) {
+                                    const yearChange = ((year.avgMonthlyExpense - prevYear.avgMonthlyExpense) / prevYear.avgMonthlyExpense) * 100
+                                    return (
+                                      <Badge className={`text-[10px] px-1.5 py-0 ${yearChange > 0 ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                                        {yearChange > 0 ? <ArrowUpRight className="w-2.5 h-2.5 mr-0.5" /> : <ArrowDownRight className="w-2.5 h-2.5 mr-0.5" />}
+                                        {yearChange > 0 ? '+' : ''}{yearChange.toFixed(1)}%
+                                      </Badge>
+                                    )
+                                  }
+                                  return null
+                                })()
+                              ) : null
+                            ) : (
+                              (() => {
+                                const nextYear = data.yearlyComparison.find(y => y.year === year.year + 1)
+                                if (nextYear && year.avgMonthlyExpense > 0) {
+                                  return null
+                                }
+                                return null
+                              })()
+                            )}
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-3 gap-2 text-xs">
+                          <div>
+                            <p className="text-muted-foreground">Avg Monthly</p>
+                            <p className="font-bold">৳{year.avgMonthlyExpense.toLocaleString()}</p>
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground">Total Expense</p>
+                            <p className="font-bold">৳{year.totalExpense.toLocaleString()}</p>
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground">Total Income</p>
+                            <p className="font-bold text-emerald-700">৳{year.totalIncome.toLocaleString()}</p>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            ) : (
+              /* Yearly Chart View */
+              <div>
+                <div className="h-56">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={yearlyChartData} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="year" fontSize={11} />
+                      <YAxis tickFormatter={(v: number) => `৳${(v / 1000).toFixed(0)}k`} fontSize={10} />
+                      <Tooltip formatter={(value: number, name: string) => [`৳${value.toLocaleString()}`, name === 'avgMonthly' ? 'Avg Monthly Expense' : 'Total Expense']} />
+                      <Legend />
+                      <Bar dataKey="avgMonthly" fill="#8b5cf6" name="Avg Monthly" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="totalExpense" fill="#c4b5fd" name="Total Expense" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+                {/* All-time line */}
+                {data.allTimeAvgMonthlyExpense > 0 && (
+                  <div className="mt-3 flex items-center justify-center gap-2 text-xs text-muted-foreground">
+                    <div className="w-4 h-0.5 bg-violet-600" />
+                    <span>All-time Average: <strong>৳{data.allTimeAvgMonthlyExpense.toLocaleString()}/month</strong></span>
+                  </div>
+                )}
+              </div>
+            )}
           </CardContent>
         </Card>
       )}
@@ -368,13 +709,13 @@ export default function Dashboard({ refreshTrigger }: DashboardProps) {
         </CardContent>
       </Card>
 
-      {/* Average vs Current Month Chart */}
-      {data.averageMonthlyExpense > 0 ? (
+      {/* Classification: Current vs Average Bar Chart */}
+      {data.averageMonthlyExpense > 0 && classificationComparison.length > 0 && (
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-base flex items-center gap-2">
               <BarChart3 className="w-4 h-4 text-amber-500" />
-              Average vs Current Month
+              Classification: Current vs Average
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -397,17 +738,7 @@ export default function Dashboard({ refreshTrigger }: DashboardProps) {
             </div>
           </CardContent>
         </Card>
-      ) : data.totalExpense > 0 ? (
-        <Card className="border-dashed">
-          <CardContent className="p-6 text-center">
-            <BarChart3 className="w-10 h-10 mx-auto text-muted-foreground mb-2" />
-            <h3 className="text-sm font-semibold mb-1">Average vs Current Month</h3>
-            <p className="text-muted-foreground text-xs">
-              Keep tracking for 2+ months to unlock the average expense comparison chart.
-            </p>
-          </CardContent>
-        </Card>
-      ) : null}
+      )}
 
       {/* Category Comparison: Current vs Average */}
       {categoryComparison.length > 0 && data.averageMonthlyExpense > 0 && (
