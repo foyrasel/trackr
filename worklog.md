@@ -163,3 +163,36 @@ Stage Summary:
 - Yearly comparison shows current year, previous year, and all-time averages
 - Bangla voice recognition improved with better locale, more alternatives, smart selection, post-processing
 - Build passes clean
+
+---
+Task ID: 8
+Agent: Main
+Task: Make TransactionConfirm auto-editable, add date field with voice date parsing
+
+Work Log:
+- Removed Edit/Done button from TransactionConfirm - all fields are now always editable
+- Added Date field to TransactionConfirm with date input picker (max=today)
+- Shows "Past Date" badge and "Previous expenditure" label when date differs from today
+- Added Type toggle (Expense/Income) buttons directly on the confirmation card
+- Updated CategorizedTransaction interface to include `date: string`
+- Updated AI categorize route (`/api/ai/categorize`) with comprehensive date extraction:
+  - English: "yesterday", "N days ago", "last Friday/Monday", specific dates "5 June"
+  - Bangla: "গতকাল" (yesterday), "N দিন আগে" (N days ago), "গত শুক্রবার" (last Friday), "5 জুন"
+  - DD/MM/YYYY and DD-MM-YYYY format support
+  - AI prompt updated to extract date from voice input
+  - Regex fallback (extractDateFromText) when AI unavailable
+  - Future dates rejected, defaults to today if no date mentioned
+- Updated AddTransaction with date-aware example phrases:
+  - Bangla: "গতকাল রিকশায় ১০০ টাকা", "গত শুক্রবার বাজারে ২০০০ টাকা"
+  - English: "Paid 15000 rent from debit yesterday", "Last Friday 500 taka on coffee"
+- Added hints: "তারিখ বললে সেটা অটোমেটিক সেট হবে" / "Mention date 'yesterday', 'last Friday' — it will be auto-set"
+- Toast notification shows date for past transactions
+- Tested all date extraction: "yesterday" → 2026-06-07, "গতকাল" → 2026-06-07, "last Friday" → 2026-06-05, no date → today
+
+Stage Summary:
+- All fields auto-editable, no need to click edit button
+- Date field with picker always visible and editable
+- Voice date parsing works for English and Bangla
+- "yesterday", "গতকাল", "last Friday", "গত শুক্রবার" all auto-set the date
+- No date mentioned = today's date (correct default)
+- Build passes clean
