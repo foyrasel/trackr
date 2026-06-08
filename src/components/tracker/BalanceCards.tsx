@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/dialog'
 import { Wallet, CreditCard, Banknote, Plus, ArrowUpRight, ArrowDownRight, Edit3 } from 'lucide-react'
 import { toast } from '@/hooks/use-toast'
+import { useCurrency } from './CurrencyContext'
 
 interface Account {
   id: string
@@ -37,6 +38,7 @@ const ACCOUNT_ICONS: Record<string, React.ReactNode> = {
 }
 
 export default function BalanceCards({ refreshTrigger, onBalanceUpdate, userName }: BalanceCardsProps) {
+  const { currencySymbol } = useCurrency()
   const [accounts, setAccounts] = useState<Account[]>([])
   const [loading, setLoading] = useState(true)
   const [mounted, setMounted] = useState(false)
@@ -94,7 +96,7 @@ export default function BalanceCards({ refreshTrigger, onBalanceUpdate, userName
       if (response.ok) {
         toast({
           title: adjustType === 'add' ? 'Balance Added' : 'Balance Deducted',
-          description: `৳${amount.toLocaleString()} ${adjustType === 'add' ? 'added to' : 'deducted from'} ${editAccount.name}`,
+          description: `${currencySymbol}${amount.toLocaleString()} ${adjustType === 'add' ? 'added to' : 'deducted from'} ${editAccount.name}`,
         })
         setDialogOpen(false)
         setAdjustAmount('')
@@ -138,7 +140,7 @@ export default function BalanceCards({ refreshTrigger, onBalanceUpdate, userName
             <div>
               <p className="text-xs text-muted-foreground font-medium">Total Balance</p>
               <p className={`text-2xl font-bold ${totalBalance >= 0 ? 'text-emerald-900' : 'text-red-900'}`}>
-                ৳{totalBalance.toLocaleString()}
+                {currencySymbol}{totalBalance.toLocaleString()}
               </p>
             </div>
             <div className={`w-12 h-12 rounded-full flex items-center justify-center ${totalBalance >= 0 ? 'bg-emerald-100 text-emerald-600' : 'bg-red-100 text-red-600'}`}>
@@ -167,7 +169,7 @@ export default function BalanceCards({ refreshTrigger, onBalanceUpdate, userName
                     <Edit3 className="w-3 h-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity ml-auto" />
                   </div>
                   <p className={`text-sm font-bold ${account.type === 'credit' && account.balance > 0 ? 'text-red-600' : 'text-gray-900'}`}>
-                    {account.type === 'credit' && account.balance > 0 ? '-' : ''}৳{Math.abs(account.balance).toLocaleString()}
+                    {account.type === 'credit' && account.balance > 0 ? '-' : ''}{currencySymbol}{Math.abs(account.balance).toLocaleString()}
                   </p>
                   {account.type === 'credit' && account.balance > 0 && (
                     <p className="text-[9px] text-red-500 font-medium">Owed</p>
@@ -189,7 +191,7 @@ export default function BalanceCards({ refreshTrigger, onBalanceUpdate, userName
                 <div className="text-center">
                   <p className="text-sm text-muted-foreground">Current Balance</p>
                   <p className={`text-3xl font-bold ${account.type === 'credit' && account.balance > 0 ? 'text-red-600' : 'text-emerald-600'}`}>
-                    {account.type === 'credit' && account.balance > 0 ? '-' : ''}৳{Math.abs(account.balance).toLocaleString()}
+                    {account.type === 'credit' && account.balance > 0 ? '-' : ''}{currencySymbol}{Math.abs(account.balance).toLocaleString()}
                   </p>
                 </div>
 
@@ -213,7 +215,7 @@ export default function BalanceCards({ refreshTrigger, onBalanceUpdate, userName
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <span className="text-xl font-bold text-muted-foreground">৳</span>
+                  <span className="text-xl font-bold text-muted-foreground">{currencySymbol}</span>
                   <Input
                     type="number"
                     placeholder="Enter amount"
@@ -229,7 +231,7 @@ export default function BalanceCards({ refreshTrigger, onBalanceUpdate, userName
                   className={`w-full ${adjustType === 'add' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-red-600 hover:bg-red-700'}`}
                 >
                   <Plus className="w-4 h-4 mr-1" />
-                  {adjustType === 'add' ? 'Add' : 'Deduct'} ৳{adjustAmount ? parseFloat(adjustAmount).toLocaleString() : '0'}
+                  {adjustType === 'add' ? 'Add' : 'Deduct'} {currencySymbol}{adjustAmount ? parseFloat(adjustAmount).toLocaleString() : '0'}
                 </Button>
               </div>
             </DialogContent>

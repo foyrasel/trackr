@@ -1,36 +1,97 @@
 ---
 Task ID: 1
-Agent: Main Agent
-Task: Implement all 11 features for Trackr expense tracker (10 original + Lend/Borrow + internationalization)
+Agent: Main
+Task: Fix hardcoded ৳ currency symbol across all components + add CurrencyContext
 
 Work Log:
-- Explored existing codebase: Next.js 16, Prisma + SQLite, NextAuth, shadcn/ui, Recharts
-- Found that API routes already existed for recurring, goals, reminders, export, upload, accounts but UI components were missing
-- Updated Prisma schema: Added LendBorrow model (id, userId, type, amount, person, description, date, dueDate, isSettled, settledDate), added currency/currencySymbol fields to User model
-- Ran prisma db push to migrate schema
-- Created /api/lend-borrow route with full CRUD (GET with summary/enrichment, POST, PUT, DELETE)
-- Created /api/user route for settings (GET/PUT for darkMode, currency, currencySymbol)
-- Created /api/notifications route for weekly/monthly summary data
-- Built 4 major UI components via subagents:
-  - LendBorrowPanel.tsx - Full CRUD for lend/borrow records with summary cards, overdue tracking, settle functionality
-  - GoalsPanel.tsx - Financial goals with progress bars, emoji/color pickers, add-funds quick buttons, completion celebration
-  - RemindersPanel.tsx - Bill reminders grouped by urgency (Due Now/Upcoming/Later/Paid), recurring reminder support
-  - RecurringPanel.tsx - Recurring transactions with monthly commitment summary, next execution dates, active/inactive toggle
-- Built MorePanel.tsx - Hub component with 2-column grid menu and detail views for all sub-features (Goals, Lend/Borrow, Reminders, Recurring, Export, Accounts, Settings, Dark Mode toggle)
-- Enhanced TransactionList.tsx with search bar (debounced), category filter, date range filter, and export button
-- Updated transactions API to support search, fromDate, toDate query params
-- Updated page.tsx: New bottom nav with "More" tab replacing "Insights" tab position, dark mode toggle in header, currency badge, dark mode class management
-- Set up PWA: manifest.json, service worker (sw.js) with cache-first/network-first strategies, generated 192x192 and 512x512 icons, updated layout.tsx with PWA meta tags
-- Created use-pwa.ts hook for service worker registration and install prompt
-- Added weekly summary card in MorePanel menu view
-- Internationalized app: Removed BDT/৳ hardcoded symbols, changed to "T" logo, added 22 currencies in settings, removed Bangladesh-only references from LoginScreen and metadata
-- Updated layout.tsx metadata: global description, new keywords, PWA icon paths
-- Final build: Compiles successfully with zero errors
+- Created CurrencyContext.tsx with useCurrency() hook and CurrencyProvider
+- Replaced ~60 hardcoded ৳ symbols across 8 component files and 2 API routes
+- API routes now fetch user's currencySymbol from database
+- Added mobile wallet (📱) option to TransactionConfirm and TransactionList
+- Dashboard Payment Method Breakdown now handles mobile type
+- Wired up CurrencyProvider in page.tsx
+- Build compiles clean
 
 Stage Summary:
-- All 11 features implemented: Recurring Transactions, Search & Filter, Data Export, PWA, Dark Mode, Financial Goals, Photo Receipts (existing API), Weekly Summary, Custom Accounts, Bill Reminders, Lend/Borrow
-- App internationalized with 22 currency options
-- Build compiles cleanly with 18 routes registered
-- New components: LendBorrowPanel, GoalsPanel, RemindersPanel, RecurringPanel, MorePanel
-- New API routes: /api/lend-borrow, /api/user, /api/notifications
-- Updated schema with LendBorrow model and User currency fields
+- All components now use dynamic currencySymbol via React Context
+- 22 currencies supported with proper symbol display
+- Mobile wallet added as 4th payment method
+
+---
+Task ID: 2
+Agent: Main
+Task: Add behavioral payment method insights (Spending Psychology card)
+
+Work Log:
+- Added spendingTypeStats to analytics API (total, count, avgPerTxn per payment type)
+- Created "Spending Psychology" card in Dashboard with behavioral insight
+- Shows "You spend X% more per transaction on Credit vs Cash" message
+- Visual comparison bars and summary stat grid
+- Single payment type fallback message
+- Color scheme: Cash=emerald, Debit=blue, Credit=amber, Mobile=purple
+
+Stage Summary:
+- Unique differentiator: no competitor offers payment method behavioral insights
+- Report recommendation #6 fully implemented
+
+---
+Task ID: 3
+Agent: Main
+Task: Add 5-Day Abandoner onboarding screen
+
+Work Log:
+- Created OnboardingScreen.tsx with 4 swipeable screens
+- Screen 1: Empathy - "Tried budgeting apps before? We get it."
+- Screen 2: Voice - "Just talk. Trackr listens." (5 sec vs 45 sec comparison)
+- Screen 3: Flexibility - "Cash, Card, or Mobile — we track it all"
+- Screen 4: CTA - "Ready to give tracking another shot?"
+- Framer Motion animations, dot indicator, skip button
+- Integrated into page.tsx with localStorage persistence
+- Build compiles clean
+
+Stage Summary:
+- Report's target segment strategy fully implemented
+- "Tried budgeting apps before? This one is different. Just talk." message present
+- First-time users see onboarding, returning users skip it
+
+---
+Task ID: 4
+Agent: Main
+Task: Add Photo Receipts UI + Fix PDF Export
+
+Work Log:
+- Added receipt upload UI in TransactionConfirm (camera button, preview, remove)
+- Added receipt viewer in TransactionList (📎 indicator, full-screen dialog)
+- Added receipt upload/replace in edit dialog
+- Updated Transaction interface to include receiptUrl
+- Installed pdfkit, rewrote PDF export with proper formatting
+- PDF includes: title, date range, summary, category breakdown, transaction table
+- CSV export unchanged and working
+- Build compiles clean
+
+Stage Summary:
+- Photo receipts: full UI flow (attach → upload → preview → view)
+- PDF export: real PDF document instead of text file
+- Both CSV and PDF export work with filters
+
+---
+Task ID: 5
+Agent: Main
+Task: Add browser push notifications + recurring transaction auto-execution
+
+Work Log:
+- Created /src/lib/notifications.ts utility (requestPermission, showNotification, etc.)
+- Updated service worker with notificationclick and push event handlers
+- Created useNotificationCheck hook (overdue reminders, weekly summary)
+- Created useNotificationPermission hook
+- Added "Enable Notifications" card in MorePanel
+- Created /api/recurring/execute route for auto-processing
+- Created useRecurringExecution hook (once per session)
+- Integrated in page.tsx
+- Build compiles clean (19 routes)
+
+Stage Summary:
+- Browser notifications for overdue reminders and weekly summaries
+- Notification permission UI in MorePanel settings
+- Recurring transactions auto-execute on app load (once per session)
+- Safe idempotent execution via API route

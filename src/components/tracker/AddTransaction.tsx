@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Send, Type, Mic, Receipt } from 'lucide-react'
 import { toast } from '@/hooks/use-toast'
+import { useCurrency } from './CurrencyContext'
 
 interface AddTransactionProps {
   onTransactionAdded: () => void
@@ -31,6 +32,7 @@ const ENGLISH_EXAMPLES = [
 ]
 
 export default function AddTransaction({ onTransactionAdded, userName }: AddTransactionProps) {
+  const { currencySymbol } = useCurrency()
   const [inputMode, setInputMode] = useState<'voice' | 'text'>('voice')
   const [language, setLanguage] = useState<'en' | 'bn'>('bn') // Default to Bangla for Bangladesh
   const [textInput, setTextInput] = useState('')
@@ -110,8 +112,8 @@ export default function AddTransaction({ onTransactionAdded, userName }: AddTran
           ? (language === 'bn' ? '💰 আয় যোগ হয়েছে!' : '💰 Income Added!') 
           : (language === 'bn' ? '💸 খরচ রেকর্ড হয়েছে!' : '💸 Expense Recorded!'),
         description: isPastDate
-          ? `৳${data.amount.toLocaleString()} - ${data.description} (${new Date(data.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })})`
-          : `৳${data.amount.toLocaleString()} - ${data.description}`,
+          ? `${currencySymbol}${data.amount.toLocaleString()} - ${data.description} (${new Date(data.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })})`
+          : `${currencySymbol}${data.amount.toLocaleString()} - ${data.description}`,
       })
 
       setCategorizedData(null)

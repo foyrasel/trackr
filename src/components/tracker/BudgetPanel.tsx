@@ -23,6 +23,7 @@ import {
   AlertTriangle, TrendingDown, CheckCircle2,
 } from 'lucide-react'
 import { toast } from '@/hooks/use-toast'
+import { useCurrency } from './CurrencyContext'
 
 interface BudgetItem {
   id: string
@@ -72,6 +73,7 @@ const CATEGORY_COLORS: Record<string, string> = {
 }
 
 export default function BudgetPanel({ refreshTrigger, userName }: BudgetPanelProps) {
+  const { currencySymbol } = useCurrency()
   const [budgets, setBudgets] = useState<BudgetItem[]>([])
   const [suggestions, setSuggestions] = useState<BudgetSuggestion[]>([])
   const [totalBudget, setTotalBudget] = useState(0)
@@ -148,7 +150,7 @@ export default function BudgetPanel({ refreshTrigger, userName }: BudgetPanelPro
       if (response.ok) {
         toast({
           title: isIgnored ? 'Budget Skipped' : 'Budget Set',
-          description: `${category}: ৳${amount.toLocaleString()}/month${isIgnored ? ' (ignored)' : ''}`,
+          description: `${category}: ${currencySymbol}${amount.toLocaleString()}/month${isIgnored ? ' (ignored)' : ''}`,
         })
         fetchBudgets()
       }
@@ -252,19 +254,19 @@ export default function BudgetPanel({ refreshTrigger, userName }: BudgetPanelPro
             <div className="flex items-center justify-between mb-2">
               <div>
                 <p className="text-xs text-muted-foreground">Total Budget</p>
-                <p className="text-2xl font-bold">৳{totalBudget.toLocaleString()}</p>
+                <p className="text-2xl font-bold">{currencySymbol}{totalBudget.toLocaleString()}</p>
               </div>
               <div className="text-right">
                 <p className="text-xs text-muted-foreground">Spent</p>
                 <p className={`text-lg font-bold ${budgetUtilization > 90 ? 'text-red-600' : budgetUtilization > 70 ? 'text-amber-600' : 'text-emerald-600'}`}>
-                  ৳{totalSpent.toLocaleString()}
+                  {currencySymbol}{totalSpent.toLocaleString()}
                 </p>
               </div>
             </div>
             <div className="space-y-1">
               <div className="flex justify-between text-xs">
                 <span className="text-muted-foreground">{budgetUtilization}% used</span>
-                <span className="text-muted-foreground">৳{Math.max(totalBudget - totalSpent, 0).toLocaleString()} remaining</span>
+                <span className="text-muted-foreground">{currencySymbol}{Math.max(totalBudget - totalSpent, 0).toLocaleString()} remaining</span>
               </div>
               <div className="h-3 bg-muted rounded-full overflow-hidden">
                 <div
@@ -347,7 +349,7 @@ export default function BudgetPanel({ refreshTrigger, userName }: BudgetPanelPro
                       <p className="text-[10px] text-muted-foreground mt-0.5 ml-5">{s.reason}</p>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
-                      <span className="text-sm font-bold">৳{s.suggestedBudget.toLocaleString()}</span>
+                      <span className="text-sm font-bold">{currencySymbol}{s.suggestedBudget.toLocaleString()}</span>
                       <Button
                         size="sm"
                         variant="outline"
@@ -388,7 +390,7 @@ export default function BudgetPanel({ refreshTrigger, userName }: BudgetPanelPro
             </Select>
             <div className="flex gap-2">
               <div className="relative flex-1">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-bold">৳</span>
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-bold">{currencySymbol}</span>
                 <Input
                   type="number"
                   placeholder="Budget amount"
@@ -446,7 +448,7 @@ export default function BudgetPanel({ refreshTrigger, userName }: BudgetPanelPro
                   </div>
                   <div className="flex items-center justify-between text-xs mb-1">
                     <span className={isOverBudget ? 'text-red-600 font-medium' : 'text-muted-foreground'}>
-                      ৳{budget.spent.toLocaleString()} / ৳{budget.amount.toLocaleString()}
+                      {currencySymbol}{budget.spent.toLocaleString()} / {currencySymbol}{budget.amount.toLocaleString()}
                     </span>
                     <span className={isOverBudget ? 'text-red-600 font-bold' : isWarning ? 'text-amber-600 font-medium' : 'text-emerald-600'}>
                       {budget.percentUsed}%
@@ -463,7 +465,7 @@ export default function BudgetPanel({ refreshTrigger, userName }: BudgetPanelPro
                   {isOverBudget && (
                     <div className="flex items-center gap-1 mt-1.5 text-red-600">
                       <TrendingDown className="w-3 h-3" />
-                      <span className="text-[10px] font-medium">Over by ৳{Math.abs(budget.remaining).toLocaleString()}</span>
+                      <span className="text-[10px] font-medium">Over by {currencySymbol}{Math.abs(budget.remaining).toLocaleString()}</span>
                     </div>
                   )}
                 </CardContent>

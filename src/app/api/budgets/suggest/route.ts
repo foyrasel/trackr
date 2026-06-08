@@ -60,29 +60,32 @@ export async function GET(request: NextRequest) {
 
     // Try AI-powered budget suggestion
     try {
+      // Get user's currency symbol for the prompt
+      const dbUser = await db.user.findUnique({ where: { id: user.id } })
+      const currencySymbol = dbUser?.currencySymbol || '$'
+
       const zai = await ZAI.create()
       const completion = await zai.chat.completions.create({
         messages: [
           {
             role: 'system',
-            content: `You are a personal finance advisor for a Bangladesh expense tracker (BDT currency).
+            content: `You are a personal finance advisor for an expense tracker (${currencySymbol} currency).
 Given the user's average monthly spending by category, suggest a reasonable monthly budget for each category.
 Apply the 50/30/20 rule: 50% needs, 30% wants, 20% savings/debt.
-Consider the Bangladesh cost of living context.
 
 Respond with ONLY a valid JSON array of objects with:
 - "category": string (category name)
-- "suggestedBudget": number (monthly budget in BDT)
+- "suggestedBudget": number (monthly budget)
 - "reason": string (short reason for the suggestion, 1 line)
 
 Categories to budget for: ${Object.keys(avgCategorySpending).join(', ')}
-Average monthly total expense: ৳${totalAvgExpense.toLocaleString()}
-Average spending by category: ${Object.entries(avgCategorySpending).map(([c, a]) => `${c}: ৳${a.toLocaleString()}`).join(', ')}
-Classification breakdown: ${Object.entries(classificationTotals).map(([c, t]) => `${c}: ৳${Math.round(t / monthCount).toLocaleString()}/month`).join(', ')}`,
+Average monthly total expense: ${currencySymbol}${totalAvgExpense.toLocaleString()}
+Average spending by category: ${Object.entries(avgCategorySpending).map(([c, a]) => `${c}: ${currencySymbol}${a.toLocaleString()}`).join(', ')}
+Classification breakdown: ${Object.entries(classificationTotals).map(([c, t]) => `${c}: ${currencySymbol}${Math.round(t / monthCount).toLocaleString()}/month`).join(', ')}`,
           },
           {
             role: 'user',
-            content: `Suggest a monthly budget for ${currentMonth} based on my past spending patterns. My average monthly expense is ৳${totalAvgExpense.toLocaleString()}.`,
+            content: `Suggest a monthly budget for ${currentMonth} based on my past spending patterns. My average monthly expense is ${currencySymbol}${totalAvgExpense.toLocaleString()}.`,
           },
         ],
         temperature: 0.3,

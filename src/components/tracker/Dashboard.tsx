@@ -19,10 +19,11 @@ import {
 import {
   TrendingUp, TrendingDown, Wallet, AlertTriangle,
   PiggyBank, BarChart3, Calendar, ChevronLeft, ChevronRight,
-  ArrowUpRight, ArrowDownRight, Activity,
+  ArrowUpRight, ArrowDownRight, Activity, Brain, Lightbulb,
 } from 'lucide-react'
 import BalanceCards from './BalanceCards'
 import { Button } from '@/components/ui/button'
+import { useCurrency } from './CurrencyContext'
 
 interface AnalyticsData {
   currentMonth: string
@@ -41,6 +42,12 @@ interface AnalyticsData {
   categoryBreakdown: Record<string, number>
   incomeBreakdown: Record<string, number>
   spendingTypeBreakdown: Record<string, number>
+  spendingTypeStats: {
+    cash: { total: number; count: number; avgPerTxn: number }
+    debit: { total: number; count: number; avgPerTxn: number }
+    credit: { total: number; count: number; avgPerTxn: number }
+    mobile: { total: number; count: number; avgPerTxn: number }
+  }
   dailySpending: Record<string, number>
   monthlyTrend: Record<string, { income: number; expense: number }>
   averageMonthlyExpense: number
@@ -93,6 +100,7 @@ const CLASSIFICATION_LABELS: Record<string, string> = {
 const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
 
 export default function Dashboard({ refreshTrigger, userName }: DashboardProps) {
+  const { currencySymbol } = useCurrency()
   const [data, setData] = useState<AnalyticsData | null>(null)
   const [loading, setLoading] = useState(true)
   const [mounted, setMounted] = useState(false)
@@ -318,7 +326,7 @@ export default function Dashboard({ refreshTrigger, userName }: DashboardProps) 
               <TrendingUp className="w-4 h-4 text-emerald-600" />
               <span className="text-xs text-emerald-700 font-medium">Income</span>
             </div>
-            <p className="text-xl font-bold text-emerald-900">৳{data.totalIncome.toLocaleString()}</p>
+            <p className="text-xl font-bold text-emerald-900">{currencySymbol}{data.totalIncome.toLocaleString()}</p>
           </CardContent>
         </Card>
 
@@ -328,7 +336,7 @@ export default function Dashboard({ refreshTrigger, userName }: DashboardProps) 
               <TrendingDown className="w-4 h-4 text-red-600" />
               <span className="text-xs text-red-700 font-medium">Expense</span>
             </div>
-            <p className="text-xl font-bold text-red-900">৳{data.totalExpense.toLocaleString()}</p>
+            <p className="text-xl font-bold text-red-900">{currencySymbol}{data.totalExpense.toLocaleString()}</p>
           </CardContent>
         </Card>
 
@@ -339,7 +347,7 @@ export default function Dashboard({ refreshTrigger, userName }: DashboardProps) 
               <span className="text-xs font-medium">Net Balance</span>
             </div>
             <p className={`text-xl font-bold ${data.balance >= 0 ? 'text-emerald-900' : 'text-red-900'}`}>
-              ৳{data.balance.toLocaleString()}
+              {currencySymbol}{data.balance.toLocaleString()}
             </p>
           </CardContent>
         </Card>
@@ -374,9 +382,9 @@ export default function Dashboard({ refreshTrigger, userName }: DashboardProps) 
                 <div>
                   <p className="text-xs text-muted-foreground">{data.monthShortName} vs Average Habit</p>
                   <p className="text-lg font-bold">
-                    ৳{data.totalExpense.toLocaleString()}
+                    {currencySymbol}{data.totalExpense.toLocaleString()}
                     <span className="text-sm font-normal text-muted-foreground mx-1">vs</span>
-                    <span className="text-sm">৳{Math.round(data.averageMonthlyExpense).toLocaleString()} avg</span>
+                    <span className="text-sm">{currencySymbol}{Math.round(data.averageMonthlyExpense).toLocaleString()} avg</span>
                   </p>
                 </div>
               </div>
@@ -428,12 +436,12 @@ export default function Dashboard({ refreshTrigger, userName }: DashboardProps) 
                     ticks={[1, 5, 10, 15, 20, 25, 30]}
                   />
                   <YAxis
-                    tickFormatter={(v: number) => `৳${(v / 1000).toFixed(0)}k`}
+                    tickFormatter={(v: number) => `${currencySymbol}${(v / 1000).toFixed(0)}k`}
                     fontSize={10}
                     label={{ value: 'Expense', angle: -90, position: 'insideLeft', offset: 10, fontSize: 11, fill: '#6b7280' }}
                   />
                   <Tooltip
-                    formatter={(value: number, name: string) => [`৳${value.toLocaleString()}`, name]}
+                    formatter={(value: number, name: string) => [`${currencySymbol}${value.toLocaleString()}`, name]}
                     labelFormatter={(label: number) => `Day ${label}`}
                   />
                   <Legend
@@ -480,14 +488,14 @@ export default function Dashboard({ refreshTrigger, userName }: DashboardProps) 
             <div className="mt-3 grid grid-cols-2 gap-3">
               <div className="bg-emerald-50 rounded-lg p-2.5 text-center">
                 <p className="text-[10px] text-emerald-600 font-medium">Current Month</p>
-                <p className="text-sm font-bold text-emerald-900">৳{data.totalExpense.toLocaleString()}</p>
+                <p className="text-sm font-bold text-emerald-900">{currencySymbol}{data.totalExpense.toLocaleString()}</p>
                 <p className="text-[10px] text-emerald-600">
                   {isCurrentMonth ? `Day ${currentDayOfMonth} of ${new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate()}` : `Full Month`}
                 </p>
               </div>
               <div className="bg-slate-50 rounded-lg p-2.5 text-center">
                 <p className="text-[10px] text-slate-600 font-medium">Average Habit</p>
-                <p className="text-sm font-bold text-slate-900">৳{Math.round(data.averageMonthlyExpense).toLocaleString()}</p>
+                <p className="text-sm font-bold text-slate-900">{currencySymbol}{Math.round(data.averageMonthlyExpense).toLocaleString()}</p>
                 <p className="text-[10px] text-slate-500">Per month average</p>
               </div>
             </div>
@@ -546,11 +554,11 @@ export default function Dashboard({ refreshTrigger, userName }: DashboardProps) 
                       </div>
                       <div>
                         <p className="text-xs text-violet-600 font-medium">All-Time Average</p>
-                        <p className="text-lg font-bold text-violet-900">৳{data.allTimeAvgMonthlyExpense.toLocaleString()}<span className="text-xs font-normal text-violet-600">/month</span></p>
+                        <p className="text-lg font-bold text-violet-900">{currencySymbol}{data.allTimeAvgMonthlyExpense.toLocaleString()}<span className="text-xs font-normal text-violet-600">/month</span></p>
                       </div>
                     </div>
                     <div className="flex gap-4 text-xs text-violet-600">
-                      <span>Total Expense: ৳{data.allTimeTotalExpense.toLocaleString()}</span>
+                      <span>Total Expense: {currencySymbol}{data.allTimeTotalExpense.toLocaleString()}</span>
                       <span>Over {data.allTimeMonths} months</span>
                     </div>
                   </div>
@@ -600,15 +608,15 @@ export default function Dashboard({ refreshTrigger, userName }: DashboardProps) 
                         <div className="grid grid-cols-3 gap-2 text-xs">
                           <div>
                             <p className="text-muted-foreground">Avg Monthly</p>
-                            <p className="font-bold">৳{year.avgMonthlyExpense.toLocaleString()}</p>
+                            <p className="font-bold">{currencySymbol}{year.avgMonthlyExpense.toLocaleString()}</p>
                           </div>
                           <div>
                             <p className="text-muted-foreground">Total Expense</p>
-                            <p className="font-bold">৳{year.totalExpense.toLocaleString()}</p>
+                            <p className="font-bold">{currencySymbol}{year.totalExpense.toLocaleString()}</p>
                           </div>
                           <div>
                             <p className="text-muted-foreground">Total Income</p>
-                            <p className="font-bold text-emerald-700">৳{year.totalIncome.toLocaleString()}</p>
+                            <p className="font-bold text-emerald-700">{currencySymbol}{year.totalIncome.toLocaleString()}</p>
                           </div>
                         </div>
                       </div>
@@ -624,8 +632,8 @@ export default function Dashboard({ refreshTrigger, userName }: DashboardProps) 
                     <BarChart data={yearlyChartData} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis dataKey="year" fontSize={11} />
-                      <YAxis tickFormatter={(v: number) => `৳${(v / 1000).toFixed(0)}k`} fontSize={10} />
-                      <Tooltip formatter={(value: number, name: string) => [`৳${value.toLocaleString()}`, name === 'avgMonthly' ? 'Avg Monthly Expense' : 'Total Expense']} />
+                      <YAxis tickFormatter={(v: number) => `${currencySymbol}${(v / 1000).toFixed(0)}k`} fontSize={10} />
+                      <Tooltip formatter={(value: number, name: string) => [`${currencySymbol}${value.toLocaleString()}`, name === 'avgMonthly' ? 'Avg Monthly Expense' : 'Total Expense']} />
                       <Legend />
                       <Bar dataKey="avgMonthly" fill="#8b5cf6" name="Avg Monthly" radius={[4, 4, 0, 0]} />
                       <Bar dataKey="totalExpense" fill="#c4b5fd" name="Total Expense" radius={[4, 4, 0, 0]} />
@@ -636,7 +644,7 @@ export default function Dashboard({ refreshTrigger, userName }: DashboardProps) 
                 {data.allTimeAvgMonthlyExpense > 0 && (
                   <div className="mt-3 flex items-center justify-center gap-2 text-xs text-muted-foreground">
                     <div className="w-4 h-0.5 bg-violet-600" />
-                    <span>All-time Average: <strong>৳{data.allTimeAvgMonthlyExpense.toLocaleString()}/month</strong></span>
+                    <span>All-time Average: <strong>{currencySymbol}{data.allTimeAvgMonthlyExpense.toLocaleString()}/month</strong></span>
                   </div>
                 )}
               </div>
@@ -669,7 +677,7 @@ export default function Dashboard({ refreshTrigger, userName }: DashboardProps) 
                 <span className="w-3 h-3 rounded-full bg-emerald-500" />
                 Needs (Target: 50%)
               </span>
-              <span className="font-medium">৳{data.classificationBreakdown.need.toLocaleString()} ({needPercent}%)</span>
+              <span className="font-medium">{currencySymbol}{data.classificationBreakdown.need.toLocaleString()} ({needPercent}%)</span>
             </div>
             <Progress value={Math.min(needPercent, 100)} className="h-2.5" />
           </div>
@@ -680,7 +688,7 @@ export default function Dashboard({ refreshTrigger, userName }: DashboardProps) 
                 <span className="w-3 h-3 rounded-full bg-amber-500" />
                 Wants (Target: 30%)
               </span>
-              <span className="font-medium">৳{data.classificationBreakdown.want.toLocaleString()} ({wantPercent}%)</span>
+              <span className="font-medium">{currencySymbol}{data.classificationBreakdown.want.toLocaleString()} ({wantPercent}%)</span>
             </div>
             <Progress value={Math.min(wantPercent, 100)} className="h-2.5 [&>div]:bg-amber-500" />
           </div>
@@ -691,7 +699,7 @@ export default function Dashboard({ refreshTrigger, userName }: DashboardProps) 
                 <span className="w-3 h-3 rounded-full bg-red-500" />
                 Ego/Luxury
               </span>
-              <span className="font-medium">৳{data.classificationBreakdown.ego.toLocaleString()} ({egoPercent}%)</span>
+              <span className="font-medium">{currencySymbol}{data.classificationBreakdown.ego.toLocaleString()} ({egoPercent}%)</span>
             </div>
             <Progress value={Math.min(egoPercent, 100)} className="h-2.5 [&>div]:bg-red-500" />
           </div>
@@ -699,14 +707,14 @@ export default function Dashboard({ refreshTrigger, userName }: DashboardProps) 
           {data.classificationBreakdown.savings > 0 && (
             <div className="flex items-center gap-2 text-sm">
               <span className="w-3 h-3 rounded-full bg-sky-500" />
-              <span>Savings: ৳{data.classificationBreakdown.savings.toLocaleString()}</span>
+              <span>Savings: {currencySymbol}{data.classificationBreakdown.savings.toLocaleString()}</span>
             </div>
           )}
 
           {data.classificationBreakdown.debt > 0 && (
             <div className="flex items-center gap-2 text-sm">
               <span className="w-3 h-3 rounded-full bg-purple-500" />
-              <span>Debt: ৳{data.classificationBreakdown.debt.toLocaleString()}</span>
+              <span>Debt: {currencySymbol}{data.classificationBreakdown.debt.toLocaleString()}</span>
             </div>
           )}
         </CardContent>
@@ -727,8 +735,8 @@ export default function Dashboard({ refreshTrigger, userName }: DashboardProps) 
                 <BarChart data={classificationComparison} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="name" fontSize={11} />
-                  <YAxis tickFormatter={(v: number) => `৳${(v / 1000).toFixed(0)}k`} fontSize={10} />
-                  <Tooltip formatter={(value: number, name: string) => [`৳${value.toLocaleString()}`, name]} />
+                  <YAxis tickFormatter={(v: number) => `${currencySymbol}${(v / 1000).toFixed(0)}k`} fontSize={10} />
+                  <Tooltip formatter={(value: number, name: string) => [`${currencySymbol}${value.toLocaleString()}`, name]} />
                   <Legend />
                   <Bar dataKey="average" fill="#94a3b8" name="Avg Monthly" radius={[4, 4, 0, 0]} />
                   <Bar dataKey="current" fill="#10b981" name="This Month" radius={[4, 4, 0, 0]} />
@@ -736,8 +744,8 @@ export default function Dashboard({ refreshTrigger, userName }: DashboardProps) 
               </ResponsiveContainer>
             </div>
             <div className="mt-3 flex items-center justify-center gap-4 text-xs text-muted-foreground">
-              <span>Avg Monthly Expense: <strong>৳{Math.round(data.averageMonthlyExpense).toLocaleString()}</strong></span>
-              <span>Current: <strong>৳{data.totalExpense.toLocaleString()}</strong></span>
+              <span>Avg Monthly Expense: <strong>{currencySymbol}{Math.round(data.averageMonthlyExpense).toLocaleString()}</strong></span>
+              <span>Current: <strong>{currencySymbol}{data.totalExpense.toLocaleString()}</strong></span>
             </div>
           </CardContent>
         </Card>
@@ -754,9 +762,9 @@ export default function Dashboard({ refreshTrigger, userName }: DashboardProps) 
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={categoryComparison} layout="vertical" margin={{ left: 10 }}>
                   <CartesianGrid strokeDasharray="3 3" horizontal={false} />
-                  <XAxis type="number" tickFormatter={(v: number) => `৳${v}`} fontSize={10} />
+                  <XAxis type="number" tickFormatter={(v: number) => `${currencySymbol}${v}`} fontSize={10} />
                   <YAxis type="category" dataKey="name" width={90} fontSize={11} />
-                  <Tooltip formatter={(value: number, name: string) => [`৳${value.toLocaleString()}`, name]} />
+                  <Tooltip formatter={(value: number, name: string) => [`${currencySymbol}${value.toLocaleString()}`, name]} />
                   <Legend />
                   <Bar dataKey="average" fill="#94a3b8" name="Avg" radius={[0, 2, 2, 0]} />
                   <Bar dataKey="current" fill="#10b981" name="Current" radius={[0, 4, 4, 0]} />
@@ -792,7 +800,7 @@ export default function Dashboard({ refreshTrigger, userName }: DashboardProps) 
                       ))}
                     </Pie>
                     <Tooltip
-                      formatter={(value: number) => `৳${value.toLocaleString()}`}
+                      formatter={(value: number) => `${currencySymbol}${value.toLocaleString()}`}
                     />
                   </PieChart>
                 </ResponsiveContainer>
@@ -819,9 +827,9 @@ export default function Dashboard({ refreshTrigger, userName }: DashboardProps) 
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={categoryData} layout="vertical" margin={{ left: 10 }}>
                     <CartesianGrid strokeDasharray="3 3" horizontal={false} />
-                    <XAxis type="number" tickFormatter={(v: number) => `৳${v}`} fontSize={10} />
+                    <XAxis type="number" tickFormatter={(v: number) => `${currencySymbol}${v}`} fontSize={10} />
                     <YAxis type="category" dataKey="name" width={90} fontSize={11} />
-                    <Tooltip formatter={(value: number) => `৳${value.toLocaleString()}`} />
+                    <Tooltip formatter={(value: number) => `${currencySymbol}${value.toLocaleString()}`} />
                     <Bar dataKey="amount" fill="#10b981" radius={[0, 4, 4, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
@@ -843,8 +851,8 @@ export default function Dashboard({ refreshTrigger, userName }: DashboardProps) 
                 <AreaChart data={trendData}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="month" fontSize={11} />
-                  <YAxis tickFormatter={(v: number) => `৳${(v / 1000).toFixed(0)}k`} fontSize={10} />
-                  <Tooltip formatter={(value: number) => `৳${value.toLocaleString()}`} />
+                  <YAxis tickFormatter={(v: number) => `${currencySymbol}${(v / 1000).toFixed(0)}k`} fontSize={10} />
+                  <Tooltip formatter={(value: number) => `${currencySymbol}${value.toLocaleString()}`} />
                   <Legend />
                   <Area type="monotone" dataKey="income" stackId="1" stroke="#10b981" fill="#10b981" fillOpacity={0.2} name="Income" />
                   <Area type="monotone" dataKey="expense" stackId="2" stroke="#ef4444" fill="#ef4444" fillOpacity={0.2} name="Expense" />
@@ -866,11 +874,11 @@ export default function Dashboard({ refreshTrigger, userName }: DashboardProps) 
               {Object.entries(data.spendingTypeBreakdown).map(([type, amount]) => (
                 <div key={type} className="flex items-center gap-2 bg-muted rounded-lg px-4 py-2">
                   <span className="text-lg">
-                    {type === 'cash' ? '💵' : type === 'debit' ? '💳' : '💳'}
+                    {type === 'cash' ? '💵' : type === 'debit' ? '💳' : type === 'mobile' ? '📱' : '💳'}
                   </span>
                   <div>
                     <p className="text-xs text-muted-foreground capitalize">{type}</p>
-                    <p className="font-bold text-sm">৳{amount.toLocaleString()}</p>
+                    <p className="font-bold text-sm">{currencySymbol}{amount.toLocaleString()}</p>
                   </div>
                 </div>
               ))}
@@ -878,6 +886,175 @@ export default function Dashboard({ refreshTrigger, userName }: DashboardProps) 
           </CardContent>
         </Card>
       )}
+
+      {/* Spending Psychology - Behavioral Insights */}
+      {(() => {
+        const stats = data.spendingTypeStats
+        const activeTypes = (['cash', 'debit', 'credit', 'mobile'] as const).filter(
+          (type) => stats[type].count > 0
+        )
+
+        if (activeTypes.length === 0) return null
+
+        if (activeTypes.length === 1) {
+          return (
+            <Card className="border-2 border-dashed border-amber-300 bg-gradient-to-br from-amber-50/50 to-white">
+              <CardContent className="p-6 text-center">
+                <div className="flex justify-center mb-3">
+                  <div className="w-12 h-12 rounded-full bg-amber-100 flex items-center justify-center">
+                    <Brain className="w-6 h-6 text-amber-600" />
+                  </div>
+                </div>
+                <h3 className="text-base font-semibold mb-1.5">Spending Psychology</h3>
+                <p className="text-sm text-muted-foreground">
+                  Add transactions with different payment methods to unlock behavioral insights
+                </p>
+              </CardContent>
+            </Card>
+          )
+        }
+
+        // Find the highest and lowest avg per transaction
+        let maxAvgType = activeTypes[0]
+        let minAvgType = activeTypes[0]
+        activeTypes.forEach((type) => {
+          if (stats[type].avgPerTxn > stats[maxAvgType].avgPerTxn) maxAvgType = type
+          if (stats[type].avgPerTxn < stats[minAvgType].avgPerTxn) minAvgType = type
+        })
+
+        const percentMore =
+          stats[minAvgType].avgPerTxn > 0
+            ? Math.round(
+                ((stats[maxAvgType].avgPerTxn - stats[minAvgType].avgPerTxn) /
+                  stats[minAvgType].avgPerTxn) *
+                  100
+              )
+            : 0
+
+        const PAYMENT_COLORS: Record<string, string> = {
+          cash: '#10b981',
+          debit: '#3b82f6',
+          credit: '#f59e0b',
+          mobile: '#8b5cf6',
+        }
+        const PAYMENT_LABELS: Record<string, string> = {
+          cash: 'Cash',
+          debit: 'Debit',
+          credit: 'Credit Card',
+          mobile: 'Mobile',
+        }
+        const PAYMENT_ICONS: Record<string, string> = {
+          cash: '💵',
+          debit: '💳',
+          credit: '💳',
+          mobile: '📱',
+        }
+
+        const barData = activeTypes.map((type) => ({
+          name: PAYMENT_LABELS[type],
+          avgPerTxn: stats[type].avgPerTxn,
+          fill: PAYMENT_COLORS[type],
+        }))
+
+        const maxAvgForScale = Math.max(...activeTypes.map((t) => stats[t].avgPerTxn), 1)
+
+        return (
+          <Card className="border-2 border-amber-200 bg-gradient-to-br from-amber-50/30 via-white to-orange-50/20">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base flex items-center gap-2">
+                <div className="w-7 h-7 rounded-full bg-amber-100 flex items-center justify-center">
+                  <Brain className="w-4 h-4 text-amber-600" />
+                </div>
+                Spending Psychology
+              </CardTitle>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                How your payment method affects spending behavior
+              </p>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {/* Key Insight */}
+              {percentMore > 0 && maxAvgType !== minAvgType && (
+                <div className="bg-gradient-to-r from-amber-100 to-orange-100 rounded-xl p-4 border border-amber-200">
+                  <div className="flex items-start gap-3">
+                    <div className="w-8 h-8 rounded-full bg-amber-200 flex items-center justify-center flex-shrink-0 mt-0.5">
+                      <Lightbulb className="w-4 h-4 text-amber-700" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold text-amber-900">
+                        You spend {percentMore}% more per transaction on {PAYMENT_LABELS[maxAvgType]} vs {PAYMENT_LABELS[minAvgType]}
+                      </p>
+                      <p className="text-xs text-amber-700 mt-1">
+                        Average {PAYMENT_LABELS[maxAvgType]} transaction: {currencySymbol}{stats[maxAvgType].avgPerTxn.toLocaleString()} vs {PAYMENT_LABELS[minAvgType]}: {currencySymbol}{stats[minAvgType].avgPerTxn.toLocaleString()}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Visual Comparison Bars */}
+              <div className="space-y-3">
+                {activeTypes
+                  .sort((a, b) => stats[b].avgPerTxn - stats[a].avgPerTxn)
+                  .map((type) => {
+                    const barWidth = Math.max(
+                      (stats[type].avgPerTxn / maxAvgForScale) * 100,
+                      4
+                    )
+                    return (
+                      <div key={type} className="space-y-1">
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="flex items-center gap-1.5 font-medium">
+                            <span className="text-sm">{PAYMENT_ICONS[type]}</span>
+                            {PAYMENT_LABELS[type]}
+                            <span className="text-xs text-muted-foreground font-normal">
+                              ({stats[type].count} txn{stats[type].count !== 1 ? 's' : ''})
+                            </span>
+                          </span>
+                          <span className="font-bold" style={{ color: PAYMENT_COLORS[type] }}>
+                            {currencySymbol}{stats[type].avgPerTxn.toLocaleString()}
+                          </span>
+                        </div>
+                        <div className="h-3 bg-muted/50 rounded-full overflow-hidden">
+                          <div
+                            className="h-full rounded-full transition-all duration-700"
+                            style={{
+                              width: `${barWidth}%`,
+                              backgroundColor: PAYMENT_COLORS[type],
+                            }}
+                          />
+                        </div>
+                      </div>
+                    )
+                  })}
+              </div>
+
+              {/* Summary Stats */}
+              <div className="grid grid-cols-2 gap-3 pt-1">
+                {activeTypes.map((type) => (
+                  <div
+                    key={type}
+                    className="rounded-lg p-3 border"
+                    style={{
+                      backgroundColor: `${PAYMENT_COLORS[type]}08`,
+                      borderColor: `${PAYMENT_COLORS[type]}30`,
+                    }}
+                  >
+                    <p className="text-[10px] font-medium uppercase tracking-wide" style={{ color: PAYMENT_COLORS[type] }}>
+                      {PAYMENT_ICONS[type]} {PAYMENT_LABELS[type]}
+                    </p>
+                    <p className="text-sm font-bold mt-0.5">
+                      {currencySymbol}{stats[type].total.toLocaleString()}
+                    </p>
+                    <p className="text-[10px] text-muted-foreground">
+                      avg {currencySymbol}{stats[type].avgPerTxn.toLocaleString()}/txn
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )
+      })()}
 
       {/* Empty State */}
       {data.totalExpense === 0 && data.totalIncome === 0 && (
