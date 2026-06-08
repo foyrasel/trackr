@@ -16,17 +16,17 @@ interface AddTransactionProps {
 const BANGLA_EXAMPLES = [
   'বাজারে ৫০০ টাকা খরচ',
   'বাসা ভাড়া ১৫০০০ টাকা',
+  'গতকাল রিকশায় ১০০ টাকা',
   'বেতন পেয়েছি ৫০০০০ টাকা',
-  'রিকশায় ১০০ টাকা',
-  '৫০০০ টাকা সেভ করেছি',
+  'গত শুক্রবার বাজারে ২০০০ টাকা',
 ]
 
 const ENGLISH_EXAMPLES = [
   'Spent 200 taka on transport',
-  'Paid 15000 rent from debit',
+  'Paid 15000 rent from debit yesterday',
   'Income 50000 salary',
   'Bought groceries for 800 taka cash',
-  '500 taka on coffee',
+  'Last Friday 500 taka on coffee',
 ]
 
 export default function AddTransaction({ onTransactionAdded }: AddTransactionProps) {
@@ -98,11 +98,15 @@ export default function AddTransaction({ onTransactionAdded }: AddTransactionPro
         throw new Error('Failed to save transaction')
       }
 
+      const today = new Date().toISOString().split('T')[0]
+      const isPastDate = data.date && data.date !== today
       toast({
         title: data.type === 'income' 
           ? (language === 'bn' ? '💰 আয় যোগ হয়েছে!' : '💰 Income Added!') 
           : (language === 'bn' ? '💸 খরচ রেকর্ড হয়েছে!' : '💸 Expense Recorded!'),
-        description: `৳${data.amount.toLocaleString()} - ${data.description}`,
+        description: isPastDate
+          ? `৳${data.amount.toLocaleString()} - ${data.description} (${new Date(data.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })})`
+          : `৳${data.amount.toLocaleString()} - ${data.description}`,
       })
 
       setCategorizedData(null)
@@ -175,7 +179,10 @@ export default function AddTransaction({ onTransactionAdded }: AddTransactionPro
                   উচ্চারণ করুন: &quot;বাজারে ৫০০ টাকা খরচ&quot;
                 </p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  অথবা: &quot;বেতন পেয়েছি ৫০০০০ টাকা&quot;
+                  অথবা: &quot;গতকাল রিকশায় ১০০ টাকা&quot;
+                </p>
+                <p className="text-[10px] text-blue-500 mt-1">
+                  তারিখ বললে সেটা অটোমেটিক সেট হবে
                 </p>
               </>
             ) : (
@@ -184,7 +191,10 @@ export default function AddTransaction({ onTransactionAdded }: AddTransactionPro
                   Try saying: &quot;Spent 500 taka on groceries from cash&quot;
                 </p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  or: &quot;Income 50000 salary from job&quot;
+                  or: &quot;Paid 200 taka yesterday for transport&quot;
+                </p>
+                <p className="text-[10px] text-blue-500 mt-1">
+                  Mention date &quot;yesterday&quot;, &quot;last Friday&quot; — it will be auto-set
                 </p>
               </>
             )}
@@ -229,8 +239,8 @@ export default function AddTransaction({ onTransactionAdded }: AddTransactionPro
             <div className="flex gap-2">
               <Input
                 placeholder={language === 'bn' 
-                  ? 'যেমন: বাজারে ৫০০ টাকা খরচ' 
-                  : 'e.g., Spent 500 taka on groceries from cash'
+                  ? 'যেমন: গতকাল বাজারে ৫০০ টাকা খরচ' 
+                  : 'e.g., Spent 500 taka on groceries yesterday'
                 }
                 value={textInput}
                 onChange={(e) => setTextInput(e.target.value)}
