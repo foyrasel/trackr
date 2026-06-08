@@ -61,6 +61,14 @@ export default function AddTransaction({ onTransactionAdded, userName }: AddTran
       })
 
       if (!response.ok) {
+        // API error — try to use fallback from error response
+        try {
+          const errorData = await response.json()
+          if (errorData.result) {
+            setCategorizedData(errorData.result)
+            return
+          }
+        } catch {}
         throw new Error('Failed to categorize')
       }
 

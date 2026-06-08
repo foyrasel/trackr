@@ -199,8 +199,10 @@ function extractDateFromText(text: string): string | null {
 }
 
 export async function POST(request: NextRequest) {
+  let text = ''
   try {
-    const { text } = await request.json()
+    const body = await request.json()
+    text = body.text || ''
 
     if (!text || typeof text !== 'string') {
       return NextResponse.json({ error: 'Text input is required' }, { status: 400 })
@@ -212,7 +214,14 @@ export async function POST(request: NextRequest) {
     // Try to extract date from the input
     const extractedDate = extractDateFromText(text)
 
-    const zai = await ZAI.create()
+    let zai
+    try {
+      zai = await ZAI.create()
+    } catch (sdkError) {
+      console.error('ZAI SDK init failed, using fallback:', sdkError)
+      const fallbackResult = extractBasicInfo(text)
+      return NextResponse.json({ result: fallbackResult, fallback: true })
+    }
 
     const completion = await zai.chat.completions.create({
       messages: [
@@ -366,7 +375,7 @@ IMPORTANT RULES:
     return NextResponse.json({ result })
   } catch (error) {
     console.error('Error categorizing transaction:', error)
-    const fallbackResult = extractBasicInfo(text || '')
+    const fallbackResult = extractBasicInfo(text || 'expense 0 other')
     return NextResponse.json({ result: fallbackResult, fallback: true })
   }
 }
