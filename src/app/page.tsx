@@ -5,12 +5,13 @@ import { useSession, signOut } from 'next-auth/react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import AddTransaction from '@/components/tracker/AddTransaction'
 import Dashboard from '@/components/tracker/Dashboard'
 import TransactionList from '@/components/tracker/TransactionList'
 import BudgetPanel from '@/components/tracker/BudgetPanel'
 import LoginScreen from '@/components/tracker/LoginScreen'
-import { LayoutDashboard, Plus, History, Lightbulb, Target, LogOut } from 'lucide-react'
+import { LayoutDashboard, Plus, History, Lightbulb, Target, LogOut, Loader2 } from 'lucide-react'
 import InsightsPanel from '@/components/tracker/InsightsPanel'
 
 export default function Home() {
@@ -18,6 +19,7 @@ export default function Home() {
   const [refreshTrigger, setRefreshTrigger] = useState(0)
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [userName, setUserName] = useState('')
+  const [userImage, setUserImage] = useState<string | null>(null)
   const [userId, setUserId] = useState<string | null>(null)
   const [mounted, setMounted] = useState(false)
 
@@ -28,26 +30,19 @@ export default function Home() {
     setMounted(true)
   }, [])
 
-  // Check for next-auth session
+  // Check for next-auth session (handles Google/Facebook OAuth redirect)
   useEffect(() => {
     if (status === 'authenticated' && session?.user) {
       setUserName(session.user.name || 'User')
+      setUserImage(session.user.image || null)
       setIsLoggedIn(true)
-      // Try to get userId from our API
-      fetch('/api/accounts', {
-        headers: { 'x-user-name': session.user.name || '' },
-      })
-        .then(res => res.json())
-        .then(data => {
-          if (data.userId) setUserId(data.userId)
-        })
-        .catch(console.error)
+      localStorage.setItem('trackr_user_name', session.user.name || 'User')
     }
   }, [session, status])
 
   // Check for existing session on mount (localStorage fallback for demo mode)
   useEffect(() => {
-    if (status !== 'authenticated') {
+    if (status !== 'authenticated' && status !== 'loading') {
       const savedName = localStorage.getItem('trackr_user_name')
       if (savedName) {
         requestAnimationFrame(() => {
@@ -81,6 +76,7 @@ export default function Home() {
   const handleLogout = async () => {
     localStorage.removeItem('trackr_user_name')
     setUserName('')
+    setUserImage(null)
     setUserId(null)
     setIsLoggedIn(false)
     try {
@@ -97,10 +93,33 @@ export default function Home() {
     }, 300)
   }
 
+  // Show loading while session is being checked (important for OAuth redirect)
+  if (!mounted || status === 'loading') {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-teal-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 rounded-2xl bg-emerald-500 flex items-center justify-center mx-auto mb-4 shadow-lg shadow-emerald-500/30">
+            <span className="text-white text-3xl font-bold">৳</span>
+          </div>
+          <Loader2 className="w-6 h-6 animate-spin text-emerald-500 mx-auto" />
+          <p className="text-sm text-muted-foreground mt-2">Loading...</p>
+        </div>
+      </div>
+    )
+  }
+
   // Show login screen if not logged in
   if (!isLoggedIn) {
     return <LoginScreen onLogin={handleLogin} />
   }
+
+  // Get user initials for avatar fallback
+  const userInitials = userName
+    .split(' ')
+    .map(n => n[0])
+    .join('')
+    .toUpperCase()
+    .slice(0, 2)
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-emerald-50/30">
@@ -122,6 +141,12 @@ export default function Home() {
             <Badge variant="outline" className="text-[10px] bg-emerald-50 text-emerald-700 border-emerald-200">
               BDT
             </Badge>
+            {userImage && (
+              <Avatar className="h-7 w-7">
+                <AvatarImage src={userImage} alt={userName} />
+                <AvatarFallback className="text-[10px] bg-emerald-100 text-emerald-700">{userInitials}</AvatarFallback>
+              </Avatar>
+            )}
             <Button variant="ghost" size="sm" onClick={handleLogout} className="text-muted-foreground hover:text-destructive h-8 w-8 p-0">
               <LogOut className="w-4 h-4" />
             </Button>

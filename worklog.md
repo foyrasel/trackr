@@ -31,3 +31,26 @@ Stage Summary:
 - Transaction editing is fully functional with balance adjustment logic
 - Pagination added with Load More button
 - Build compiles without errors
+
+---
+Task ID: 2
+Agent: Super Z (main)
+Task: Improve OAuth flow, add env setup guide, improve login UX
+
+Work Log:
+- Reviewed entire project codebase to assess current auth implementation state
+- Found that all core auth features were already implemented in previous session
+- Updated next-auth route to only include OAuth providers when real credentials are configured (no more dummy providers causing errors)
+- Added NEXT_PUBLIC_GOOGLE_CONFIGURED and NEXT_PUBLIC_FACEBOOK_CONFIGURED env flags via next.config.ts
+- Updated LoginScreen to show "(setup needed)" indicator when OAuth is not configured
+- Updated page.tsx to show loading spinner during session check (important for OAuth redirect flow)
+- Added user avatar display in header when logged in via OAuth (Google/Facebook profile picture)
+- Created .env.example file with setup instructions for Google and Facebook OAuth credentials
+- Build passes successfully
+
+Stage Summary:
+- OAuth providers are only loaded when real credentials exist (prevents errors from dummy values)
+- Login screen shows clear indicators when OAuth setup is needed
+- Session loading state properly handles OAuth redirect callback
+- User avatar from Google/Facebook shown in header
+- .env.example provides step-by-step guide for OAuth setup
