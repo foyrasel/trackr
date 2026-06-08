@@ -1,5 +1,6 @@
-generator client {
+﻿generator client {
   provider = "prisma-client-js"
+  previewFeatures = ["driverAdapters"]
 }
 
 datasource db {
@@ -36,7 +37,7 @@ model Account {
   type      String   // "cash", "debit", "credit", "mobile" (bKash/Nagad)
   balance   Float    @default(0)
   color     String   @default("#10b981")
-  icon      String   @default("💵")
+  icon      String   @default("ðŸ’µ")
   isDefault Boolean  @default(false)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -103,7 +104,7 @@ model Goal {
   targetAmount Float    // Goal amount in BDT
   savedAmount  Float    @default(0) // How much saved so far
   deadline     DateTime? // Target date
-  icon         String   @default("🎯")
+  icon         String   @default("ðŸŽ¯")
   color        String   @default("#10b981")
   isCompleted  Boolean  @default(false)
   createdAt    DateTime @default(now())
@@ -142,3 +143,4 @@ model LendBorrow {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }
+
