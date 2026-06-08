@@ -4,48 +4,65 @@ import FacebookProvider from 'next-auth/providers/facebook'
 import CredentialsProvider from 'next-auth/providers/credentials'
 import { db } from '@/lib/db'
 
-export const authOptions: NextAuthOptions = {
-  providers: [
-    // Google OAuth - requires GOOGLE_ID and GOOGLE_SECRET env vars
-    GoogleProvider({
-      clientId: process.env.GOOGLE_ID || 'dummy-google-id',
-      clientSecret: process.env.GOOGLE_SECRET || 'dummy-google-secret',
-    }),
-    // Facebook OAuth - requires FACEBOOK_ID and FACEBOOK_SECRET env vars
-    FacebookProvider({
-      clientId: process.env.FACEBOOK_ID || 'dummy-facebook-id',
-      clientSecret: process.env.FACEBOOK_SECRET || 'dummy-facebook-secret',
-    }),
-    // Demo credentials provider for easy testing without OAuth setup
-    CredentialsProvider({
-      name: 'Demo Login',
-      credentials: {
-        name: { label: 'Name', type: 'text', placeholder: 'Your name' },
-      },
-      async authorize(credentials) {
-        if (!credentials?.name) return null
+// Only include OAuth providers if they have real (non-dummy) credentials
+const providers = []
 
-        let user = await db.user.findFirst({ where: { name: credentials.name } })
-        if (!user) {
-          user = await db.user.create({
-            data: {
-              name: credentials.name,
-              provider: 'demo',
-            },
-          })
-          // Create default accounts for new user
-          await db.account.createMany({
-            data: [
-              { userId: user.id, name: 'Cash', type: 'cash', balance: 0, color: '#10b981', icon: '💵', isDefault: true },
-              { userId: user.id, name: 'Debit Card', type: 'debit', balance: 0, color: '#3b82f6', icon: '💳', isDefault: false },
-              { userId: user.id, name: 'Credit Card', type: 'credit', balance: 0, color: '#8b5cf6', icon: '💳', isDefault: false },
-            ],
-          })
-        }
-        return { id: user.id, name: user.name, email: user.email, image: user.image }
-      },
-    }),
-  ],
+if (process.env.GOOGLE_ID && process.env.GOOGLE_SECRET &&
+    process.env.GOOGLE_ID !== 'dummy-google-id' &&
+    process.env.GOOGLE_ID !== 'your-google-client-id') {
+  providers.push(
+    GoogleProvider({
+      clientId: process.env.GOOGLE_ID,
+      clientSecret: process.env.GOOGLE_SECRET,
+    })
+  )
+}
+
+if (process.env.FACEBOOK_ID && process.env.FACEBOOK_SECRET &&
+    process.env.FACEBOOK_ID !== 'dummy-facebook-id' &&
+    process.env.FACEBOOK_ID !== 'your-facebook-app-id') {
+  providers.push(
+    FacebookProvider({
+      clientId: process.env.FACEBOOK_ID,
+      clientSecret: process.env.FACEBOOK_SECRET,
+    })
+  )
+}
+
+// Always include the credentials provider for easy name-based login
+providers.push(
+  CredentialsProvider({
+    name: 'Demo Login',
+    credentials: {
+      name: { label: 'Name', type: 'text', placeholder: 'Your name' },
+    },
+    async authorize(credentials) {
+      if (!credentials?.name) return null
+
+      let user = await db.user.findFirst({ where: { name: credentials.name } })
+      if (!user) {
+        user = await db.user.create({
+          data: {
+            name: credentials.name,
+            provider: 'demo',
+          },
+        })
+        // Create default accounts for new user
+        await db.account.createMany({
+          data: [
+            { userId: user.id, name: 'Cash', type: 'cash', balance: 0, color: '#10b981', icon: '💵', isDefault: true },
+            { userId: user.id, name: 'Debit Card', type: 'debit', balance: 0, color: '#3b82f6', icon: '💳', isDefault: false },
+            { userId: user.id, name: 'Credit Card', type: 'credit', balance: 0, color: '#8b5cf6', icon: '💳', isDefault: false },
+          ],
+        })
+      }
+      return { id: user.id, name: user.name, email: user.email, image: user.image }
+    },
+  })
+)
+
+export const authOptions: NextAuthOptions = {
+  providers,
   callbacks: {
     async signIn({ user, account }) {
       if (account?.provider === 'google' || account?.provider === 'facebook') {

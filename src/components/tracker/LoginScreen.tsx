@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { signIn } from 'next-auth/react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -15,6 +15,18 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
   const [name, setName] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [loginMethod, setLoginMethod] = useState<string | null>(null)
+  const [googleConfigured, setGoogleConfigured] = useState(false)
+  const [facebookConfigured, setFacebookConfigured] = useState(false)
+
+  // Check if OAuth credentials are configured (non-dummy values)
+  useEffect(() => {
+    setGoogleConfigured(
+      process.env.NEXT_PUBLIC_GOOGLE_CONFIGURED === 'true'
+    )
+    setFacebookConfigured(
+      process.env.NEXT_PUBLIC_FACEBOOK_CONFIGURED === 'true'
+    )
+  }, [])
 
   const handleDemoLogin = async () => {
     const userName = name.trim() || 'User'
@@ -60,10 +72,6 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
     }
   }
 
-  const hasOAuthConfigured = 
-    (process.env.NEXT_PUBLIC_GOOGLE_CONFIGURED === 'true') ||
-    (process.env.NEXT_PUBLIC_FACEBOOK_CONFIGURED === 'true')
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-teal-50 flex items-center justify-center p-4">
       <div className="w-full max-w-sm">
@@ -88,7 +96,11 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
               onClick={handleGoogleLogin}
               disabled={isLoading}
               variant="outline"
-              className="w-full h-12 flex items-center justify-center gap-3 text-sm font-medium border-gray-300 hover:bg-gray-50"
+              className={`w-full h-12 flex items-center justify-center gap-3 text-sm font-medium ${
+                googleConfigured 
+                  ? 'border-gray-300 hover:bg-gray-50' 
+                  : 'border-gray-200 opacity-60'
+              }`}
             >
               {isLoading && loginMethod === 'google' ? (
                 <Loader2 className="w-5 h-5 animate-spin" />
@@ -101,6 +113,9 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
                 </svg>
               )}
               Continue with Google
+              {!googleConfigured && (
+                <span className="text-[9px] text-muted-foreground ml-1">(setup needed)</span>
+              )}
             </Button>
 
             {/* Facebook Login */}
@@ -108,7 +123,11 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
               onClick={handleFacebookLogin}
               disabled={isLoading}
               variant="outline"
-              className="w-full h-12 flex items-center justify-center gap-3 text-sm font-medium bg-[#1877F2] text-white border-[#1877F2] hover:bg-[#166FE5] hover:text-white"
+              className={`w-full h-12 flex items-center justify-center gap-3 text-sm font-medium ${
+                facebookConfigured
+                  ? 'bg-[#1877F2] text-white border-[#1877F2] hover:bg-[#166FE5] hover:text-white'
+                  : 'border-gray-200 opacity-60'
+              }`}
             >
               {isLoading && loginMethod === 'facebook' ? (
                 <Loader2 className="w-5 h-5 animate-spin" />
@@ -118,6 +137,9 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
                 </svg>
               )}
               Continue with Facebook
+              {!facebookConfigured && (
+                <span className="text-[9px] text-muted-foreground ml-1">(setup needed)</span>
+              )}
             </Button>
 
             {/* Divider */}
