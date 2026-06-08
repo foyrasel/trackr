@@ -51,8 +51,6 @@ function preprocessBanglaText(text: string): string {
   }
   
   // Normalize common Bangla speech recognition artifacts
-  // Sometimes "৫০০ টাকা" gets recognized as "500 টাকা" or vice versa
-  // Normalize Bangla digits to English for consistent parsing
   const banglaDigitMap: Record<string, string> = {
     '০': '0', '১': '1', '২': '2', '৩': '3', '৪': '4',
     '৫': '5', '৬': '6', '৭': '7', '৮': '8', '৯': '9',
@@ -66,6 +64,140 @@ function preprocessBanglaText(text: string): string {
   return processed
 }
 
+// Try to extract date from text input
+function extractDateFromText(text: string): string | null {
+  const today = new Date()
+  const lower = text.toLowerCase()
+  const preprocessed = preprocessBanglaText(text)
+  
+  // "yesterday" / "কাল" / "গতকাল"
+  if (/\byesterday\b/i.test(lower) || /গতকাল|কালকের/i.test(preprocessed)) {
+    const d = new Date(today)
+    d.setDate(d.getDate() - 1)
+    return d.toISOString().split('T')[0]
+  }
+  
+  // "day before yesterday" / "আগামীকালের আগের দিন" / "তিন দিন আগে"
+  if (/\bday before yesterday\b/i.test(lower)) {
+    const d = new Date(today)
+    d.setDate(d.getDate() - 2)
+    return d.toISOString().split('T')[0]
+  }
+  
+  // "গত" (last/previous) + day name
+  const banglaDayMap: Record<string, number> = {
+    'রবিবার': 0, 'সোমবার': 1, 'মঙ্গলবার': 2, 'বুধবার': 3,
+    'বৃহস্পতিবার': 4, 'শুক্রবার': 5, 'শনিবার': 6,
+    'শুক্র': 5, 'শনি': 6, 'রবি': 0, 'সোম': 1, 'মঙ্গল': 2, 'বুধ': 3, 'বৃহস্পতি': 4,
+  }
+  
+  for (const [dayName, dayNum] of Object.entries(banglaDayMap)) {
+    const gatRegex = new RegExp(`গত\\s*${dayName}`, 'i')
+    if (gatRegex.test(preprocessed)) {
+      const d = new Date(today)
+      const currentDay = d.getDay()
+      let diff = currentDay - dayNum
+      if (diff <= 0) diff += 7
+      d.setDate(d.getDate() - diff)
+      return d.toISOString().split('T')[0]
+    }
+  }
+  
+  // "last Monday/Tuesday..." in English
+  const englishDayMap: Record<string, number> = {
+    'sunday': 0, 'monday': 1, 'tuesday': 2, 'wednesday': 3,
+    'thursday': 4, 'friday': 5, 'saturday': 6,
+  }
+  const lastDayMatch = lower.match(/last\s+(sunday|monday|tuesday|wednesday|thursday|friday|saturday)/i)
+  if (lastDayMatch) {
+    const dayNum = englishDayMap[lastDayMatch[1].toLowerCase()]
+    if (dayNum !== undefined) {
+      const d = new Date(today)
+      const currentDay = d.getDay()
+      let diff = currentDay - dayNum
+      if (diff <= 0) diff += 7
+      d.setDate(d.getDate() - diff)
+      return d.toISOString().split('T')[0]
+    }
+  }
+  
+  // "N days ago" / "N দিন আগে"
+  const daysAgoMatch = lower.match(/(\d+)\s+days?\s+ago/i) || preprocessed.match(/(\d+)\s*দিন\s*আগে/)
+  if (daysAgoMatch) {
+    const d = new Date(today)
+    d.setDate(d.getDate() - parseInt(daysAgoMatch[1]))
+    return d.toISOString().split('T')[0]
+  }
+  
+  // Specific date: "5th June" / "June 5" / "5 জুন" / "জুন ৫"
+  const months: Record<string, number> = {
+    'january': 0, 'february': 1, 'march': 2, 'april': 3, 'may': 4, 'june': 5,
+    'july': 6, 'august': 7, 'september': 8, 'october': 9, 'november': 10, 'december': 11,
+    'jan': 0, 'feb': 1, 'mar': 2, 'apr': 3, 'may': 4, 'jun': 5,
+    'jul': 6, 'aug': 7, 'sep': 8, 'oct': 9, 'nov': 10, 'dec': 11,
+    'জানুয়ারি': 0, 'ফেব্রুয়ারি': 1, 'মার্চ': 2, 'এপ্রিল': 3, 'মে': 4, 'জুন': 5,
+    'জুলাই': 6, 'আগস্ট': 7, 'সেপ্টেম্বর': 8, 'অক্টোবর': 9, 'নভেম্বর': 10, 'ডিসেম্বর': 11,
+    'জানু': 0, 'ফেব': 1, 'মার্চ্': 2, 'এপ্': 3, 'জুন্': 5, 'জুল্': 6, 'আগ': 7, 'সেপ্ট': 8, 'অক্টো': 9, 'নভে': 10, 'ডিসে': 11,
+  }
+  
+  // "5 June" or "June 5" pattern
+  for (const [monthName, monthNum] of Object.entries(months)) {
+    // "5 June" or "5th June"
+    const dayMonthPattern = new RegExp(`(\\d{1,2})(?:st|nd|rd|th)?\\s+${monthName}`, 'i')
+    const dayMonthMatch = preprocessed.match(dayMonthPattern) || lower.match(dayMonthPattern)
+    if (dayMonthMatch) {
+      const day = parseInt(dayMonthMatch[1])
+      const year = monthNum <= today.getMonth() ? today.getFullYear() : today.getFullYear() - 1
+      const d = new Date(year, monthNum, day)
+      if (d <= today) {
+        return d.toISOString().split('T')[0]
+      }
+    }
+    
+    // "June 5" pattern
+    const monthDayPattern = new RegExp(`${monthName}\\s+(\\d{1,2})(?:st|nd|rd|th)?`, 'i')
+    const monthDayMatch = preprocessed.match(monthDayPattern) || lower.match(monthDayPattern)
+    if (monthDayMatch) {
+      const day = parseInt(monthDayMatch[1])
+      const year = monthNum <= today.getMonth() ? today.getFullYear() : today.getFullYear() - 1
+      const d = new Date(year, monthNum, day)
+      if (d <= today) {
+        return d.toISOString().split('T')[0]
+      }
+    }
+  }
+  
+  // "last week" / "গত সপ্তাহ"
+  if (/\blast\s*week\b/i.test(lower) || /গত\s*সপ্তাহ/i.test(preprocessed)) {
+    const d = new Date(today)
+    d.setDate(d.getDate() - 7)
+    return d.toISOString().split('T')[0]
+  }
+  
+  // "last month" / "গত মাস"
+  if (/\blast\s*month\b/i.test(lower) || /গত\s*মাস/i.test(preprocessed)) {
+    const d = new Date(today)
+    d.setMonth(d.getMonth() - 1)
+    d.setDate(Math.min(d.getDate(), new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate()))
+    return d.toISOString().split('T')[0]
+  }
+  
+  // DD/MM/YYYY or DD-MM-YYYY format
+  const dateSlashMatch = text.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/)
+  if (dateSlashMatch) {
+    const day = parseInt(dateSlashMatch[1])
+    const month = parseInt(dateSlashMatch[2]) - 1
+    let year = parseInt(dateSlashMatch[3])
+    if (year < 100) year += 2000
+    const d = new Date(year, month, day)
+    if (!isNaN(d.getTime()) && d <= today) {
+      return d.toISOString().split('T')[0]
+    }
+  }
+  
+  return null
+}
+
 export async function POST(request: NextRequest) {
   try {
     const { text } = await request.json()
@@ -76,6 +208,9 @@ export async function POST(request: NextRequest) {
 
     // Preprocess Bangla text to fix common recognition errors
     const preprocessed = preprocessBanglaText(text)
+    
+    // Try to extract date from the input
+    const extractedDate = extractDateFromText(text)
 
     const zai = await ZAI.create()
 
@@ -93,6 +228,7 @@ IMPORTANT: Voice recognition for Bangla is imperfect. The input may contain:
 - Bangla numbers written as English digits after preprocessing
 - Extra words or filler words from speech recognition
 - Words split incorrectly (e.g., "বাজারে" might be "বাজার এ")
+- DATE references like "yesterday", "last Friday", "3 days ago", "গতকাল", "গত শুক্রবার", "3 দিন আগে"
 
 Your job is to UNDERSTAND the INTENT even from imperfect input and extract the correct transaction.
 
@@ -101,10 +237,11 @@ Given a user's voice or text input about a spending or income, extract and categ
 You MUST respond with ONLY a valid JSON object (no markdown, no explanation) with these fields:
 - "type": "expense" or "income"
 - "amount": number (the monetary amount, just the number)
-- "description": string (a clean description in the SAME language the user used)
+- "description": string (a clean description in the SAME language the user used, WITHOUT date references)
 - "category": string (must be one of: ${[...CATEGORIES.expense, ...CATEGORIES.income].join(', ')})
 - "spendingType": string (must be one of: ${SPENDING_TYPES.join(', ')}) - default "cash" if not mentioned
 - "classification": string (for expenses, must be one of: ${CLASSIFICATIONS.join(', ')}; for income, use "income")
+- "date": string or null (if the user mentions a specific date like "yesterday", "last Friday", "গতকাল", "3 days ago", etc., return the date in YYYY-MM-DD format. If no date is mentioned, return null)
 
 Classification guide:
 - "need": Essential expenses (rent, groceries, utilities, healthcare, education, transport to work)
@@ -112,6 +249,18 @@ Classification guide:
 - "ego": Status/luxury spending (designer brands, premium gadgets, luxury dining, show-off purchases)
 - "savings": Money saved or invested (savings account, investments, emergency fund contributions)
 - "debt": Debt repayment (loan EMI, credit card payments, borrowed money repayment)
+
+Date extraction guide:
+- "yesterday" = yesterday's date in YYYY-MM-DD format
+- "day before yesterday" / "2 days ago" = 2 days ago
+- "N days ago" / "N দিন আগে" = N days ago
+- "last Friday/Monday/etc." = the most recent past Friday/Monday
+- "গতকাল" = yesterday
+- "গত শুক্রবার/সোমবার/etc." = last Friday/Monday
+- "last week" = 7 days ago
+- "last month" = same date last month
+- Specific dates like "5 June", "June 5th", "5 জুন" = that date in YYYY-MM-DD
+- If no date is mentioned, return null
 
 Comprehensive Bangla keyword mapping (include common misrecognitions):
 - টাকা/টাকার/টাকাে/takar/taka = currency (BDT)
@@ -137,36 +286,32 @@ Comprehensive Bangla keyword mapping (include common misrecognitions):
 - কিনলাম/কিনেছি/কিনলাম/কেনা = bought/purchased
 - দিলাম/দিয়েছি = gave/paid
 - লাখ/lokho = 100,000
+- গতকাল/কালকে/yesterday = yesterday
+- গত/last = last/previous
 
 English examples:
-- "Spent 500 taka on groceries from cash" → {"type":"expense","amount":500,"description":"Groceries","category":"Groceries","spendingType":"cash","classification":"need"}
-- "Income: 50000 salary from job" → {"type":"income","amount":50000,"description":"Monthly salary","category":"Salary","spendingType":"cash","classification":"income"}
-- "Paid 2000 for Netflix subscription" → {"type":"expense","amount":2000,"description":"Netflix subscription","category":"Subscriptions","spendingType":"cash","classification":"want"}
+- "Spent 500 taka on groceries from cash" → {"type":"expense","amount":500,"description":"Groceries","category":"Groceries","spendingType":"cash","classification":"need","date":null}
+- "Income: 50000 salary from job" → {"type":"income","amount":50000,"description":"Monthly salary","category":"Salary","spendingType":"cash","classification":"income","date":null}
+- "Paid 2000 for Netflix subscription yesterday" → {"type":"expense","amount":2000,"description":"Netflix subscription","category":"Subscriptions","spendingType":"cash","classification":"want","date":"${new Date(Date.now() - 86400000).toISOString().split('T')[0]}"}
+- "Bought groceries for 800 taka last Friday" → {"type":"expense","amount":800,"description":"Groceries","category":"Groceries","spendingType":"cash","classification":"need","date":"2026-06-05"}
 
 Bangla examples (including imperfect recognition):
-- "বাজারে 500 টাকা খরচ" → {"type":"expense","amount":500,"description":"বাজারে খরচ","category":"Groceries","spendingType":"cash","classification":"need"}
-- "বাজারে 5 শ টাকা খরচ" → {"type":"expense","amount":500,"description":"বাজারে খরচ","category":"Groceries","spendingType":"cash","classification":"need"}
-- "বাসা ভাড়া 15000 টাকা ডেবিট কার্ডে" → {"type":"expense","amount":15000,"description":"বাসা ভাড়া","category":"Rent","spendingType":"debit","classification":"need"}
-- "বেতন পেয়েছি 50000 টাকা" → {"type":"income","amount":50000,"description":"বেতন","category":"Salary","spendingType":"cash","classification":"income"}
-- "রিকশায় 100 টাকা" → {"type":"expense","amount":100,"description":"রিকশা ভাড়া","category":"Transport","spendingType":"cash","classification":"need"}
-- "5000 টাকা সেভ করেছি" → {"type":"expense","amount":5000,"description":"সঞ্চয়","category":"Savings","spendingType":"cash","classification":"savings"}
-- "লোনের কিস্তি 5000 টাকা" → {"type":"expense","amount":5000,"description":"লোনের কিস্তি","category":"Debt","spendingType":"cash","classification":"debt"}
-- "মুভিতে 500 টাকা খরচ" → {"type":"expense","amount":500,"description":"মুভিতে খরচ","category":"Entertainment","spendingType":"cash","classification":"want"}
-- "আইফোন কিনলাম 1 লাখ টাকায় ক্রেডিটে" → {"type":"expense","amount":100000,"description":"আইফোন","category":"Shopping","spendingType":"credit","classification":"ego"}
-- "খরোচ 500 টাকা বাজারে" → {"type":"expense","amount":500,"description":"বাজারে খরচ","category":"Groceries","spendingType":"cash","classification":"need"}
-- "5 হাজার টাকা খরচ" → {"type":"expense","amount":5000,"description":"খরচ","category":"Other","spendingType":"cash","classification":"need"}
-- "2 লাখ টাকা ব্যতন পেলাম" → {"type":"income","amount":200000,"description":"বেতন","category":"Salary","spendingType":"cash","classification":"income"}
-
-Banglish (mixed) examples:
-- "bazar e 500 taka khoroche" → {"type":"expense","amount":500,"description":"বাজারে খরচ","category":"Groceries","spendingType":"cash","classification":"need"}
-- "basha bhara 15000 debit e" → {"type":"expense","amount":15000,"description":"বাসা ভাড়া","category":"Rent","spendingType":"debit","classification":"need"}
-- "rickshaw e 50 taka" → {"type":"expense","amount":50,"description":"রিকশা ভাড়া","category":"Transport","spendingType":"cash","classification":"need"}
+- "বাজারে 500 টাকা খরচ" → {"type":"expense","amount":500,"description":"বাজারে খরচ","category":"Groceries","spendingType":"cash","classification":"need","date":null}
+- "বাজারে 5 শ টাকা খরচ" → {"type":"expense","amount":500,"description":"বাজারে খরচ","category":"Groceries","spendingType":"cash","classification":"need","date":null}
+- "বাসা ভাড়া 15000 টাকা ডেবিট কার্ডে" → {"type":"expense","amount":15000,"description":"বাসা ভাড়া","category":"Rent","spendingType":"debit","classification":"need","date":null}
+- "বেতন পেয়েছি 50000 টাকা" → {"type":"income","amount":50000,"description":"বেতন","category":"Salary","spendingType":"cash","classification":"income","date":null}
+- "রিকশায় 100 টাকা গতকাল" → {"type":"expense","amount":100,"description":"রিকশা ভাড়া","category":"Transport","spendingType":"cash","classification":"need","date":"${new Date(Date.now() - 86400000).toISOString().split('T')[0]}"}
+- "গত শুক্রবার বাজারে 2000 টাকা খরচ" → {"type":"expense","amount":2000,"description":"বাজারে খরচ","category":"Groceries","spendingType":"cash","classification":"need","date":"2026-06-05"}
+- "3 দিন আগে ডাক্তার দেখানো 1500 টাকা" → {"type":"expense","amount":1500,"description":"ডাক্তার দেখানো","category":"Healthcare","spendingType":"cash","classification":"need","date":"${new Date(Date.now() - 3 * 86400000).toISOString().split('T')[0]}"}
 
 IMPORTANT RULES:
 1. For Bangla numbers written as words: "5 শ" = 500, "5 হাজার" = 5000, "1 লাখ" = 100000, "2 লাখ" = 200000
 2. If the text seems like garbled/misrecognized Bangla, try your best to find any amount and reasonable category
 3. Default spendingType to "cash" if not specified (most Bangladesh transactions are cash)
-4. When in doubt about classification, use "need" for essential-sounding items`
+4. When in doubt about classification, use "need" for essential-sounding items
+5. Remove date references from the description (e.g., "yesterday's groceries" → description: "Groceries")
+6. If a date is mentioned, always extract it and return in YYYY-MM-DD format
+7. Never return a future date - if parsed date is in the future, return null`
         },
         {
           role: 'user',
@@ -192,6 +337,18 @@ IMPORTANT RULES:
 
     const parsed = JSON.parse(cleaned)
 
+    // Use the AI-extracted date, or fall back to the regex-extracted date, or default to today
+    let finalDate = parsed.date || extractedDate || new Date().toISOString().split('T')[0]
+    
+    // Validate the date is not in the future
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const parsedDate = new Date(finalDate)
+    parsedDate.setHours(0, 0, 0, 0)
+    if (parsedDate > today) {
+      finalDate = new Date().toISOString().split('T')[0]
+    }
+
     const result = {
       type: parsed.type === 'income' ? 'income' : 'expense',
       amount: typeof parsed.amount === 'number' ? parsed.amount : parseFloat(parsed.amount) || 0,
@@ -203,6 +360,7 @@ IMPORTANT RULES:
         : CLASSIFICATIONS.includes(parsed.classification) 
           ? parsed.classification 
           : 'need',
+      date: finalDate,
     }
 
     return NextResponse.json({ result })
@@ -220,6 +378,7 @@ function extractBasicInfo(text: string): {
   category: string
   spendingType: string
   classification: string
+  date: string
 } {
   const preprocessed = preprocessBanglaText(text)
   const isIncome = /income|salary|earned|received|got paid|আয়|বেতন|ব্যতন|পেয়েছি|পাইছি|সালারি|peyechi/i.test(preprocessed)
@@ -239,7 +398,7 @@ function extractBasicInfo(text: string): {
       const shMatch = preprocessed.match(/(\d+)\s*শ/)
       if (shMatch) amount = parseFloat(shMatch[1]) * 100
     }
-    // "5 হাজার" = 5000, "5 হাজার" = 5000
+    // "5 হাজার" = 5000
     if (/হাজার/i.test(preprocessed)) {
       const hazarMatch = preprocessed.match(/(\d+)\s*হাজার/)
       if (hazarMatch) amount = parseFloat(hazarMatch[1]) * 1000
@@ -265,6 +424,9 @@ function extractBasicInfo(text: string): {
   else if (/সেভ|সঞ্চয়|saving/i.test(preprocessed)) category = 'Savings'
   else if (/লোন|কিস্তি|loan|ঋণ|কর্জ|EMI/i.test(preprocessed)) category = 'Debt'
   
+  // Try to extract date
+  const extractedDate = extractDateFromText(text)
+  
   return {
     type: isIncome ? 'income' : 'expense',
     amount,
@@ -272,5 +434,6 @@ function extractBasicInfo(text: string): {
     category,
     spendingType: /debit|ডেবিট/i.test(preprocessed) ? 'debit' : /credit|ক্রেডিট/i.test(preprocessed) ? 'credit' : 'cash',
     classification: isIncome ? 'income' : 'need',
+    date: extractedDate || new Date().toISOString().split('T')[0],
   }
 }

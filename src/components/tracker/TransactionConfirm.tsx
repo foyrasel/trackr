@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import {
   Card,
   CardContent,
@@ -18,7 +18,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
-import { Check, X, Edit3, Loader2 } from 'lucide-react'
+import { Check, X, Loader2, Calendar } from 'lucide-react'
 
 export interface CategorizedTransaction {
   type: string
@@ -27,6 +27,7 @@ export interface CategorizedTransaction {
   category: string
   spendingType: string
   classification: string
+  date: string // ISO date string (YYYY-MM-DD)
 }
 
 interface TransactionConfirmProps {
@@ -57,141 +58,192 @@ const CLASSIFICATION_LABELS: Record<string, { label: string; color: string }> = 
 }
 
 export default function TransactionConfirm({ data, onConfirm, onReject, isSaving }: TransactionConfirmProps) {
-  const [isEditing, setIsEditing] = useState(false)
   const [editData, setEditData] = useState<CategorizedTransaction>({ ...data })
 
-  const categories = data.type === 'income' ? INCOME_CATEGORIES : EXPENSE_CATEGORIES
-  const currentData = isEditing ? editData : data
+  // Keep editData in sync if data prop changes
+  useEffect(() => {
+    setEditData({ ...data })
+  }, [data])
+
+  const categories = editData.type === 'income' ? INCOME_CATEGORIES : EXPENSE_CATEGORIES
 
   const handleConfirm = () => {
-    onConfirm(isEditing ? editData : data)
+    onConfirm(editData)
   }
 
-  const classificationInfo = CLASSIFICATION_LABELS[currentData.classification] || CLASSIFICATION_LABELS.need
+  const classificationInfo = CLASSIFICATION_LABELS[editData.classification] || CLASSIFICATION_LABELS.need
+
+  // Format date for display
+  const formatDate = (dateStr: string) => {
+    if (!dateStr) return 'Today'
+    try {
+      const d = new Date(dateStr)
+      return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })
+    } catch {
+      return dateStr
+    }
+  }
+
+  // Check if date is different from today
+  const isDateCustom = editData.date && editData.date !== new Date().toISOString().split('T')[0]
 
   return (
     <Card className="w-full max-w-md mx-auto border-2 border-emerald-200 bg-gradient-to-br from-white to-emerald-50/30">
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-lg">
-            {data.type === 'income' ? '💰 Income' : '💸 Expense'} Detected
+          <CardTitle className="text-lg flex items-center gap-2">
+            {editData.type === 'income' ? '💰 Income' : '💸 Expense'} Detected
           </CardTitle>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setIsEditing(!isEditing)}
-          >
-            <Edit3 className="w-4 h-4 mr-1" />
-            {isEditing ? 'Done' : 'Edit'}
-          </Button>
+          <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+            Tap any field to edit
+          </span>
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
-        {/* Amount */}
+        {/* Amount - Always Editable */}
         <div className="text-center">
-          {isEditing ? (
-            <div className="flex items-center justify-center gap-2">
-              <span className="text-2xl font-bold text-muted-foreground">৳</span>
-              <Input
-                type="number"
-                value={editData.amount}
-                onChange={(e) => setEditData({ ...editData, amount: parseFloat(e.target.value) || 0 })}
-                className="text-2xl font-bold w-40 text-center"
-              />
-            </div>
-          ) : (
-            <p className="text-4xl font-bold">
-              ৳{currentData.amount.toLocaleString()}
-            </p>
-          )}
-        </div>
-
-        {/* Description */}
-        <div>
-          <Label className="text-xs text-muted-foreground">Description</Label>
-          {isEditing ? (
+          <Label className="text-xs text-muted-foreground">Amount</Label>
+          <div className="flex items-center justify-center gap-2 mt-1">
+            <span className="text-2xl font-bold text-muted-foreground">৳</span>
             <Input
-              value={editData.description}
-              onChange={(e) => setEditData({ ...editData, description: e.target.value })}
-              className="mt-1"
+              type="number"
+              value={editData.amount || ''}
+              onChange={(e) => setEditData({ ...editData, amount: parseFloat(e.target.value) || 0 })}
+              className="text-3xl font-bold w-44 text-center border-2 border-emerald-200 focus:border-emerald-500 bg-emerald-50/50"
+              placeholder="0"
             />
-          ) : (
-            <p className="font-medium">{currentData.description}</p>
-          )}
+          </div>
         </div>
 
-        {/* Category */}
+        {/* Date - Always Editable */}
         <div>
-          <Label className="text-xs text-muted-foreground">Category</Label>
-          {isEditing ? (
-            <Select
-              value={editData.category}
-              onValueChange={(value) => setEditData({ ...editData, category: value })}
-            >
-              <SelectTrigger className="mt-1">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {categories.map((cat) => (
-                  <SelectItem key={cat} value={cat}>{cat}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          ) : (
-            <p className="font-medium">{currentData.category}</p>
-          )}
-        </div>
-
-        {/* Spending Type */}
-        <div>
-          <Label className="text-xs text-muted-foreground">Payment Method</Label>
-          {isEditing ? (
-            <Select
-              value={editData.spendingType}
-              onValueChange={(value) => setEditData({ ...editData, spendingType: value })}
-            >
-              <SelectTrigger className="mt-1">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="cash">💵 Cash</SelectItem>
-                <SelectItem value="debit">💳 Debit Card</SelectItem>
-                <SelectItem value="credit">💳 Credit Card</SelectItem>
-              </SelectContent>
-            </Select>
-          ) : (
-            <p className="font-medium capitalize">
-              {currentData.spendingType === 'cash' ? '💵 Cash' : 
-               currentData.spendingType === 'debit' ? '💳 Debit' : '💳 Credit'}
-            </p>
-          )}
-        </div>
-
-        {/* Classification Badge */}
-        <div>
-          <Label className="text-xs text-muted-foreground">Classification</Label>
-          <div className="mt-1">
-            {isEditing && data.type === 'expense' ? (
-              <Select
-                value={editData.classification}
-                onValueChange={(value) => setEditData({ ...editData, classification: value })}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {Object.entries(CLASSIFICATION_LABELS)
-                    .filter(([key]) => key !== 'income')
-                    .map(([key, { label }]) => (
-                      <SelectItem key={key} value={key}>{label}</SelectItem>
-                    ))}
-                </SelectContent>
-              </Select>
-            ) : (
-              <Badge className={`${classificationInfo.color} border text-sm px-3 py-1`}>
-                {classificationInfo.label}
+          <Label className="text-xs text-muted-foreground flex items-center gap-1">
+            <Calendar className="w-3 h-3" />
+            Date
+            {isDateCustom && (
+              <Badge className="bg-blue-100 text-blue-800 border-blue-300 text-[9px] px-1 py-0 ml-1">
+                Past Date
               </Badge>
             )}
+          </Label>
+          <Input
+            type="date"
+            value={editData.date || new Date().toISOString().split('T')[0]}
+            onChange={(e) => setEditData({ ...editData, date: e.target.value })}
+            className="mt-1 border-2 border-blue-200 focus:border-blue-500 bg-blue-50/50"
+            max={new Date().toISOString().split('T')[0]}
+          />
+          <p className="text-[10px] text-muted-foreground mt-0.5">
+            {formatDate(editData.date)}
+            {isDateCustom && ' — Previous expenditure'}
+          </p>
+        </div>
+
+        {/* Description - Always Editable */}
+        <div>
+          <Label className="text-xs text-muted-foreground">Description</Label>
+          <Input
+            value={editData.description}
+            onChange={(e) => setEditData({ ...editData, description: e.target.value })}
+            className="mt-1 border-2 border-emerald-200 focus:border-emerald-500 bg-emerald-50/50"
+          />
+        </div>
+
+        {/* Category - Always Editable */}
+        <div>
+          <Label className="text-xs text-muted-foreground">Category</Label>
+          <Select
+            value={editData.category}
+            onValueChange={(value) => setEditData({ ...editData, category: value })}
+          >
+            <SelectTrigger className="mt-1 border-2 border-emerald-200 focus:border-emerald-500 bg-emerald-50/50">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {categories.map((cat) => (
+                <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Spending Type - Always Editable */}
+        <div>
+          <Label className="text-xs text-muted-foreground">Payment Method</Label>
+          <Select
+            value={editData.spendingType}
+            onValueChange={(value) => setEditData({ ...editData, spendingType: value })}
+          >
+            <SelectTrigger className="mt-1 border-2 border-emerald-200 focus:border-emerald-500 bg-emerald-50/50">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="cash">💵 Cash</SelectItem>
+              <SelectItem value="debit">💳 Debit Card</SelectItem>
+              <SelectItem value="credit">💳 Credit Card</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Classification - Always Editable (for expenses) */}
+        <div>
+          <Label className="text-xs text-muted-foreground">Classification</Label>
+          {editData.type === 'expense' ? (
+            <Select
+              value={editData.classification}
+              onValueChange={(value) => setEditData({ ...editData, classification: value })}
+            >
+              <SelectTrigger className={`mt-1 border-2 focus:border-emerald-500 bg-emerald-50/50 ${classificationInfo.color.replace('bg-', 'border-').split(' ')[0].replace('border-', 'border-')}`}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {Object.entries(CLASSIFICATION_LABELS)
+                  .filter(([key]) => key !== 'income')
+                  .map(([key, { label }]) => (
+                    <SelectItem key={key} value={key}>
+                      <span className="flex items-center gap-2">
+                        <span className={`w-2.5 h-2.5 rounded-full ${CLASSIFICATION_LABELS[key].color.split(' ')[0]}`} />
+                        {label}
+                      </span>
+                    </SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
+          ) : (
+            <div className="mt-1">
+              <Badge className={`${CLASSIFICATION_LABELS.income.color} border text-sm px-3 py-1`}>
+                Income
+              </Badge>
+            </div>
+          )}
+        </div>
+
+        {/* Type Toggle */}
+        <div>
+          <Label className="text-xs text-muted-foreground">Type</Label>
+          <div className="flex gap-2 mt-1">
+            <button
+              type="button"
+              onClick={() => setEditData({ ...editData, type: 'expense', classification: 'need' })}
+              className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-all border-2 ${
+                editData.type === 'expense'
+                  ? 'bg-red-50 border-red-300 text-red-800'
+                  : 'bg-white border-gray-200 text-muted-foreground hover:bg-gray-50'
+              }`}
+            >
+              💸 Expense
+            </button>
+            <button
+              type="button"
+              onClick={() => setEditData({ ...editData, type: 'income', classification: 'income' })}
+              className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-all border-2 ${
+                editData.type === 'income'
+                  ? 'bg-emerald-50 border-emerald-300 text-emerald-800'
+                  : 'bg-white border-gray-200 text-muted-foreground hover:bg-gray-50'
+              }`}
+            >
+              💰 Income
+            </button>
           </div>
         </div>
 
