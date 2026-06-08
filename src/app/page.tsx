@@ -10,7 +10,7 @@ import AddTransaction from '@/components/tracker/AddTransaction'
 import Dashboard from '@/components/tracker/Dashboard'
 import TransactionList from '@/components/tracker/TransactionList'
 import BudgetPanel from '@/components/tracker/BudgetPanel'
-import LoginScreen from '@/components/tracker/LoginScreen'
+import LandingPage from '@/components/tracker/LandingPage'
 import OnboardingScreen from '@/components/tracker/OnboardingScreen'
 import InsightsPanel from '@/components/tracker/InsightsPanel'
 import MorePanel from '@/components/tracker/MorePanel'
@@ -197,9 +197,9 @@ export default function Home() {
     )
   }
 
-  // Show login screen if not logged in
+  // Show landing page if not logged in
   if (!isLoggedIn) {
-    return <LoginScreen onLogin={handleLogin} />
+    return <LandingPage onLogin={handleLogin} />
   }
 
   // Show onboarding screen for first-time users
