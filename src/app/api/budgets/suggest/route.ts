@@ -1,17 +1,18 @@
 import { db } from '@/lib/db'
 import { NextRequest, NextResponse } from 'next/server'
+import { getCurrentUser } from '@/lib/auth'
 import ZAI from 'z-ai-web-dev-sdk'
 
 // GET /api/budgets/suggest - AI-suggested budgets based on past spending
 export async function GET(request: NextRequest) {
   try {
+    const user = await getCurrentUser(request)
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const { searchParams } = new URL(request.url)
     const month = searchParams.get('month')
-
-    const user = await db.user.findFirst()
-    if (!user) {
-      return NextResponse.json({ suggestions: [] })
-    }
 
     const currentMonth = month || `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`
 
@@ -21,6 +22,7 @@ export async function GET(request: NextRequest) {
 
     const pastExpenses = await db.transaction.findMany({
       where: {
+        userId: user.id,
         type: 'expense',
         date: { gte: threeMonthsAgo },
       },

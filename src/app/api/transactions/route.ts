@@ -1,8 +1,14 @@
 import { db } from '@/lib/db'
 import { NextRequest, NextResponse } from 'next/server'
+import { getCurrentUser } from '@/lib/auth'
 
 export async function GET(request: NextRequest) {
   try {
+    const user = await getCurrentUser(request)
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const { searchParams } = new URL(request.url)
     const type = searchParams.get('type') // 'expense' or 'income'
     const category = searchParams.get('category')
@@ -10,7 +16,7 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '50')
     const offset = parseInt(searchParams.get('offset') || '0')
 
-    const where: Record<string, unknown> = {}
+    const where: Record<string, unknown> = { userId: user.id }
 
     if (type) where.type = type
     if (category) where.category = category
@@ -40,6 +46,11 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const user = await getCurrentUser(request)
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const body = await request.json()
     const { type, amount, description, category, spendingType, classification, date, isRecurring } = body
 
@@ -52,6 +63,7 @@ export async function POST(request: NextRequest) {
 
     const transaction = await db.transaction.create({
       data: {
+        userId: user.id,
         type,
         amount: parseFloat(amount),
         description,
@@ -64,30 +76,25 @@ export async function POST(request: NextRequest) {
     })
 
     // Update account balance
-    const user = await db.user.findFirst()
-    if (user) {
-      const accountType = spendingType || 'cash'
-      const account = await db.account.findFirst({
-        where: { userId: user.id, type: accountType },
-      })
+    const accountType = spendingType || 'cash'
+    const account = await db.account.findFirst({
+      where: { userId: user.id, type: accountType },
+    })
 
-      if (account) {
-        if (type === 'expense') {
-          // For expense: subtract from cash/debit, add to credit card (credit card balance = amount owed)
-          const newBalance = accountType === 'credit'
-            ? account.balance + parseFloat(amount) // Credit card: increase balance = more debt
-            : account.balance - parseFloat(amount) // Cash/Debit: decrease balance
-          await db.account.update({
-            where: { id: account.id },
-            data: { balance: newBalance },
-          })
-        } else if (type === 'income') {
-          // Income adds to the account
-          await db.account.update({
-            where: { id: account.id },
-            data: { balance: account.balance + parseFloat(amount) },
-          })
-        }
+    if (account) {
+      if (type === 'expense') {
+        const newBalance = accountType === 'credit'
+          ? account.balance + parseFloat(amount) // Credit card: increase balance = more debt
+          : account.balance - parseFloat(amount) // Cash/Debit: decrease balance
+        await db.account.update({
+          where: { id: account.id },
+          data: { balance: newBalance },
+        })
+      } else if (type === 'income') {
+        await db.account.update({
+          where: { id: account.id },
+          data: { balance: account.balance + parseFloat(amount) },
+        })
       }
     }
 

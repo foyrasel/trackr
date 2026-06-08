@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState } from 'react'
+import { signIn } from 'next-auth/react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -19,20 +20,49 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
     const userName = name.trim() || 'User'
     setIsLoading(true)
     setLoginMethod('demo')
-    // Small delay for visual feedback
-    setTimeout(() => {
+    try {
+      // Use next-auth credentials provider to create a proper session
+      const result = await signIn('credentials', {
+        name: userName,
+        redirect: false,
+      })
+      if (result?.ok) {
+        onLogin(userName)
+      } else {
+        // Fallback: if next-auth fails, still allow login via localStorage
+        onLogin(userName)
+      }
+    } catch {
+      // Fallback to localStorage-based login
       onLogin(userName)
-    }, 500)
+    }
   }
 
-  const handleOAuthLogin = async (provider: string) => {
+  const handleGoogleLogin = async () => {
     setIsLoading(true)
-    setLoginMethod(provider)
-    // For demo: simulate OAuth by creating a user with the provider name
-    setTimeout(() => {
-      onLogin(provider === 'google' ? 'Google User' : 'Facebook User')
-    }, 800)
+    setLoginMethod('google')
+    try {
+      await signIn('google', { callbackUrl: '/' })
+    } catch {
+      setIsLoading(false)
+      setLoginMethod(null)
+    }
   }
+
+  const handleFacebookLogin = async () => {
+    setIsLoading(true)
+    setLoginMethod('facebook')
+    try {
+      await signIn('facebook', { callbackUrl: '/' })
+    } catch {
+      setIsLoading(false)
+      setLoginMethod(null)
+    }
+  }
+
+  const hasOAuthConfigured = 
+    (process.env.NEXT_PUBLIC_GOOGLE_CONFIGURED === 'true') ||
+    (process.env.NEXT_PUBLIC_FACEBOOK_CONFIGURED === 'true')
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-teal-50 flex items-center justify-center p-4">
@@ -55,7 +85,7 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
           <CardContent className="space-y-4">
             {/* Google Login */}
             <Button
-              onClick={() => handleOAuthLogin('google')}
+              onClick={handleGoogleLogin}
               disabled={isLoading}
               variant="outline"
               className="w-full h-12 flex items-center justify-center gap-3 text-sm font-medium border-gray-300 hover:bg-gray-50"
@@ -75,7 +105,7 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
 
             {/* Facebook Login */}
             <Button
-              onClick={() => handleOAuthLogin('facebook')}
+              onClick={handleFacebookLogin}
               disabled={isLoading}
               variant="outline"
               className="w-full h-12 flex items-center justify-center gap-3 text-sm font-medium bg-[#1877F2] text-white border-[#1877F2] hover:bg-[#166FE5] hover:text-white"

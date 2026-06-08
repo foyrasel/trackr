@@ -43,6 +43,7 @@ interface InsightsData {
 
 interface InsightsPanelProps {
   refreshTrigger: number
+  userName?: string
 }
 
 const CLASSIFICATION_COLORS: Record<string, string> = {
@@ -53,7 +54,7 @@ const CLASSIFICATION_COLORS: Record<string, string> = {
   debt: '#8b5cf6',
 }
 
-export default function InsightsPanel({ refreshTrigger }: InsightsPanelProps) {
+export default function InsightsPanel({ refreshTrigger, userName }: InsightsPanelProps) {
   const [data, setData] = useState<InsightsData | null>(null)
   const [loading, setLoading] = useState(true)
   const [mounted, setMounted] = useState(false)
@@ -65,7 +66,9 @@ export default function InsightsPanel({ refreshTrigger }: InsightsPanelProps) {
 
   const fetchAnalytics = useCallback(async () => {
     try {
-      const response = await fetch('/api/analytics')
+      const headers: Record<string, string> = {}
+      if (userName) headers['x-user-name'] = userName
+      const response = await fetch('/api/analytics', { headers })
       if (response.ok) {
         const result = await response.json()
         setData(result)
@@ -75,7 +78,7 @@ export default function InsightsPanel({ refreshTrigger }: InsightsPanelProps) {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [userName])
 
   useEffect(() => {
     if (mounted) fetchAnalytics()

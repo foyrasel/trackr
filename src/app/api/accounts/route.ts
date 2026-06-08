@@ -1,25 +1,12 @@
 import { db } from '@/lib/db'
 import { NextRequest, NextResponse } from 'next/server'
+import { getCurrentUser } from '@/lib/auth'
 
-// GET /api/accounts - Get all accounts for a user
 export async function GET(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url)
-    const userId = searchParams.get('userId') || 'default'
-
-    // Find or create default user
-    let user = await db.user.findFirst()
+    const user = await getCurrentUser(request)
     if (!user) {
-      user = await db.user.create({
-        data: { name: 'User', provider: 'demo' },
-      })
-      await db.account.createMany({
-        data: [
-          { userId: user.id, name: 'Cash', type: 'cash', balance: 0, color: '#10b981', icon: '💵', isDefault: true },
-          { userId: user.id, name: 'Debit Card', type: 'debit', balance: 0, color: '#3b82f6', icon: '💳', isDefault: false },
-          { userId: user.id, name: 'Credit Card', type: 'credit', balance: 0, color: '#8b5cf6', icon: '💳', isDefault: false },
-        ],
-      })
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     const accounts = await db.account.findMany({
@@ -37,15 +24,15 @@ export async function GET(request: NextRequest) {
 // POST /api/accounts - Create or update account balance
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json()
-    const { userId, type, balance, name, color, icon } = body
-
-    const user = await db.user.findFirst()
+    const user = await getCurrentUser(request)
     if (!user) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 })
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Check if account type already exists
+    const body = await request.json()
+    const { type, balance, name, color, icon } = body
+
+    // Check if account type already exists for this user
     const existing = await db.account.findFirst({
       where: { userId: user.id, type },
     })
@@ -80,12 +67,22 @@ export async function POST(request: NextRequest) {
 // PUT /api/accounts - Update balance (add/subtract)
 export async function PUT(request: NextRequest) {
   try {
+    const user = await getCurrentUser(request)
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const body = await request.json()
     const { accountId, amount, operation } = body // operation: 'add' or 'subtract'
 
     const account = await db.account.findUnique({ where: { id: accountId } })
     if (!account) {
       return NextResponse.json({ error: 'Account not found' }, { status: 404 })
+    }
+
+    // Verify the account belongs to the current user
+    if (account.userId !== user.id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
     }
 
     const newBalance = operation === 'add'
