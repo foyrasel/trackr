@@ -63,6 +63,34 @@ export async function POST(request: NextRequest) {
       },
     })
 
+    // Update account balance
+    const user = await db.user.findFirst()
+    if (user) {
+      const accountType = spendingType || 'cash'
+      const account = await db.account.findFirst({
+        where: { userId: user.id, type: accountType },
+      })
+
+      if (account) {
+        if (type === 'expense') {
+          // For expense: subtract from cash/debit, add to credit card (credit card balance = amount owed)
+          const newBalance = accountType === 'credit'
+            ? account.balance + parseFloat(amount) // Credit card: increase balance = more debt
+            : account.balance - parseFloat(amount) // Cash/Debit: decrease balance
+          await db.account.update({
+            where: { id: account.id },
+            data: { balance: newBalance },
+          })
+        } else if (type === 'income') {
+          // Income adds to the account
+          await db.account.update({
+            where: { id: account.id },
+            data: { balance: account.balance + parseFloat(amount) },
+          })
+        }
+      }
+    }
+
     return NextResponse.json({ transaction }, { status: 201 })
   } catch (error) {
     console.error('Error creating transaction:', error)

@@ -38,6 +38,39 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params
+
+    // Get the transaction first to reverse its effect on account balance
+    const transaction = await db.transaction.findUnique({ where: { id } })
+
+    if (transaction) {
+      // Reverse the balance effect
+      const user = await db.user.findFirst()
+      if (user) {
+        const account = await db.account.findFirst({
+          where: { userId: user.id, type: transaction.spendingType },
+        })
+
+        if (account) {
+          if (transaction.type === 'expense') {
+            // Reverse expense: add back to cash/debit, subtract from credit
+            const newBalance = transaction.spendingType === 'credit'
+              ? account.balance - transaction.amount // Credit card: reduce debt
+              : account.balance + transaction.amount // Cash/Debit: add back
+            await db.account.update({
+              where: { id: account.id },
+              data: { balance: newBalance },
+            })
+          } else if (transaction.type === 'income') {
+            // Reverse income: subtract from account
+            await db.account.update({
+              where: { id: account.id },
+              data: { balance: account.balance - transaction.amount },
+            })
+          }
+        }
+      }
+    }
+
     await db.transaction.delete({ where: { id } })
     return NextResponse.json({ success: true })
   } catch (error) {

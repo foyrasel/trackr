@@ -1,8 +1,9 @@
 'use client'
 
 import React, { useState, useRef, useEffect, useCallback } from 'react'
-import { Mic, MicOff, Loader2, Languages } from 'lucide-react'
+import { Mic, MicOff, Loader2, Languages, Volume2 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
 
 interface VoiceInputProps {
   onTranscript: (text: string) => void
@@ -18,12 +19,25 @@ interface SpeechRecognitionEvent {
 
 interface SpeechRecognitionErrorEvent {
   error: string
+  message?: string
 }
 
-// Language configurations - try bn-IN as it often has better speech model support
+// Language configurations with multiple fallback codes
 const LANG_CONFIG = {
-  en: { code: 'en-US', label: 'English', hint: 'Listening in English...' },
-  bn: { code: 'bn-IN', label: 'বাংলা', hint: 'বাংলায় শুনছি... ধীরে কথা বলুন' },
+  en: {
+    code: 'en-US',
+    fallbackCodes: ['en-GB', 'en-IN'],
+    label: 'English',
+    hint: 'Listening in English...',
+    tips: ['Speak clearly', 'Try: "Spent 500 taka on groceries"'],
+  },
+  bn: {
+    code: 'bn-IN',
+    fallbackCodes: ['bn-BD'],
+    label: 'বাংলা',
+    hint: 'বাংলায় শুনছি... ধীরে ও স্পষ্টভাবে বলুন',
+    tips: ['ধীরে ও স্পষ্টভাবে বলুন', 'বলুন: "বাজারে ৫০০ টাকা খরচ"', 'শব্দগুলো আলাদা করে বলুন', 'চুলচেরা উচ্চারণ এড়িয়ে চলুন'],
+  },
 }
 
 export default function VoiceInput({ onTranscript, isProcessing, language, onLanguageChange }: VoiceInputProps) {
@@ -31,11 +45,17 @@ export default function VoiceInput({ onTranscript, isProcessing, language, onLan
   const [isSupported, setIsSupported] = useState(false)
   const [isListening, setIsListening] = useState(false)
   const [transcript, setTranscript] = useState('')
+  const [interimText, setInterimText] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [retryCount, setRetryCount] = useState(0)
+  const [confidence, setConfidence] = useState<number>(0)
+  const [hasFinalResult, setHasFinalResult] = useState(false)
+  const [silenceTimer, setSilenceTimer] = useState<number | null>(null)
+  const [autoStopCountdown, setAutoStopCountdown] = useState<number | null>(null)
   const recognitionRef = useRef<SpeechRecognition | null>(null)
   const onTranscriptRef = useRef(onTranscript)
   const languageRef = useRef(language)
+  const finalTranscriptRef = useRef<string>('')
 
   useEffect(() => {
     onTranscriptRef.current = onTranscript
@@ -47,6 +67,20 @@ export default function VoiceInput({ onTranscript, isProcessing, language, onLan
       recognitionRef.current.lang = LANG_CONFIG[language].code
     }
   }, [language])
+
+  // Auto-stop countdown
+  useEffect(() => {
+    if (autoStopCountdown !== null && autoStopCountdown > 0) {
+      const timer = setTimeout(() => {
+        setAutoStopCountdown(prev => prev !== null ? prev - 1 : null)
+      }, 1000)
+      return () => clearTimeout(timer)
+    } else if (autoStopCountdown === 0) {
+      // Auto-stop after countdown
+      handleStop()
+      setAutoStopCountdown(null)
+    }
+  }, [autoStopCountdown])
 
   // Initialize speech recognition after mount
   useEffect(() => {
@@ -61,64 +95,128 @@ export default function VoiceInput({ onTranscript, isProcessing, language, onLan
     if (!SpeechRecognition) return pending
 
     const recognition = new SpeechRecognition()
-    // Use continuous mode for better Bangla recognition — allows longer utterances
     recognition.continuous = true
     recognition.interimResults = true
     recognition.lang = LANG_CONFIG[languageRef.current].code
-    // Set max alternatives to help with uncertain recognition
-    recognition.maxAlternatives = 3
+    recognition.maxAlternatives = 5 // Get more alternatives for Bangla
 
-    let finalTranscriptAccumulator = ''
+    let restartAttempts = 0
+    const MAX_RESTARTS = 3
 
     recognition.onresult = (event: SpeechRecognitionEvent) => {
       let interimTranscript = ''
+      let bestConfidence = 0
 
       for (let i = event.resultIndex; i < event.results.length; i++) {
         const result = event.results[i]
+
+        // Get the best confidence from all alternatives
+        for (let j = 0; j < result.length; j++) {
+          if (result[j].confidence > bestConfidence) {
+            bestConfidence = result[j].confidence
+          }
+        }
+
         if (result.isFinal) {
-          // Use the most confident result
-          const bestTranscript = result[0].transcript
-          finalTranscriptAccumulator += bestTranscript + ' '
-          setTranscript(finalTranscriptAccumulator.trim())
+          // Pick the best alternative (first one is usually highest confidence)
+          const bestTranscript = result[0].transcript.trim()
+          finalTranscriptRef.current += bestTranscript + ' '
+          setTranscript(finalTranscriptRef.current.trim())
+          setHasFinalResult(true)
+          setInterimText('')
+          restartAttempts = 0
+
+          // Reset auto-stop countdown when we get a result
+          if (languageRef.current === 'bn') {
+            setAutoStopCountdown(5) // Auto-stop after 5 seconds of silence
+          } else {
+            setAutoStopCountdown(3)
+          }
+
           // Send the accumulated final transcript
-          onTranscriptRef.current(finalTranscriptAccumulator.trim())
+          onTranscriptRef.current(finalTranscriptRef.current.trim())
         } else {
           interimTranscript += result[0].transcript
         }
       }
 
-      // Show interim results as user speaks
       if (interimTranscript) {
-        setTranscript((finalTranscriptAccumulator + interimTranscript).trim())
+        setInterimText(interimTranscript)
+        setTranscript((finalTranscriptRef.current + interimTranscript).trim())
+      }
+
+      if (bestConfidence > 0) {
+        setConfidence(Math.round(bestConfidence * 100))
       }
     }
 
     recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
-      console.error('Speech recognition error:', event.error)
+      console.error('Speech recognition error:', event.error, event.message)
+
       if (event.error === 'not-allowed') {
-        setError(languageRef.current === 'bn' 
-          ? 'মাইক্রোফোন অ্যাক্সেস অস্বীকৃত। অনুগ্রহ করে মাইক্রোফোন অ্যাক্সেস দিন।' 
-          : 'Microphone access denied. Please allow microphone access.')
+        setError(languageRef.current === 'bn'
+          ? 'মাইক্রোফোন অ্যাক্সেস অস্বীকৃত। অনুগ্রহ করে ব্রাউজার সেটিংস থেকে মাইক্রোফোন অ্যাক্সেস দিন।'
+          : 'Microphone access denied. Please allow microphone access in browser settings.')
+        setIsListening(false)
       } else if (event.error === 'no-speech') {
-        setError(languageRef.current === 'bn' 
-          ? 'কোনো কথা শোনা যায়নি। ধীরে ও স্পষ্টভাবে বলুন।' 
-          : 'No speech detected. Please speak clearly and try again.')
+        // For Bangla, try to restart automatically
+        if (languageRef.current === 'bn' && restartAttempts < MAX_RESTARTS && finalTranscriptRef.current) {
+          restartAttempts++
+          try {
+            recognition.stop()
+            setTimeout(() => {
+              try {
+                recognition.start()
+              } catch {
+                // ignore
+              }
+            }, 200)
+          } catch {
+            // ignore
+          }
+        } else if (!finalTranscriptRef.current) {
+          setError(languageRef.current === 'bn'
+            ? 'কোনো কথা শোনা যায়নি। ধীরে ও স্পষ্টভাবে বলুন। মাইকের কাছে কথা বলুন।'
+            : 'No speech detected. Please speak clearly and closer to the mic.')
+          setIsListening(false)
+        }
       } else if (event.error === 'network') {
         setError(languageRef.current === 'bn'
-          ? 'নেটওয়ার্ক সমস্যা। ইন্টারনেট সংযোগ পরীক্ষা করুন।'
-          : 'Network error. Please check your internet connection.')
+          ? 'নেটওয়ার্ক সমস্যা। ইন্টারনেট সংযোগ পরীক্ষা করুন। ভয়েস রিকগনিশনের জন্য ইন্টারনেট প্রয়োজন।'
+          : 'Network error. Voice recognition requires internet. Please check your connection.')
+        setIsListening(false)
+      } else if (event.error === 'aborted') {
+        // Normal abort, don't show error
       } else {
-        setError(`Speech recognition error: ${event.error}`)
+        setError(`Recognition error: ${event.error}`)
+        setIsListening(false)
       }
-      setIsListening(false)
     }
 
     recognition.onend = () => {
-      setIsListening(false)
+      // If we were listening and still have the listening state, it means
+      // the recognition ended unexpectedly - try to restart
+      if (isListening && !hasFinalResult && finalTranscriptRef.current === '' && restartAttempts < MAX_RESTARTS) {
+        restartAttempts++
+        setTimeout(() => {
+          try {
+            recognition.lang = LANG_CONFIG[languageRef.current].code
+            recognition.start()
+          } catch {
+            setIsListening(false)
+          }
+        }, 300)
+      } else {
+        setIsListening(false)
+        setAutoStopCountdown(null)
+      }
     }
 
     recognition.onstart = () => {
-      finalTranscriptAccumulator = ''
+      finalTranscriptRef.current = ''
+      setHasFinalResult(false)
+      setInterimText('')
+      setConfidence(0)
     }
 
     recognitionRef.current = recognition
@@ -129,48 +227,90 @@ export default function VoiceInput({ onTranscript, isProcessing, language, onLan
     }
   }, [])
 
+  const handleStop = useCallback(() => {
+    if (!recognitionRef.current) return
+    try {
+      recognitionRef.current.stop()
+    } catch {
+      // ignore
+    }
+    setIsListening(false)
+    setAutoStopCountdown(null)
+    setInterimText('')
+
+    // If we have a final transcript, send it
+    if (finalTranscriptRef.current.trim()) {
+      onTranscriptRef.current(finalTranscriptRef.current.trim())
+    }
+  }, [])
+
   const toggleListening = useCallback(() => {
     if (!recognitionRef.current) return
 
     if (isListening) {
-      recognitionRef.current.stop()
-      setIsListening(false)
+      handleStop()
     } else {
       setError(null)
       setTranscript('')
+      setInterimText('')
       setRetryCount(0)
+      setConfidence(0)
+      setHasFinalResult(false)
+      finalTranscriptRef.current = ''
+
       try {
+        // Try the primary language code first
         recognitionRef.current.lang = LANG_CONFIG[language].code
         recognitionRef.current.start()
         setIsListening(true)
+        // Set initial auto-stop countdown
+        setAutoStopCountdown(language === 'bn' ? 15 : 10) // Longer for Bangla since users speak slower
       } catch (err) {
         console.error('Failed to start recognition:', err)
-        // If already started, stop and retry
-        if (retryCount < 2) {
-          setRetryCount(prev => prev + 1)
+
+        // Try fallback language codes
+        const fallbacks = LANG_CONFIG[language].fallbackCodes
+        let started = false
+
+        for (const fallbackCode of fallbacks) {
           try {
-            recognitionRef.current.stop()
+            recognitionRef.current.lang = fallbackCode
+            recognitionRef.current.start()
+            setIsListening(true)
+            started = true
+            break
           } catch {
-            // ignore
+            // try next fallback
           }
-          setTimeout(() => {
+        }
+
+        if (!started) {
+          if (retryCount < 2) {
+            setRetryCount(prev => prev + 1)
             try {
-              recognitionRef.current?.start()
-              setIsListening(true)
+              recognitionRef.current.stop()
             } catch {
-              setError(language === 'bn' 
-                ? 'ভয়েস রিকগনিশন শুরু করা যায়নি। পেজ রিফ্রেশ করুন।' 
-                : 'Failed to start voice recognition. Please refresh the page.')
+              // ignore
             }
-          }, 300)
-        } else {
-          setError(language === 'bn' 
-            ? 'ভয়েস রিকগনিশন শুরু করা যায়নি। পেজ রিফ্রেশ করুন।' 
-            : 'Failed to start voice recognition. Please refresh the page.')
+            setTimeout(() => {
+              try {
+                recognitionRef.current?.start()
+                setIsListening(true)
+              } catch {
+                setError(language === 'bn'
+                  ? 'ভয়েস রিকগনিশন শুরু করা যায়নি। পেজ রিফ্রেশ করুন।'
+                  : 'Failed to start voice recognition. Please refresh the page.')
+              }
+            }, 300)
+          } else {
+            setError(language === 'bn'
+              ? 'ভয়েস রিকগনিশন শুরু করা যায়নি। পেজ রিফ্রেশ করুন।'
+              : 'Failed to start voice recognition. Please refresh the page.')
+          }
         }
       }
     }
-  }, [isListening, language, retryCount])
+  }, [isListening, language, retryCount, handleStop])
 
   if (!mounted) {
     return (
@@ -220,8 +360,8 @@ export default function VoiceInput({ onTranscript, isProcessing, language, onLan
         disabled={!isSupported || isProcessing}
         className={`
           relative w-24 h-24 rounded-full flex items-center justify-center transition-all duration-300
-          ${isListening 
-            ? 'bg-red-500 text-white shadow-lg shadow-red-500/30 scale-110' 
+          ${isListening
+            ? 'bg-red-500 text-white shadow-lg shadow-red-500/30 scale-110'
             : 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/30 hover:scale-105 active:scale-95'
           }
           ${(!isSupported || isProcessing) ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
@@ -254,9 +394,31 @@ export default function VoiceInput({ onTranscript, isProcessing, language, onLan
           <div className="space-y-1">
             <p className="text-sm text-red-600 font-medium animate-pulse">{currentLang.hint}</p>
             {language === 'bn' && (
-              <p className="text-[10px] text-muted-foreground">
-                ধীরে ও স্পষ্টভাবে কথা বলুন • বলা শেষে আবার ট্যাপ করুন
-              </p>
+              <div className="space-y-0.5">
+                <p className="text-[10px] text-muted-foreground">
+                  ধীরে ও স্পষ্টভাবে কথা বলুন • বলা শেষে আবার ট্যাপ করুন
+                </p>
+                {autoStopCountdown !== null && autoStopCountdown <= 3 && (
+                  <p className="text-[10px] text-amber-500 font-medium">
+                    আর {autoStopCountdown} সেকেন্ডে স্বয়ংক্রিয়ভাবে বন্ধ হবে...
+                  </p>
+                )}
+              </div>
+            )}
+            {/* Confidence indicator */}
+            {confidence > 0 && (
+              <div className="flex items-center justify-center gap-1.5 mt-1">
+                <Volume2 className="w-3 h-3 text-muted-foreground" />
+                <div className="w-20 h-1.5 bg-muted rounded-full overflow-hidden">
+                  <div
+                    className={`h-full rounded-full transition-all duration-300 ${
+                      confidence > 70 ? 'bg-emerald-500' : confidence > 40 ? 'bg-amber-500' : 'bg-red-500'
+                    }`}
+                    style={{ width: `${confidence}%` }}
+                  />
+                </div>
+                <span className="text-[9px] text-muted-foreground">{confidence}%</span>
+              </div>
             )}
           </div>
         ) : (
@@ -266,7 +428,7 @@ export default function VoiceInput({ onTranscript, isProcessing, language, onLan
             </p>
             {language === 'bn' && (
               <p className="text-[10px] text-muted-foreground">
-                ভয়েস চালু রাখতে ধীরে বলুন, বন্ধ করতে আবার ট্যাপ করুন
+                সবচেয়ে ভালো ফলাফলের জন্য Chrome বা Edge ব্যবহার করুন
               </p>
             )}
           </div>
@@ -274,16 +436,26 @@ export default function VoiceInput({ onTranscript, isProcessing, language, onLan
       </div>
 
       {/* Live Transcript */}
-      {transcript && (
+      {(transcript || interimText) && (
         <Card className="w-full max-w-md">
           <CardContent className="p-4">
             <p className="text-sm text-muted-foreground mb-1">
               {language === 'bn' ? 'আপনি বলেছেন:' : 'You said:'}
             </p>
-            <p className="text-base font-medium">{transcript}</p>
-            {isListening && (
+            <p className="text-base font-medium">
+              {transcript}
+              {interimText && !isProcessing && (
+                <span className="text-muted-foreground italic">{interimText}</span>
+              )}
+            </p>
+            {isListening && !hasFinalResult && (
               <p className="text-[10px] text-muted-foreground mt-1">
                 {language === 'bn' ? 'কথা বলতে থাকুন... শেষে ট্যাপ করুন' : 'Keep speaking... tap again when done'}
+              </p>
+            )}
+            {hasFinalResult && isListening && (
+              <p className="text-[10px] text-emerald-600 mt-1">
+                {language === 'bn' ? '✓ শোনা হয়েছে! আরও কিছু বলতে পারেন বা ট্যাপ করে শেষ করুন' : '✓ Heard! Speak more or tap to finish'}
               </p>
             )}
           </CardContent>
@@ -292,7 +464,20 @@ export default function VoiceInput({ onTranscript, isProcessing, language, onLan
 
       {/* Error Message */}
       {error && (
-        <p className="text-sm text-destructive">{error}</p>
+        <div className="text-center">
+          <p className="text-sm text-destructive">{error}</p>
+          {language === 'bn' && error.includes('শোনা যায়নি') && (
+            <div className="mt-2 p-3 bg-amber-50 rounded-lg border border-amber-200">
+              <p className="text-[10px] text-amber-800 font-medium mb-1">বাংলা ভয়েস টিপস:</p>
+              <ul className="text-[10px] text-amber-700 space-y-0.5 text-left">
+                <li>• ধীরে ও স্পষ্টভাবে কথা বলুন</li>
+                <li>• মাইকের ৩-৫ ইঞ্চি কাছে থাকুন</li>
+                <li>• আধা বাংলা আধা ইংরেজি এড়িয়ে চলুন</li>
+                <li>• "বাজারে ৫০০ টাকা খরচ" এভাবে বলুন</li>
+              </ul>
+            </div>
+          )}
+        </div>
       )}
     </div>
   )
