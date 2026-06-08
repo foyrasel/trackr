@@ -8,32 +8,34 @@ datasource db {
 }
 
 model User {
-  id            String   @id @default(cuid())
-  name          String?
-  email         String?  @unique
-  image         String?
-  provider      String   @default("demo") // "google", "facebook", "demo"
-  accounts      Account[]
-  budgets       Budget[]
-  transactions  Transaction[]
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id             String    @id @default(cuid())
+  name           String?
+  email          String?   @unique
+  image          String?
+  provider       String    @default("demo") // "google", "facebook", "demo"
+  darkMode       Boolean   @default(false)
+  accounts       Account[]
+  budgets        Budget[]
+  transactions   Transaction[]
+  recurringTxns  RecurringTransaction[]
+  goals          Goal[]
+  reminders      Reminder[]
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 }
 
 model Account {
   id        String   @id @default(cuid())
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  name      String   // "Cash", "Debit Card", "Credit Card"
-  type      String   // "cash", "debit", "credit"
+  name      String   // "Cash", "Debit Card", "Credit Card", "bKash", "Nagad", etc.
+  type      String   // "cash", "debit", "credit", "mobile" (bKash/Nagad)
   balance   Float    @default(0)
   color     String   @default("#10b981")
   icon      String   @default("💵")
   isDefault Boolean  @default(false)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-
-  @@unique([userId, type])
 }
 
 model Budget {
@@ -52,16 +54,71 @@ model Budget {
 
 model Transaction {
   id             String   @id @default(cuid())
-  userId         String?
-  user           User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   type           String   // "expense" or "income"
   amount         Float
   description    String
   category       String   // e.g., "Groceries", "Transport", "Salary"
-  spendingType   String   @default("cash") // "cash", "debit", "credit"
+  spendingType   String   @default("cash") // "cash", "debit", "credit", "mobile"
   classification String   @default("need") // "need", "want", "ego", "savings", "debt" (for expenses), "income" (for income)
   date           DateTime @default(now())
   isRecurring    Boolean  @default(false)
+  receiptUrl     String?  // Path to uploaded receipt photo
+  recurringId    String?  // Link to recurring transaction that created this
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
+}
+
+model RecurringTransaction {
+  id             String   @id @default(cuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type           String   // "expense" or "income"
+  amount         Float
+  description    String
+  category       String
+  spendingType   String   @default("cash")
+  classification String   @default("need")
+  frequency      String   // "daily", "weekly", "monthly", "yearly"
+  dayOfMonth     Int      @default(1) // For monthly: which day (1-31)
+  dayOfWeek      Int?     // For weekly: which day (0=Sun, 6=Sat)
+  startDate      DateTime @default(now())
+  endDate        DateTime? // null = forever
+  lastExecuted   DateTime?
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model Goal {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name         String   // e.g., "Save for Eid", "Emergency Fund"
+  targetAmount Float    // Goal amount in BDT
+  savedAmount  Float    @default(0) // How much saved so far
+  deadline     DateTime? // Target date
+  icon         String   @default("🎯")
+  color        String   @default("#10b981")
+  isCompleted  Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Reminder {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title       String   // e.g., "Pay Electricity Bill"
+  amount      Float?   // Expected amount
+  category    String   @default("Utilities")
+  dueDate     DateTime // When the bill is due
+  remindDays  Int      @default(3) // Remind N days before due date
+  isRecurring Boolean  @default(false)
+  frequency   String?  // "monthly", "yearly" if recurring
+  isPaid      Boolean  @default(false)
+  isDismissed Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
