@@ -7,14 +7,20 @@ const globalForPrisma = globalThis as unknown as {
 }
 
 function createPrismaClient() {
-  // Check if using Turso (cloud) or local SQLite
-  const databaseUrl = process.env.DATABASE_URL || ''
+  // Turso connection uses TURSO_URL (separate from Prisma's DATABASE_URL)
+  const tursoUrl = process.env.TURSO_URL || process.env.DATABASE_URL || ''
+  const isTurso = tursoUrl.startsWith('libsql://') || tursoUrl.startsWith('http://') || tursoUrl.startsWith('https://')
 
-  if (databaseUrl.startsWith('libsql://') || databaseUrl.startsWith('http://') || databaseUrl.startsWith('https://')) {
-    // Turso / libsql cloud database
+  if (isTurso) {
+    const authToken = process.env.DATABASE_AUTH_TOKEN || undefined
+
+    if (!authToken) {
+      console.error('⚠️ DATABASE_AUTH_TOKEN is missing for Turso connection')
+    }
+
     const libsql = createClient({
-      url: databaseUrl,
-      authToken: process.env.DATABASE_AUTH_TOKEN || undefined,
+      url: tursoUrl,
+      authToken,
     })
 
     const adapter = new PrismaLibSql(libsql)
