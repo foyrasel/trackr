@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
+import { useSession, signOut } from 'next-auth/react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -18,29 +19,58 @@ export default function Home() {
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [userName, setUserName] = useState('')
   const [userId, setUserId] = useState<string | null>(null)
+  const [mounted, setMounted] = useState(false)
 
-  // Check for existing session on mount
+  const { data: session, status } = useSession()
+
+  // Mark as mounted
   useEffect(() => {
-    const savedName = localStorage.getItem('trackr_user_name')
-    if (savedName) {
-      requestAnimationFrame(() => {
-        setUserName(savedName)
-        setIsLoggedIn(true)
-      })
-    }
+    setMounted(true)
   }, [])
 
-  // Fetch userId after login
+  // Check for next-auth session
   useEffect(() => {
-    if (isLoggedIn && !userId) {
-      fetch('/api/accounts')
+    if (status === 'authenticated' && session?.user) {
+      setUserName(session.user.name || 'User')
+      setIsLoggedIn(true)
+      // Try to get userId from our API
+      fetch('/api/accounts', {
+        headers: { 'x-user-name': session.user.name || '' },
+      })
         .then(res => res.json())
         .then(data => {
           if (data.userId) setUserId(data.userId)
         })
         .catch(console.error)
     }
-  }, [isLoggedIn, userId])
+  }, [session, status])
+
+  // Check for existing session on mount (localStorage fallback for demo mode)
+  useEffect(() => {
+    if (status !== 'authenticated') {
+      const savedName = localStorage.getItem('trackr_user_name')
+      if (savedName) {
+        requestAnimationFrame(() => {
+          setUserName(savedName)
+          setIsLoggedIn(true)
+        })
+      }
+    }
+  }, [status])
+
+  // Fetch userId after login
+  useEffect(() => {
+    if (isLoggedIn && !userId) {
+      fetch('/api/accounts', {
+        headers: { 'x-user-name': userName },
+      })
+        .then(res => res.json())
+        .then(data => {
+          if (data.userId) setUserId(data.userId)
+        })
+        .catch(console.error)
+    }
+  }, [isLoggedIn, userId, userName])
 
   const handleLogin = (name: string) => {
     setUserName(name)
@@ -48,16 +78,19 @@ export default function Home() {
     localStorage.setItem('trackr_user_name', name)
   }
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     localStorage.removeItem('trackr_user_name')
     setUserName('')
     setUserId(null)
     setIsLoggedIn(false)
+    try {
+      await signOut({ redirect: false })
+    } catch {
+      // Ignore signOut errors if no next-auth session
+    }
   }
 
   const handleTransactionAdded = () => {
-    // Navigate to dashboard first, then refresh data with a small delay
-    // to ensure DB writes are committed before fetching
     setActiveTab('dashboard')
     setTimeout(() => {
       setRefreshTrigger(prev => prev + 1)
@@ -100,23 +133,23 @@ export default function Home() {
       <main className="max-w-2xl mx-auto px-4 pb-24 pt-4">
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsContent value="dashboard" className="mt-0">
-            <Dashboard refreshTrigger={refreshTrigger} />
+            <Dashboard refreshTrigger={refreshTrigger} userName={userName} />
           </TabsContent>
 
           <TabsContent value="add" className="mt-0">
-            <AddTransaction onTransactionAdded={handleTransactionAdded} />
+            <AddTransaction onTransactionAdded={handleTransactionAdded} userName={userName} />
           </TabsContent>
 
           <TabsContent value="budget" className="mt-0">
-            <BudgetPanel refreshTrigger={refreshTrigger} />
+            <BudgetPanel refreshTrigger={refreshTrigger} userName={userName} />
           </TabsContent>
 
           <TabsContent value="history" className="mt-0">
-            <TransactionList refreshTrigger={refreshTrigger} />
+            <TransactionList refreshTrigger={refreshTrigger} userName={userName} />
           </TabsContent>
 
           <TabsContent value="insights" className="mt-0">
-            <InsightsPanel refreshTrigger={refreshTrigger} />
+            <InsightsPanel refreshTrigger={refreshTrigger} userName={userName} />
           </TabsContent>
         </Tabs>
       </main>

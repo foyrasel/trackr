@@ -11,6 +11,7 @@ import { toast } from '@/hooks/use-toast'
 
 interface AddTransactionProps {
   onTransactionAdded: () => void
+  userName?: string
 }
 
 const BANGLA_EXAMPLES = [
@@ -29,7 +30,7 @@ const ENGLISH_EXAMPLES = [
   'Last Friday 500 taka on coffee',
 ]
 
-export default function AddTransaction({ onTransactionAdded }: AddTransactionProps) {
+export default function AddTransaction({ onTransactionAdded, userName }: AddTransactionProps) {
   const [inputMode, setInputMode] = useState<'voice' | 'text'>('voice')
   const [language, setLanguage] = useState<'en' | 'bn'>('bn') // Default to Bangla for Bangladesh
   const [textInput, setTextInput] = useState('')
@@ -49,9 +50,11 @@ export default function AddTransaction({ onTransactionAdded }: AddTransactionPro
   const processInput = async (text: string) => {
     setIsProcessing(true)
     try {
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+      if (userName) headers['x-user-name'] = userName
       const response = await fetch('/api/ai/categorize', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({ text }),
       })
 
@@ -88,9 +91,11 @@ export default function AddTransaction({ onTransactionAdded }: AddTransactionPro
   const handleConfirm = async (data: CategorizedTransaction) => {
     setIsSaving(true)
     try {
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+      if (userName) headers['x-user-name'] = userName
       const response = await fetch('/api/transactions', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify(data),
       })
 

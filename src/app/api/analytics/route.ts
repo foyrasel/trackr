@@ -1,8 +1,14 @@
 import { db } from '@/lib/db'
 import { NextRequest, NextResponse } from 'next/server'
+import { getCurrentUser } from '@/lib/auth'
 
 export async function GET(request: NextRequest) {
   try {
+    const user = await getCurrentUser(request)
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const { searchParams } = new URL(request.url)
     const month = searchParams.get('month')
 
@@ -19,9 +25,10 @@ export async function GET(request: NextRequest) {
     const currentYear = startDate.getFullYear()
     const currentMonthNum = startDate.getMonth() + 1
 
-    // Get all transactions for the current month
+    // Get all transactions for the current month (filtered by user)
     const transactions = await db.transaction.findMany({
       where: {
+        userId: user.id,
         date: { gte: startDate, lt: endDate },
       },
       orderBy: { date: 'desc' },
@@ -86,8 +93,9 @@ export async function GET(request: NextRequest) {
       alerts.push(`Debt repayment is ${((debtTotal / totalIncome) * 100).toFixed(1)}% of income. Prioritize debt reduction.`)
     }
 
-    // Get ALL transactions for comprehensive analytics
+    // Get ALL transactions for comprehensive analytics (filtered by user)
     const allTransactions = await db.transaction.findMany({
+      where: { userId: user.id },
       orderBy: { date: 'asc' },
     })
 
@@ -124,7 +132,6 @@ export async function GET(request: NextRequest) {
       pastCategoryBreakdown[t.category] = (pastCategoryBreakdown[t.category] || 0) + t.amount
     })
 
-    // Average category breakdown (per month)
     const avgCategoryBreakdown: Record<string, number> = {}
     if (pastMonths.length > 0) {
       Object.entries(pastCategoryBreakdown).forEach(([cat, total]) => {
@@ -132,7 +139,6 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    // Classification comparison: current vs average
     const pastNeed = pastExpenses.filter(t => t.classification === 'need').reduce((sum, t) => sum + t.amount, 0) / Math.max(pastMonths.length, 1)
     const pastWant = pastExpenses.filter(t => t.classification === 'want').reduce((sum, t) => sum + t.amount, 0) / Math.max(pastMonths.length, 1)
     const pastEgo = pastExpenses.filter(t => t.classification === 'ego').reduce((sum, t) => sum + t.amount, 0) / Math.max(pastMonths.length, 1)
@@ -140,7 +146,6 @@ export async function GET(request: NextRequest) {
     const pastDebt = pastExpenses.filter(t => t.classification === 'debt').reduce((sum, t) => sum + t.amount, 0) / Math.max(pastMonths.length, 1)
 
     // ===== CUMULATIVE DAILY EXPENSE DATA FOR LINE CHART =====
-    // Current month: cumulative expense by day-of-month
     const daysInCurrentMonth = new Date(currentYear, currentMonthNum, 0).getDate()
     const currentMonthDaily: Record<number, number> = {}
     expenses.forEach(t => {
@@ -148,7 +153,6 @@ export async function GET(request: NextRequest) {
       currentMonthDaily[day] = (currentMonthDaily[day] || 0) + t.amount
     })
 
-    // Build cumulative data for current month
     const currentCumulative: { day: number; cumulative: number }[] = []
     let runningTotal = 0
     for (let d = 1; d <= daysInCurrentMonth; d++) {
@@ -156,14 +160,11 @@ export async function GET(request: NextRequest) {
       currentCumulative.push({ day: d, cumulative: runningTotal })
     }
 
-    // Average habit: cumulative daily from past months
-    // For each past month, compute cumulative daily, then average across months
     const pastAllExpenses = allTransactions.filter(t => {
       const tMonth = new Date(t.date).toISOString().slice(0, 7)
       return t.type === 'expense' && tMonth !== currentMonth
     })
 
-    // Group past expenses by month
     const pastMonthsDaily: Record<string, Record<number, number>> = {}
     pastAllExpenses.forEach(t => {
       const monthKey = new Date(t.date).toISOString().slice(0, 7)
@@ -172,13 +173,11 @@ export async function GET(request: NextRequest) {
       pastMonthsDaily[monthKey][day] = (pastMonthsDaily[monthKey][day] || 0) + t.amount
     })
 
-    // Build average cumulative: for each day, average the cumulative amounts across past months
     const avgCumulative: { day: number; cumulative: number }[] = []
     const pastMonthKeys = Object.keys(pastMonthsDaily)
-    const maxDay = Math.max(daysInCurrentMonth, 31) // normalize to 30/31 days
+    const maxDay = Math.max(daysInCurrentMonth, 31)
 
     if (pastMonthKeys.length > 0) {
-      // For each day number, compute average cumulative across past months
       const avgDailyCumulative: number[] = new Array(maxDay + 1).fill(0)
       
       for (let d = 1; d <= maxDay; d++) {
@@ -194,7 +193,6 @@ export async function GET(request: NextRequest) {
           
           if (d > daysInThisMonth) continue
           
-          // Calculate cumulative for this month up to day d
           let cumForMonth = 0
           for (let dd = 1; dd <= d; dd++) {
             cumForMonth += (pastMonthsDaily[mKey][dd] || 0)
@@ -211,7 +209,6 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Merge for chart: [{ day, current, average }]
     const avgVsCurrentLineData = currentCumulative.map((item) => {
       const avgItem = avgCumulative.find(a => a.day === item.day)
       return {
@@ -222,7 +219,6 @@ export async function GET(request: NextRequest) {
     })
 
     // ===== YEARLY AVERAGES =====
-    // Group all expenses by year
     const yearlyData: Record<number, { expense: number; income: number; months: Set<string> }> = {}
     allTransactions.forEach(t => {
       const year = new Date(t.date).getFullYear()
@@ -233,7 +229,6 @@ export async function GET(request: NextRequest) {
       else yearlyData[year].income += t.amount
     })
 
-    // Build yearly comparison
     const yearlyComparison: {
       year: number
       label: string
@@ -255,10 +250,8 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    // Sort by year descending
     yearlyComparison.sort((a, b) => b.year - a.year)
 
-    // All-time average
     const allTimeMonths = new Set<string>()
     let allTimeExpense = 0
     let allTimeIncome = 0
@@ -299,9 +292,7 @@ export async function GET(request: NextRequest) {
         savings: pastSavings,
         debt: pastDebt,
       },
-      // NEW: Line chart data
       avgVsCurrentLineData,
-      // NEW: Yearly comparison
       yearlyComparison,
       allTimeAvgMonthlyExpense,
       allTimeTotalExpense: Math.round(allTimeExpense),

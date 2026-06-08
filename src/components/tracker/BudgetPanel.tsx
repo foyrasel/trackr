@@ -43,6 +43,7 @@ interface BudgetSuggestion {
 
 interface BudgetPanelProps {
   refreshTrigger: number
+  userName?: string
 }
 
 const EXPENSE_CATEGORIES = [
@@ -70,7 +71,7 @@ const CATEGORY_COLORS: Record<string, string> = {
   Other: '#94a3b8',
 }
 
-export default function BudgetPanel({ refreshTrigger }: BudgetPanelProps) {
+export default function BudgetPanel({ refreshTrigger, userName }: BudgetPanelProps) {
   const [budgets, setBudgets] = useState<BudgetItem[]>([])
   const [suggestions, setSuggestions] = useState<BudgetSuggestion[]>([])
   const [totalBudget, setTotalBudget] = useState(0)
@@ -89,9 +90,18 @@ export default function BudgetPanel({ refreshTrigger }: BudgetPanelProps) {
     setMounted(true)
   }, [])
 
+  const getAuthHeaders = useCallback((contentType = true): Record<string, string> => {
+    const headers: Record<string, string> = {}
+    if (contentType) headers['Content-Type'] = 'application/json'
+    if (userName) headers['x-user-name'] = userName
+    return headers
+  }, [userName])
+
   const fetchBudgets = useCallback(async () => {
     try {
-      const response = await fetch(`/api/budgets?month=${currentMonth}`)
+      const response = await fetch(`/api/budgets?month=${currentMonth}`, {
+        headers: getAuthHeaders(false),
+      })
       if (response.ok) {
         const data = await response.json()
         setBudgets(data.budgets)
@@ -103,7 +113,7 @@ export default function BudgetPanel({ refreshTrigger }: BudgetPanelProps) {
     } finally {
       setLoading(false)
     }
-  }, [currentMonth])
+  }, [currentMonth, getAuthHeaders])
 
   useEffect(() => {
     if (mounted) fetchBudgets()
@@ -113,7 +123,9 @@ export default function BudgetPanel({ refreshTrigger }: BudgetPanelProps) {
     setSuggestionsLoading(true)
     setShowSuggestions(true)
     try {
-      const response = await fetch(`/api/budgets/suggest?month=${currentMonth}`)
+      const response = await fetch(`/api/budgets/suggest?month=${currentMonth}`, {
+        headers: getAuthHeaders(false),
+      })
       if (response.ok) {
         const data = await response.json()
         setSuggestions(data.suggestions || [])
@@ -129,7 +141,7 @@ export default function BudgetPanel({ refreshTrigger }: BudgetPanelProps) {
     try {
       const response = await fetch('/api/budgets', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify({ month: currentMonth, category, amount, isIgnored }),
       })
 
@@ -158,7 +170,7 @@ export default function BudgetPanel({ refreshTrigger }: BudgetPanelProps) {
     try {
       const response = await fetch('/api/budgets', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify({ budgetId, isIgnored }),
       })
 
@@ -176,7 +188,10 @@ export default function BudgetPanel({ refreshTrigger }: BudgetPanelProps) {
 
   const handleDeleteBudget = async (budgetId: string) => {
     try {
-      const response = await fetch(`/api/budgets?id=${budgetId}`, { method: 'DELETE' })
+      const response = await fetch(`/api/budgets?id=${budgetId}`, {
+        method: 'DELETE',
+        headers: getAuthHeaders(false),
+      })
       if (response.ok) {
         toast({ title: 'Budget removed' })
         fetchBudgets()

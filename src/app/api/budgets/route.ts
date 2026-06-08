@@ -1,17 +1,17 @@
 import { db } from '@/lib/db'
 import { NextRequest, NextResponse } from 'next/server'
+import { getCurrentUser } from '@/lib/auth'
 
 // GET /api/budgets - Get budgets for a month
 export async function GET(request: NextRequest) {
   try {
+    const user = await getCurrentUser(request)
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const { searchParams } = new URL(request.url)
     const month = searchParams.get('month') // "2026-06"
-    const userId = searchParams.get('userId') || 'default'
-
-    const user = await db.user.findFirst()
-    if (!user) {
-      return NextResponse.json({ budgets: [], totalBudget: 0, totalSpent: 0 })
-    }
 
     const currentMonth = month || `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`
 
@@ -27,6 +27,7 @@ export async function GET(request: NextRequest) {
 
     const expenses = await db.transaction.findMany({
       where: {
+        userId: user.id,
         type: 'expense',
         date: { gte: startDate, lt: endDate },
       },
@@ -65,13 +66,13 @@ export async function GET(request: NextRequest) {
 // POST /api/budgets - Create or update a budget
 export async function POST(request: NextRequest) {
   try {
+    const user = await getCurrentUser(request)
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const body = await request.json()
     const { month, category, amount, isIgnored } = body
-
-    const user = await db.user.findFirst()
-    if (!user) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 })
-    }
 
     // Upsert budget
     const existing = await db.budget.findFirst({
@@ -106,8 +107,19 @@ export async function POST(request: NextRequest) {
 // PUT /api/budgets - Update budget (ignore/unignore)
 export async function PUT(request: NextRequest) {
   try {
+    const user = await getCurrentUser(request)
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const body = await request.json()
     const { budgetId, isIgnored, amount } = body
+
+    // Verify budget belongs to user
+    const existing = await db.budget.findUnique({ where: { id: budgetId } })
+    if (!existing || existing.userId !== user.id) {
+      return NextResponse.json({ error: 'Budget not found' }, { status: 404 })
+    }
 
     const budget = await db.budget.update({
       where: { id: budgetId },
@@ -127,11 +139,22 @@ export async function PUT(request: NextRequest) {
 // DELETE /api/budgets - Delete a budget
 export async function DELETE(request: NextRequest) {
   try {
+    const user = await getCurrentUser(request)
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const { searchParams } = new URL(request.url)
     const budgetId = searchParams.get('id')
 
     if (!budgetId) {
       return NextResponse.json({ error: 'Budget ID required' }, { status: 400 })
+    }
+
+    // Verify budget belongs to user
+    const existing = await db.budget.findUnique({ where: { id: budgetId } })
+    if (!existing || existing.userId !== user.id) {
+      return NextResponse.json({ error: 'Budget not found' }, { status: 404 })
     }
 
     await db.budget.delete({ where: { id: budgetId } })

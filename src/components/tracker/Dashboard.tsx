@@ -71,6 +71,7 @@ interface AnalyticsData {
 
 interface DashboardProps {
   refreshTrigger: number
+  userName?: string
 }
 
 const CLASSIFICATION_COLORS: Record<string, string> = {
@@ -91,7 +92,7 @@ const CLASSIFICATION_LABELS: Record<string, string> = {
 
 const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
 
-export default function Dashboard({ refreshTrigger }: DashboardProps) {
+export default function Dashboard({ refreshTrigger, userName }: DashboardProps) {
   const [data, setData] = useState<AnalyticsData | null>(null)
   const [loading, setLoading] = useState(true)
   const [mounted, setMounted] = useState(false)
@@ -105,7 +106,9 @@ export default function Dashboard({ refreshTrigger }: DashboardProps) {
   const fetchAnalytics = useCallback(async () => {
     try {
       const url = selectedMonth ? `/api/analytics?month=${selectedMonth}` : '/api/analytics'
-      const response = await fetch(url)
+      const headers: Record<string, string> = {}
+      if (userName) headers['x-user-name'] = userName
+      const response = await fetch(url, { headers })
       if (response.ok) {
         const result = await response.json()
         setData(result)
@@ -115,7 +118,7 @@ export default function Dashboard({ refreshTrigger }: DashboardProps) {
     } finally {
       setLoading(false)
     }
-  }, [selectedMonth])
+  }, [selectedMonth, userName])
 
   useEffect(() => {
     if (mounted) {
@@ -305,7 +308,7 @@ export default function Dashboard({ refreshTrigger }: DashboardProps) {
       </Card>
 
       {/* Balance Cards - Cash, Debit, Credit */}
-      <BalanceCards refreshTrigger={refreshTrigger} />
+      <BalanceCards refreshTrigger={refreshTrigger} userName={userName} />
 
       {/* Summary Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">

@@ -27,6 +27,7 @@ interface Account {
 interface BalanceCardsProps {
   refreshTrigger: number
   onBalanceUpdate?: () => void
+  userName?: string
 }
 
 const ACCOUNT_ICONS: Record<string, React.ReactNode> = {
@@ -35,7 +36,7 @@ const ACCOUNT_ICONS: Record<string, React.ReactNode> = {
   credit: <CreditCard className="w-5 h-5" />,
 }
 
-export default function BalanceCards({ refreshTrigger, onBalanceUpdate }: BalanceCardsProps) {
+export default function BalanceCards({ refreshTrigger, onBalanceUpdate, userName }: BalanceCardsProps) {
   const [accounts, setAccounts] = useState<Account[]>([])
   const [loading, setLoading] = useState(true)
   const [mounted, setMounted] = useState(false)
@@ -50,7 +51,9 @@ export default function BalanceCards({ refreshTrigger, onBalanceUpdate }: Balanc
 
   const fetchAccounts = useCallback(async () => {
     try {
-      const response = await fetch('/api/accounts')
+      const headers: Record<string, string> = {}
+      if (userName) headers['x-user-name'] = userName
+      const response = await fetch('/api/accounts', { headers })
       if (response.ok) {
         const data = await response.json()
         setAccounts(data.accounts)
@@ -60,7 +63,7 @@ export default function BalanceCards({ refreshTrigger, onBalanceUpdate }: Balanc
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [userName])
 
   useEffect(() => {
     if (mounted) {
@@ -76,9 +79,11 @@ export default function BalanceCards({ refreshTrigger, onBalanceUpdate }: Balanc
     if (isNaN(amount) || amount <= 0) return
 
     try {
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+      if (userName) headers['x-user-name'] = userName
       const response = await fetch('/api/accounts', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({
           accountId: editAccount.id,
           amount,
