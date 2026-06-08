@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import React, { useState } from 'react'
 import VoiceInput from './VoiceInput'
@@ -16,11 +16,11 @@ interface AddTransactionProps {
 }
 
 const BANGLA_EXAMPLES = [
-  'বাজারে ৫০০ টাকা খরচ',
-  'বাসা ভাড়া ১৫০০০ টাকা',
-  'গতকাল রিকশায় ১০০ টাকা',
-  'বেতন পেয়েছি ৫০০০০ টাকা',
-  'গত শুক্রবার বাজারে ২০০০ টাকা',
+  'à¦¬à¦¾à¦œà¦¾à¦°à§‡ à§«à§¦à§¦ à¦Ÿà¦¾à¦•à¦¾ à¦–à¦°à¦š',
+  'à¦¬à¦¾à¦¸à¦¾ à¦­à¦¾à¦¡à¦¼à¦¾ à§§à§«à§¦à§¦à§¦ à¦Ÿà¦¾à¦•à¦¾',
+  'à¦—à¦¤à¦•à¦¾à¦² à¦°à¦¿à¦•à¦¶à¦¾à¦¯à¦¼ à§§à§¦à§¦ à¦Ÿà¦¾à¦•à¦¾',
+  'à¦¬à§‡à¦¤à¦¨ à¦ªà§‡à¦¯à¦¼à§‡à¦›à¦¿ à§«à§¦à§¦à§¦à§¦ à¦Ÿà¦¾à¦•à¦¾',
+  'à¦—à¦¤ à¦¶à§à¦•à§à¦°à¦¬à¦¾à¦° à¦¬à¦¾à¦œà¦¾à¦°à§‡ à§¨à§¦à§¦à§¦ à¦Ÿà¦¾à¦•à¦¾',
 ]
 
 const ENGLISH_EXAMPLES = [
@@ -69,9 +69,9 @@ export default function AddTransaction({ onTransactionAdded, userName }: AddTran
       
       if (data.fallback) {
         toast({
-          title: language === 'bn' ? 'AI অনুপলব্ধ' : 'AI Unavailable',
+          title: language === 'bn' ? 'AI à¦…à¦¨à§à¦ªà¦²à¦¬à§à¦§' : 'AI Unavailable',
           description: language === 'bn' 
-            ? 'সাধারণ শ্রেণীবিভাগ ব্যবহার হচ্ছে।' 
+            ? 'à¦¸à¦¾à¦§à¦¾à¦°à¦£ à¦¶à§à¦°à§‡à¦£à§€à¦¬à¦¿à¦­à¦¾à¦— à¦¬à§à¦¯à¦¬à¦¹à¦¾à¦° à¦¹à¦šà§à¦›à§‡à¥¤' 
             : 'Using basic categorization. AI will improve suggestions when available.',
           variant: 'default',
         })
@@ -79,9 +79,9 @@ export default function AddTransaction({ onTransactionAdded, userName }: AddTran
     } catch (error) {
       console.error('Error processing input:', error)
       toast({
-        title: language === 'bn' ? 'ত্রুটি' : 'Error',
+        title: language === 'bn' ? 'à¦¤à§à¦°à§à¦Ÿà¦¿' : 'Error',
         description: language === 'bn' 
-          ? 'আপনার ইনপুট প্রক্রিয়া করা যায়নি। আবার চেষ্টা করুন।' 
+          ? 'à¦†à¦ªà¦¨à¦¾à¦° à¦‡à¦¨à¦ªà§à¦Ÿ à¦ªà§à¦°à¦•à§à¦°à¦¿à¦¯à¦¼à¦¾ à¦•à¦°à¦¾ à¦¯à¦¾à¦¯à¦¼à¦¨à¦¿à¥¤ à¦†à¦¬à¦¾à¦° à¦šà§‡à¦·à§à¦Ÿà¦¾ à¦•à¦°à§à¦¨à¥¤' 
           : 'Failed to process your input. Please try again or enter manually.',
         variant: 'destructive',
       })
@@ -109,8 +109,8 @@ export default function AddTransaction({ onTransactionAdded, userName }: AddTran
       const isPastDate = data.date && data.date !== today
       toast({
         title: data.type === 'income' 
-          ? (language === 'bn' ? '💰 আয় যোগ হয়েছে!' : '💰 Income Added!') 
-          : (language === 'bn' ? '💸 খরচ রেকর্ড হয়েছে!' : '💸 Expense Recorded!'),
+          ? (language === 'bn' ? 'ðŸ’° à¦†à¦¯à¦¼ à¦¯à§‹à¦— à¦¹à¦¯à¦¼à§‡à¦›à§‡!' : 'ðŸ’° Income Added!') 
+          : (language === 'bn' ? 'ðŸ’¸ à¦–à¦°à¦š à¦°à§‡à¦•à¦°à§à¦¡ à¦¹à¦¯à¦¼à§‡à¦›à§‡!' : 'ðŸ’¸ Expense Recorded!'),
         description: isPastDate
           ? `${currencySymbol}${data.amount.toLocaleString()} - ${data.description} (${new Date(data.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })})`
           : `${currencySymbol}${data.amount.toLocaleString()} - ${data.description}`,
@@ -122,9 +122,9 @@ export default function AddTransaction({ onTransactionAdded, userName }: AddTran
     } catch (error) {
       console.error('Error saving transaction:', error)
       toast({
-        title: language === 'bn' ? 'ত্রুটি' : 'Error',
+        title: language === 'bn' ? 'à¦¤à§à¦°à§à¦Ÿà¦¿' : 'Error',
         description: language === 'bn' 
-          ? 'লেনদেন সংরক্ষণ করা যায়নি।' 
+          ? 'à¦²à§‡à¦¨à¦¦à§‡à¦¨ à¦¸à¦‚à¦°à¦•à§à¦·à¦£ à¦•à¦°à¦¾ à¦¯à¦¾à¦¯à¦¼à¦¨à¦¿à¥¤' 
           : 'Failed to save transaction. Please try again.',
         variant: 'destructive',
       })
@@ -154,7 +154,7 @@ export default function AddTransaction({ onTransactionAdded, userName }: AddTran
             }`}
           >
             <Mic className="w-4 h-4" />
-            {language === 'bn' ? 'ভয়েস' : 'Voice'}
+            {language === 'bn' ? 'à¦­à¦¯à¦¼à§‡à¦¸' : 'Voice'}
           </button>
           <button
             onClick={() => setInputMode('text')}
@@ -165,7 +165,7 @@ export default function AddTransaction({ onTransactionAdded, userName }: AddTran
             }`}
           >
             <Type className="w-4 h-4" />
-            {language === 'bn' ? 'টেক্সট' : 'Text'}
+            {language === 'bn' ? 'à¦Ÿà§‡à¦•à§à¦¸à¦Ÿ' : 'Text'}
           </button>
         </div>
       </div>
@@ -183,13 +183,13 @@ export default function AddTransaction({ onTransactionAdded, userName }: AddTran
             {language === 'bn' ? (
               <>
                 <p className="text-xs text-muted-foreground">
-                  উচ্চারণ করুন: &quot;বাজারে ৫০০ টাকা খরচ&quot;
+                  à¦‰à¦šà§à¦šà¦¾à¦°à¦£ à¦•à¦°à§à¦¨: &quot;à¦¬à¦¾à¦œà¦¾à¦°à§‡ à§«à§¦à§¦ à¦Ÿà¦¾à¦•à¦¾ à¦–à¦°à¦š&quot;
                 </p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  অথবা: &quot;গতকাল রিকশায় ১০০ টাকা&quot;
+                  à¦…à¦¥à¦¬à¦¾: &quot;à¦—à¦¤à¦•à¦¾à¦² à¦°à¦¿à¦•à¦¶à¦¾à¦¯à¦¼ à§§à§¦à§¦ à¦Ÿà¦¾à¦•à¦¾&quot;
                 </p>
                 <p className="text-[10px] text-blue-500 mt-1">
-                  তারিখ বললে সেটা অটোমেটিক সেট হবে
+                  à¦¤à¦¾à¦°à¦¿à¦– à¦¬à¦²à¦²à§‡ à¦¸à§‡à¦Ÿà¦¾ à¦…à¦Ÿà§‹à¦®à§‡à¦Ÿà¦¿à¦• à¦¸à§‡à¦Ÿ à¦¹à¦¬à§‡
                 </p>
               </>
             ) : (
@@ -201,7 +201,7 @@ export default function AddTransaction({ onTransactionAdded, userName }: AddTran
                   or: &quot;Paid 200 yesterday for transport&quot;
                 </p>
                 <p className="text-[10px] text-blue-500 mt-1">
-                  Mention date &quot;yesterday&quot;, &quot;last Friday&quot; — it will be auto-set
+                  Mention date &quot;yesterday&quot;, &quot;last Friday&quot; â€” it will be auto-set
                 </p>
               </>
             )}
@@ -215,7 +215,7 @@ export default function AddTransaction({ onTransactionAdded, userName }: AddTran
           <CardHeader>
             <CardTitle className="text-base flex items-center gap-2">
               <Receipt className="w-5 h-5 text-emerald-500" />
-              {language === 'bn' ? 'লেনদেন বর্ণনা করুন' : 'Describe Your Transaction'}
+              {language === 'bn' ? 'à¦²à§‡à¦¨à¦¦à§‡à¦¨ à¦¬à¦°à§à¦£à¦¨à¦¾ à¦•à¦°à§à¦¨' : 'Describe Your Transaction'}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -229,7 +229,7 @@ export default function AddTransaction({ onTransactionAdded, userName }: AddTran
                     : 'bg-muted text-muted-foreground hover:text-foreground'
                 }`}
               >
-                বাংলা
+                à¦¬à¦¾à¦‚à¦²à¦¾
               </button>
               <button
                 onClick={() => setLanguage('en')}
@@ -246,7 +246,7 @@ export default function AddTransaction({ onTransactionAdded, userName }: AddTran
             <div className="flex gap-2">
               <Input
                 placeholder={language === 'bn' 
-                  ? 'যেমন: গতকাল বাজারে ৫০০ টাকা খরচ' 
+                  ? 'à¦¯à§‡à¦®à¦¨: à¦—à¦¤à¦•à¦¾à¦² à¦¬à¦¾à¦œà¦¾à¦°à§‡ à§«à§¦à§¦ à¦Ÿà¦¾à¦•à¦¾ à¦–à¦°à¦š' 
                   : 'e.g., Spent 500 on groceries yesterday'
                 }
                 value={textInput}
@@ -294,3 +294,4 @@ export default function AddTransaction({ onTransactionAdded, userName }: AddTran
     </div>
   )
 }
+
