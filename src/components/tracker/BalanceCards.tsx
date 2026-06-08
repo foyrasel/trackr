@@ -11,7 +11,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog'
-import { Wallet, CreditCard, Banknote, Plus, ArrowUpRight, ArrowDownRight, Edit3 } from 'lucide-react'
+import { Wallet, CreditCard, Banknote, Smartphone, Plus, ArrowUpRight, ArrowDownRight, Edit3 } from 'lucide-react'
 import { toast } from '@/hooks/use-toast'
 import { useCurrency } from './CurrencyContext'
 
@@ -35,6 +35,7 @@ const ACCOUNT_ICONS: Record<string, React.ReactNode> = {
   cash: <Banknote className="w-5 h-5" />,
   debit: <Wallet className="w-5 h-5" />,
   credit: <CreditCard className="w-5 h-5" />,
+  mobile: <Smartphone className="w-5 h-5" />,
 }
 
 export default function BalanceCards({ refreshTrigger, onBalanceUpdate, userName }: BalanceCardsProps) {

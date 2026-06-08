@@ -14,6 +14,28 @@ export async function GET(request: NextRequest) {
       orderBy: { isDefault: 'desc' },
     })
 
+    // Auto-migrate: Add Mobile Wallet account for existing users who don't have one
+    const hasMobile = accounts.some(a => a.type === 'mobile')
+    if (!hasMobile) {
+      await db.account.create({
+        data: {
+          userId: user.id,
+          name: 'Mobile Wallet',
+          type: 'mobile',
+          balance: 0,
+          color: '#a855f7',
+          icon: '📱',
+          isDefault: false,
+        },
+      })
+      // Re-fetch to include the new account
+      const updatedAccounts = await db.account.findMany({
+        where: { userId: user.id },
+        orderBy: { isDefault: 'desc' },
+      })
+      return NextResponse.json({ accounts: updatedAccounts, userId: user.id })
+    }
+
     return NextResponse.json({ accounts, userId: user.id })
   } catch (error) {
     console.error('Error fetching accounts:', error)

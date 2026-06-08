@@ -24,17 +24,17 @@ const BANGLA_EXAMPLES = [
 ]
 
 const ENGLISH_EXAMPLES = [
-  'Spent 200 taka on transport',
-  'Paid 15000 rent from debit yesterday',
-  'Income 50000 salary',
-  'Bought groceries for 800 taka cash',
-  'Last Friday 500 taka on coffee',
+  'Spent 200 on transport',
+  'Paid 1500 rent from debit yesterday',
+  'Income 5000 salary',
+  'Bought groceries for 800 cash',
+  'Last Friday 50 on coffee',
 ]
 
 export default function AddTransaction({ onTransactionAdded, userName }: AddTransactionProps) {
   const { currencySymbol } = useCurrency()
   const [inputMode, setInputMode] = useState<'voice' | 'text'>('voice')
-  const [language, setLanguage] = useState<'en' | 'bn'>('bn') // Default to Bangla for Bangladesh
+  const [language, setLanguage] = useState<'en' | 'bn'>('en') // Default to English for international app
   const [textInput, setTextInput] = useState('')
   const [isProcessing, setIsProcessing] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
@@ -195,10 +195,10 @@ export default function AddTransaction({ onTransactionAdded, userName }: AddTran
             ) : (
               <>
                 <p className="text-xs text-muted-foreground">
-                  Try saying: &quot;Spent 500 taka on groceries from cash&quot;
+                  Try saying: &quot;Spent 500 on groceries from cash&quot;
                 </p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  or: &quot;Paid 200 taka yesterday for transport&quot;
+                  or: &quot;Paid 200 yesterday for transport&quot;
                 </p>
                 <p className="text-[10px] text-blue-500 mt-1">
                   Mention date &quot;yesterday&quot;, &quot;last Friday&quot; — it will be auto-set
@@ -247,7 +247,7 @@ export default function AddTransaction({ onTransactionAdded, userName }: AddTran
               <Input
                 placeholder={language === 'bn' 
                   ? 'যেমন: গতকাল বাজারে ৫০০ টাকা খরচ' 
-                  : 'e.g., Spent 500 taka on groceries yesterday'
+                  : 'e.g., Spent 500 on groceries yesterday'
                 }
                 value={textInput}
                 onChange={(e) => setTextInput(e.target.value)}
