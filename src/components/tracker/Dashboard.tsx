@@ -17,9 +17,9 @@ import {
 } from 'recharts'
 import {
   TrendingUp, TrendingDown, Wallet, AlertTriangle,
-  ArrowUpRight, ArrowDownRight, PiggyBank, CreditCard,
-  Flame, ShoppingBag, Sparkles, Shield, BarChart3,
+  PiggyBank, BarChart3,
 } from 'lucide-react'
+import BalanceCards from './BalanceCards'
 
 interface AnalyticsData {
   currentMonth: string
@@ -95,7 +95,10 @@ export default function Dashboard({ refreshTrigger }: DashboardProps) {
   }, [])
 
   useEffect(() => {
-    if (mounted) fetchAnalytics()
+    if (mounted) {
+      setLoading(true)
+      fetchAnalytics()
+    }
   }, [fetchAnalytics, refreshTrigger, mounted])
 
   if (loading || !mounted) {
@@ -205,6 +208,9 @@ export default function Dashboard({ refreshTrigger }: DashboardProps) {
 
   return (
     <div className="space-y-4">
+      {/* Balance Cards - Cash, Debit, Credit */}
+      <BalanceCards refreshTrigger={refreshTrigger} />
+
       {/* Summary Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <Card className="bg-gradient-to-br from-emerald-50 to-emerald-100/50 border-emerald-200">
@@ -216,7 +222,7 @@ export default function Dashboard({ refreshTrigger }: DashboardProps) {
             <p className="text-xl font-bold text-emerald-900">৳{data.totalIncome.toLocaleString()}</p>
           </CardContent>
         </Card>
-        
+
         <Card className="bg-gradient-to-br from-red-50 to-red-100/50 border-red-200">
           <CardContent className="p-4">
             <div className="flex items-center gap-2 mb-1">
@@ -231,7 +237,7 @@ export default function Dashboard({ refreshTrigger }: DashboardProps) {
           <CardContent className="p-4">
             <div className="flex items-center gap-2 mb-1">
               <Wallet className="w-4 h-4" />
-              <span className="text-xs font-medium">Balance</span>
+              <span className="text-xs font-medium">Net Balance</span>
             </div>
             <p className={`text-xl font-bold ${data.balance >= 0 ? 'text-emerald-900' : 'text-red-900'}`}>
               ৳{data.balance.toLocaleString()}
@@ -246,7 +252,7 @@ export default function Dashboard({ refreshTrigger }: DashboardProps) {
               <span className="text-xs text-amber-700 font-medium">Savings Rate</span>
             </div>
             <p className="text-xl font-bold text-amber-900">
-              {data.totalIncome > 0 
+              {data.totalIncome > 0
                 ? `${Math.round(((data.totalIncome - data.totalExpense) / data.totalIncome) * 100)}%`
                 : '0%'
               }
@@ -277,10 +283,10 @@ export default function Dashboard({ refreshTrigger }: DashboardProps) {
               </div>
               <div className="text-right">
                 <Badge className={`text-sm px-3 py-1 ${
-                  diffFromAvg > 10 
-                    ? 'bg-red-100 text-red-800 border-red-300' 
-                    : diffFromAvg < -10 
-                      ? 'bg-emerald-100 text-emerald-800 border-emerald-300' 
+                  diffFromAvg > 10
+                    ? 'bg-red-100 text-red-800 border-red-300'
+                    : diffFromAvg < -10
+                      ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
                       : 'bg-amber-100 text-amber-800 border-amber-300'
                 }`}>
                   {diffFromAvg > 0 ? <TrendingUp className="w-3 h-3 mr-1" /> : <TrendingDown className="w-3 h-3 mr-1" />}
@@ -362,7 +368,7 @@ export default function Dashboard({ refreshTrigger }: DashboardProps) {
         </CardContent>
       </Card>
 
-      {/* Average vs Current Expense Chart */}
+      {/* Average vs Current Month Chart */}
       {data.averageMonthlyExpense > 0 ? (
         <Card>
           <CardHeader className="pb-2">
@@ -451,7 +457,7 @@ export default function Dashboard({ refreshTrigger }: DashboardProps) {
                         <Cell key={`cell-${index}`} fill={entry.color} />
                       ))}
                     </Pie>
-                    <Tooltip 
+                    <Tooltip
                       formatter={(value: number) => `৳${value.toLocaleString()}`}
                     />
                   </PieChart>

@@ -198,6 +198,7 @@ export default function TransactionConfirm({ data, onConfirm, onReject, isSaving
         {/* Action Buttons */}
         <div className="flex gap-3 pt-2">
           <Button
+            type="button"
             onClick={onReject}
             variant="outline"
             className="flex-1"
@@ -207,6 +208,7 @@ export default function TransactionConfirm({ data, onConfirm, onReject, isSaving
             Cancel
           </Button>
           <Button
+            type="button"
             onClick={handleConfirm}
             className="flex-1 bg-emerald-600 hover:bg-emerald-700"
             disabled={isSaving}

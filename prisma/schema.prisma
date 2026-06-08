@@ -7,8 +7,53 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model User {
+  id            String   @id @default(cuid())
+  name          String?
+  email         String?  @unique
+  image         String?
+  provider      String   @default("demo") // "google", "facebook", "demo"
+  accounts      Account[]
+  budgets       Budget[]
+  transactions  Transaction[]
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model Account {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name      String   // "Cash", "Debit Card", "Credit Card"
+  type      String   // "cash", "debit", "credit"
+  balance   Float    @default(0)
+  color     String   @default("#10b981")
+  icon      String   @default("💵")
+  isDefault Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, type])
+}
+
+model Budget {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  month        String   // "2026-06" format
+  category     String   // "Groceries", "Transport", etc. or "total" for overall
+  amount       Float    // budget amount
+  isIgnored    Boolean  @default(false) // user can ignore/skip budget
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([userId, month, category])
+}
+
 model Transaction {
   id             String   @id @default(cuid())
+  userId         String?
+  user           User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
   type           String   // "expense" or "income"
   amount         Float
   description    String
