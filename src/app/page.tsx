@@ -257,9 +257,10 @@ export default function Home() {
         </div>
       </header>
 
-      {/* Main Content */}
-      <main className="max-w-2xl mx-auto px-4 pb-24 pt-4">
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
+      {/* Single Tabs component wrapping both content and navigation */}
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        {/* Main Content */}
+        <main className="max-w-2xl mx-auto px-4 pb-24 pt-4">
           <TabsContent value="dashboard" className="mt-0">
             <Dashboard refreshTrigger={refreshTrigger} userName={userName} />
           </TabsContent>
@@ -288,13 +289,11 @@ export default function Home() {
               isDarkMode={isDarkMode}
             />
           </TabsContent>
-        </Tabs>
-      </main>
+        </main>
 
-      {/* Bottom Navigation */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-white/95 dark:bg-gray-900/95 backdrop-blur-md border-t dark:border-gray-800 z-50">
-        <div className="max-w-2xl mx-auto">
-          <Tabs value={activeTab} onValueChange={setActiveTab}>
+        {/* Bottom Navigation */}
+        <nav className="fixed bottom-0 left-0 right-0 bg-white/95 dark:bg-gray-900/95 backdrop-blur-md border-t dark:border-gray-800 z-50">
+          <div className="max-w-2xl mx-auto">
             <TabsList className="w-full h-16 bg-transparent justify-around p-0 shadow-none">
               <TabsTrigger
                 value="dashboard"
@@ -338,9 +337,9 @@ export default function Home() {
                 <span className="text-[9px]">More</span>
               </TabsTrigger>
             </TabsList>
-          </Tabs>
-        </div>
-      </nav>
+          </div>
+        </nav>
+      </Tabs>
     </div>
     </CurrencyProvider>
   )

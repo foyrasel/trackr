@@ -95,3 +95,31 @@ Stage Summary:
 - Notification permission UI in MorePanel settings
 - Recurring transactions auto-execute on app load (once per session)
 - Safe idempotent execution via API route
+
+---
+Task ID: 6
+Agent: Main
+Task: Comprehensive real-user testing of Trackr app
+
+Work Log:
+- Started dev server and tested login/onboarding flow via browser agent
+- Found 4 bugs during initial testing:
+  1. Default language was Bengali ('bn') instead of English
+  2. Radix Select clicks inside TabsContent caused tab navigation (2 separate Tabs components)
+  3. Missing Mobile Wallet account (only 3 accounts: Cash, Debit, Credit)
+  4. Example texts said "taka" (Bangladesh-specific) instead of currency-neutral
+- Fixed Bug 1: Changed default language from 'bn' to 'en' in AddTransaction.tsx
+- Fixed Bug 2: Merged two separate Tabs components into one in page.tsx
+- Fixed Bug 3: Added Mobile Wallet to default accounts in 3 places (nextauth route, auth.ts, accounts API auto-migration)
+- Fixed Bug 4: Replaced "taka" with currency-neutral text in examples and placeholders
+- Found Bug 5: PDF export crashed the server (stream handling issue)
+- Fixed Bug 5: Rewrote exportAsPdf to properly handle pdfkit streams within a Promise
+- Ran comprehensive API tests: accounts, transactions, analytics, budgets, lend-borrow, reminders, goals, export CSV
+- All API endpoints tested and working correctly
+
+Stage Summary:
+- 5 bugs found and fixed during real-user testing
+- All core APIs verified: Accounts (4 types), Transactions (CRUD), Analytics, Budgets, Lend/Borrow, Reminders, Goals, Export CSV
+- PDF export fixed (was crashing server due to improper stream handling)
+- Mobile Wallet auto-migrated for existing users
+- Build clean: 19 routes, 0 errors
