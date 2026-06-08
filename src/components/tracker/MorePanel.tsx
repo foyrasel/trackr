@@ -42,20 +42,20 @@ import {
   Smartphone,
 } from 'lucide-react'
 import { toast } from '@/hooks/use-toast'
+import { useCurrency } from './CurrencyContext'
 
 import GoalsPanel from './GoalsPanel'
 import LendBorrowPanel from './LendBorrowPanel'
 import RemindersPanel from './RemindersPanel'
 import RecurringPanel from './RecurringPanel'
+import { useNotificationCheck, useNotificationPermission } from '@/hooks/use-notifications'
+import { isNotificationSupported, getNotificationPermission } from '@/lib/notifications'
 
 interface MorePanelProps {
   userName?: string
   refreshTrigger?: number
   onToggleDarkMode?: () => void
   isDarkMode?: boolean
-  currency?: string
-  currencySymbol?: string
-  onCurrencyChange?: (code: string, symbol: string) => void
 }
 
 type PanelView = 'menu' | 'goals' | 'lendBorrow' | 'reminders' | 'recurring' | 'export' | 'accounts' | 'settings'
@@ -708,18 +708,14 @@ function AccountsPanel({ userName, onBack }: { userName?: string; onBack: () => 
 function SettingsPanel({
   userName,
   onBack,
-  currency,
-  currencySymbol,
-  onCurrencyChange,
 }: {
   userName?: string
   onBack: () => void
-  currency?: string
-  currencySymbol?: string
-  onCurrencyChange?: (code: string, symbol: string) => void
 }) {
-  const selectedCurrency = currency || 'USD'
+  const { currency, currencySymbol, setCurrency } = useCurrency()
   const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null)
+  const [notifPermission, setNotifPermission] = useState<NotificationPermission | 'unsupported'>('unsupported')
+  const { requestPermission } = useNotificationPermission()
 
   // Check for PWA install prompt on mount (only runs client-side)
   useEffect(() => {
@@ -730,10 +726,25 @@ function SettingsPanel({
     }
   }, [])
 
+  // Read notification permission on mount
+  useEffect(() => {
+    setNotifPermission(getNotificationPermission())
+  }, [])
+
+  const handleEnableNotifications = async () => {
+    const granted = await requestPermission()
+    setNotifPermission(granted ? 'granted' : getNotificationPermission())
+    if (granted) {
+      toast({ title: 'Notifications enabled!' })
+    } else {
+      toast({ title: 'Notification permission denied', variant: 'destructive' })
+    }
+  }
+
   const handleCurrencyChange = async (code: string) => {
     const curr = CURRENCIES.find((c) => c.code === code)
     if (!curr) return
-    onCurrencyChange?.(curr.code, curr.symbol)
+    setCurrency(curr.code, curr.symbol)
 
     // Also persist to backend
     try {
@@ -775,7 +786,7 @@ function SettingsPanel({
       <Card>
         <CardContent className="p-4 space-y-3">
           <Label className="text-xs text-muted-foreground">Currency</Label>
-          <Select value={selectedCurrency} onValueChange={handleCurrencyChange}>
+          <Select value={currency} onValueChange={handleCurrencyChange}>
             <SelectTrigger>
               <SelectValue />
             </SelectTrigger>
@@ -787,6 +798,51 @@ function SettingsPanel({
               ))}
             </SelectContent>
           </Select>
+        </CardContent>
+      </Card>
+
+      {/* Notifications */}
+      <Card>
+        <CardContent className="p-4 space-y-3">
+          <Label className="text-xs text-muted-foreground">Notifications</Label>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm">
+                {notifPermission === 'unsupported'
+                  ? 'Not supported in this browser'
+                  : notifPermission === 'granted'
+                    ? 'Notifications enabled'
+                    : notifPermission === 'denied'
+                      ? 'Notifications blocked'
+                      : 'Notifications not enabled'}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {notifPermission === 'granted'
+                  ? 'You\'ll receive bill reminders & weekly summaries'
+                  : notifPermission === 'denied'
+                    ? 'Enable in your browser settings to get reminders'
+                    : notifPermission === 'unsupported'
+                      ? 'Try using a Chromium-based browser'
+                      : 'Enable to get bill reminders & weekly summaries'}
+              </p>
+            </div>
+            {notifPermission === 'default' && (
+              <Button
+                size="sm"
+                className="bg-amber-500 hover:bg-amber-600 text-white"
+                onClick={handleEnableNotifications}
+              >
+                <Bell className="w-4 h-4 mr-1" />
+                Enable
+              </Button>
+            )}
+            {notifPermission === 'granted' && (
+              <Badge className="bg-emerald-100 text-emerald-800 border-emerald-300 text-xs">Active</Badge>
+            )}
+            {notifPermission === 'denied' && (
+              <Badge variant="destructive" className="text-xs">Blocked</Badge>
+            )}
+          </div>
         </CardContent>
       </Card>
 
@@ -831,11 +887,30 @@ export default function MorePanel({
   refreshTrigger,
   onToggleDarkMode,
   isDarkMode,
-  currency,
-  currencySymbol,
-  onCurrencyChange,
 }: MorePanelProps) {
   const [activePanel, setActivePanel] = useState<PanelView>('menu')
+
+  // Notification permission state
+  const [notifPermission, setNotifPermission] = useState<NotificationPermission | 'unsupported'>('unsupported')
+  const { requestPermission } = useNotificationPermission()
+
+  // Check for overdue/upcoming reminders on mount and show notifications
+  useNotificationCheck(userName)
+
+  // Read notification permission on mount
+  useEffect(() => {
+    setNotifPermission(getNotificationPermission())
+  }, [])
+
+  const handleEnableNotifications = async () => {
+    const granted = await requestPermission()
+    setNotifPermission(granted ? 'granted' : getNotificationPermission())
+    if (granted) {
+      toast({ title: 'Notifications enabled!' })
+    } else {
+      toast({ title: 'Notification permission denied', variant: 'destructive' })
+    }
+  }
 
   // Weekly summary state
   const [summary, setSummary] = useState<{
@@ -911,6 +986,9 @@ export default function MorePanel({
       description: 'Currency & preferences',
     },
   ]
+
+  // Show notification enable prompt if notifications are supported but not yet granted
+  const showNotifPrompt = isNotificationSupported() && notifPermission === 'default'
 
   const handleCardClick = (item: typeof menuItems[number]) => {
     if (item.isToggle) {
@@ -998,9 +1076,6 @@ export default function MorePanel({
       <SettingsPanel
         userName={userName}
         onBack={handleBack}
-        currency={currency}
-        currencySymbol={currencySymbol}
-        onCurrencyChange={onCurrencyChange}
       />
     )
   }
@@ -1033,6 +1108,32 @@ export default function MorePanel({
                 <p className="text-[10px] text-muted-foreground">Savings</p>
                 <p className={`text-sm font-bold ${summary.savingsRate >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>{summary.savingsRate}%</p>
               </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Enable Notifications Card */}
+      {showNotifPrompt && (
+        <Card className="border-amber-200 bg-gradient-to-br from-amber-50/50 to-white">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center">
+                  <Bell className="w-5 h-5 text-amber-600" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold">Enable Notifications</p>
+                  <p className="text-xs text-muted-foreground">Get bill reminders & weekly summaries</p>
+                </div>
+              </div>
+              <Button
+                size="sm"
+                className="bg-amber-500 hover:bg-amber-600 text-white"
+                onClick={handleEnableNotifications}
+              >
+                Enable
+              </Button>
             </div>
           </CardContent>
         </Card>

@@ -57,9 +57,26 @@ export async function GET(request: NextRequest) {
     })
 
     const spendingTypeBreakdown: Record<string, number> = {}
+    const spendingTypeStats: Record<string, { total: number; count: number; avgPerTxn: number }> = {
+      cash: { total: 0, count: 0, avgPerTxn: 0 },
+      debit: { total: 0, count: 0, avgPerTxn: 0 },
+      credit: { total: 0, count: 0, avgPerTxn: 0 },
+      mobile: { total: 0, count: 0, avgPerTxn: 0 },
+    }
     expenses.forEach(t => {
       spendingTypeBreakdown[t.spendingType] = (spendingTypeBreakdown[t.spendingType] || 0) + t.amount
+      const key = t.spendingType as keyof typeof spendingTypeStats
+      if (spendingTypeStats[key]) {
+        spendingTypeStats[key].total += t.amount
+        spendingTypeStats[key].count += 1
+      }
     })
+    // Calculate averages
+    for (const key of Object.keys(spendingTypeStats) as (keyof typeof spendingTypeStats)[]) {
+      if (spendingTypeStats[key].count > 0) {
+        spendingTypeStats[key].avgPerTxn = Math.round(spendingTypeStats[key].total / spendingTypeStats[key].count)
+      }
+    }
 
     const dailySpending: Record<string, number> = {}
     expenses.forEach(t => {
@@ -281,6 +298,7 @@ export async function GET(request: NextRequest) {
       categoryBreakdown,
       incomeBreakdown,
       spendingTypeBreakdown,
+      spendingTypeStats,
       dailySpending,
       monthlyTrend,
       averageMonthlyExpense,

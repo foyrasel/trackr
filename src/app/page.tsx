@@ -11,9 +11,17 @@ import Dashboard from '@/components/tracker/Dashboard'
 import TransactionList from '@/components/tracker/TransactionList'
 import BudgetPanel from '@/components/tracker/BudgetPanel'
 import LoginScreen from '@/components/tracker/LoginScreen'
+import OnboardingScreen from '@/components/tracker/OnboardingScreen'
 import InsightsPanel from '@/components/tracker/InsightsPanel'
 import MorePanel from '@/components/tracker/MorePanel'
+import { CurrencyProvider, useCurrency } from '@/components/tracker/CurrencyContext'
+import { useRecurringExecution } from '@/hooks/use-recurring-exec'
 import { LayoutDashboard, Plus, History, Lightbulb, Target, LogOut, Loader2, MoreHorizontal, Moon, Sun } from 'lucide-react'
+
+function CurrencyDisplay() {
+  const { currency } = useCurrency()
+  return <>{currency}</>
+}
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState('dashboard')
@@ -22,12 +30,11 @@ export default function Home() {
   const [userName, setUserName] = useState('')
   const [userImage, setUserImage] = useState<string | null>(null)
   const [userId, setUserId] = useState<string | null>(null)
+  const [showOnboarding, setShowOnboarding] = useState(false)
   const [mounted, setMounted] = useState(false)
 
-  // Dark mode + currency state
+  // Dark mode state
   const [isDarkMode, setIsDarkMode] = useState(false)
-  const [currency, setCurrency] = useState('USD')
-  const [currencySymbol, setCurrencySymbol] = useState('$')
 
   const { data: session, status } = useSession()
 
@@ -36,7 +43,7 @@ export default function Home() {
     setMounted(true)
   }, [])
 
-  // Fetch user settings (dark mode, currency) after login
+  // Fetch user settings (dark mode) after login
   useEffect(() => {
     if (isLoggedIn) {
       fetch('/api/user', {
@@ -53,8 +60,6 @@ export default function Home() {
                 document.documentElement.classList.remove('dark')
               }
             }
-            if (data.currency) setCurrency(data.currency)
-            if (data.currencySymbol) setCurrencySymbol(data.currencySymbol)
           }
         })
         .catch(console.error)
@@ -68,6 +73,11 @@ export default function Home() {
       setUserImage(session.user.image || null)
       setIsLoggedIn(true)
       localStorage.setItem('trackr_user_name', session.user.name || 'User')
+      // Check if onboarding has been completed for OAuth users
+      const onboardingDone = localStorage.getItem('trackr_onboarding_done')
+      if (!onboardingDone) {
+        setShowOnboarding(true)
+      }
     }
   }, [session, status])
 
@@ -76,9 +86,13 @@ export default function Home() {
     if (status !== 'authenticated' && status !== 'loading') {
       const savedName = localStorage.getItem('trackr_user_name')
       if (savedName) {
+        const onboardingDone = localStorage.getItem('trackr_onboarding_done')
         requestAnimationFrame(() => {
           setUserName(savedName)
           setIsLoggedIn(true)
+          if (!onboardingDone) {
+            setShowOnboarding(true)
+          }
         })
       }
     }
@@ -102,6 +116,16 @@ export default function Home() {
     setUserName(name)
     setIsLoggedIn(true)
     localStorage.setItem('trackr_user_name', name)
+    // Check if onboarding has been completed before
+    const onboardingDone = localStorage.getItem('trackr_onboarding_done')
+    if (!onboardingDone) {
+      setShowOnboarding(true)
+    }
+  }
+
+  const handleOnboardingComplete = () => {
+    localStorage.setItem('trackr_onboarding_done', 'true')
+    setShowOnboarding(false)
   }
 
   const handleLogout = async () => {
@@ -116,6 +140,13 @@ export default function Home() {
       // Ignore signOut errors if no next-auth session
     }
   }
+
+  const handleRefreshData = useCallback(() => {
+    setRefreshTrigger(prev => prev + 1)
+  }, [])
+
+  // Auto-execute due recurring transactions once per session
+  useRecurringExecution(isLoggedIn ? userName : undefined, handleRefreshData)
 
   const handleTransactionAdded = () => {
     setActiveTab('dashboard')
@@ -142,19 +173,6 @@ export default function Home() {
     localStorage.setItem('trackr_dark_mode', newMode ? 'true' : 'false')
   }, [isDarkMode, userName])
 
-  const handleCurrencyChange = useCallback((code: string, symbol: string) => {
-    setCurrency(code)
-    setCurrencySymbol(symbol)
-    // Persist to server
-    fetch('/api/user', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json', ...(userName ? { 'x-user-name': userName } : {}) },
-      body: JSON.stringify({ currency: code, currencySymbol: symbol }),
-    }).catch(console.error)
-    localStorage.setItem('trackr_currency', code)
-    localStorage.setItem('trackr_currency_symbol', symbol)
-  }, [userName])
-
   // Load dark mode from localStorage quickly (before server response)
   useEffect(() => {
     const savedDarkMode = localStorage.getItem('trackr_dark_mode')
@@ -162,10 +180,6 @@ export default function Home() {
       setIsDarkMode(true)
       document.documentElement.classList.add('dark')
     }
-    const savedCurrency = localStorage.getItem('trackr_currency')
-    const savedSymbol = localStorage.getItem('trackr_currency_symbol')
-    if (savedCurrency) setCurrency(savedCurrency)
-    if (savedSymbol) setCurrencySymbol(savedSymbol)
   }, [])
 
   // Show loading while session is being checked (important for OAuth redirect)
@@ -188,6 +202,11 @@ export default function Home() {
     return <LoginScreen onLogin={handleLogin} />
   }
 
+  // Show onboarding screen for first-time users
+  if (showOnboarding) {
+    return <OnboardingScreen onComplete={handleOnboardingComplete} />
+  }
+
   // Get user initials for avatar fallback
   const userInitials = userName
     .split(' ')
@@ -197,6 +216,7 @@ export default function Home() {
     .slice(0, 2)
 
   return (
+    <CurrencyProvider>
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-emerald-50/30 dark:from-gray-950 dark:via-gray-900 dark:to-emerald-950/10">
       {/* Header */}
       <header className="sticky top-0 z-50 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md border-b dark:border-gray-800">
@@ -214,7 +234,7 @@ export default function Home() {
           </div>
           <div className="flex items-center gap-1.5">
             <Badge variant="outline" className="text-[10px] bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800">
-              {currency}
+              <CurrencyDisplay />
             </Badge>
             <Button
               variant="ghost"
@@ -266,9 +286,6 @@ export default function Home() {
               refreshTrigger={refreshTrigger}
               onToggleDarkMode={handleToggleDarkMode}
               isDarkMode={isDarkMode}
-              currency={currency}
-              currencySymbol={currencySymbol}
-              onCurrencyChange={handleCurrencyChange}
             />
           </TabsContent>
         </Tabs>
@@ -325,5 +342,6 @@ export default function Home() {
         </div>
       </nav>
     </div>
+    </CurrencyProvider>
   )
 }

@@ -18,7 +18,8 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
-import { Check, X, Loader2, Calendar } from 'lucide-react'
+import { Check, X, Loader2, Calendar, Paperclip, ImagePlus, Trash2 } from 'lucide-react'
+import { useCurrency } from './CurrencyContext'
 
 export interface CategorizedTransaction {
   type: string
@@ -28,6 +29,7 @@ export interface CategorizedTransaction {
   spendingType: string
   classification: string
   date: string // ISO date string (YYYY-MM-DD)
+  receiptUrl?: string
 }
 
 interface TransactionConfirmProps {
@@ -58,17 +60,77 @@ const CLASSIFICATION_LABELS: Record<string, { label: string; color: string }> = 
 }
 
 export default function TransactionConfirm({ data, onConfirm, onReject, isSaving }: TransactionConfirmProps) {
+  const { currencySymbol } = useCurrency()
   const [editData, setEditData] = useState<CategorizedTransaction>({ ...data })
+  const [receiptUrl, setReceiptUrl] = useState<string | undefined>(undefined)
+  const [receiptPreview, setReceiptPreview] = useState<string | null>(null)
+  const [uploading, setUploading] = useState(false)
+  const fileInputRef = React.useRef<HTMLInputElement>(null)
 
   // Keep editData in sync if data prop changes
   useEffect(() => {
     setEditData({ ...data })
   }, [data])
 
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    // Validate file type
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+      alert('Only JPEG, PNG, and WebP images are allowed')
+      return
+    }
+
+    // Validate file size (5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      alert('File size must be under 5MB')
+      return
+    }
+
+    // Show preview immediately
+    const reader = new FileReader()
+    reader.onload = (ev) => setReceiptPreview(ev.target?.result as string)
+    reader.readAsDataURL(file)
+
+    // Upload to server
+    setUploading(true)
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+      const response = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
+      })
+      if (response.ok) {
+        const data = await response.json()
+        setReceiptUrl(data.receiptUrl)
+      } else {
+        const err = await response.json()
+        alert(err.error || 'Upload failed')
+        setReceiptPreview(null)
+      }
+    } catch {
+      alert('Failed to upload receipt')
+      setReceiptPreview(null)
+    } finally {
+      setUploading(false)
+    }
+
+    // Reset file input
+    if (fileInputRef.current) fileInputRef.current.value = ''
+  }
+
+  const removeReceipt = () => {
+    setReceiptUrl(undefined)
+    setReceiptPreview(null)
+    if (fileInputRef.current) fileInputRef.current.value = ''
+  }
+
   const categories = editData.type === 'income' ? INCOME_CATEGORIES : EXPENSE_CATEGORIES
 
   const handleConfirm = () => {
-    onConfirm(editData)
+    onConfirm({ ...editData, receiptUrl })
   }
 
   const classificationInfo = CLASSIFICATION_LABELS[editData.classification] || CLASSIFICATION_LABELS.need
@@ -104,7 +166,7 @@ export default function TransactionConfirm({ data, onConfirm, onReject, isSaving
         <div className="text-center">
           <Label className="text-xs text-muted-foreground">Amount</Label>
           <div className="flex items-center justify-center gap-2 mt-1">
-            <span className="text-2xl font-bold text-muted-foreground">৳</span>
+            <span className="text-2xl font-bold text-muted-foreground">{currencySymbol}</span>
             <Input
               type="number"
               value={editData.amount || ''}
@@ -181,6 +243,7 @@ export default function TransactionConfirm({ data, onConfirm, onReject, isSaving
               <SelectItem value="cash">💵 Cash</SelectItem>
               <SelectItem value="debit">💳 Debit Card</SelectItem>
               <SelectItem value="credit">💳 Credit Card</SelectItem>
+              <SelectItem value="mobile">📱 Mobile Wallet</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -244,6 +307,80 @@ export default function TransactionConfirm({ data, onConfirm, onReject, isSaving
             >
               💰 Income
             </button>
+          </div>
+        </div>
+
+        {/* Receipt Photo */}
+        <div>
+          <Label className="text-xs text-muted-foreground flex items-center gap-1">
+            <Paperclip className="w-3 h-3" />
+            Receipt Photo
+            <span className="text-[10px] text-muted-foreground/60 ml-1">(max 5MB)</span>
+          </Label>
+          <div className="mt-1.5">
+            {receiptPreview ? (
+              <div className="relative group rounded-lg overflow-hidden border-2 border-emerald-200 bg-emerald-50/50">
+                <img
+                  src={receiptPreview}
+                  alt="Receipt preview"
+                  className="w-full h-32 object-cover"
+                />
+                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={uploading}
+                    className="h-7 text-xs"
+                  >
+                    <ImagePlus className="w-3.5 h-3.5 mr-1" />
+                    Replace
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    size="sm"
+                    onClick={removeReceipt}
+                    disabled={uploading}
+                    className="h-7 text-xs"
+                  >
+                    <Trash2 className="w-3.5 h-3.5 mr-1" />
+                    Remove
+                  </Button>
+                </div>
+                {uploading && (
+                  <div className="absolute inset-0 bg-white/60 flex items-center justify-center">
+                    <Loader2 className="w-6 h-6 animate-spin text-emerald-600" />
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploading}
+                  className="flex-1 h-9 border-dashed border-emerald-300 text-emerald-700 hover:bg-emerald-50 hover:border-emerald-400"
+                >
+                  {uploading ? (
+                    <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                  ) : (
+                    <ImagePlus className="w-3.5 h-3.5 mr-1.5" />
+                  )}
+                  {uploading ? 'Uploading...' : 'Attach Receipt'}
+                </Button>
+              </div>
+            )}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              onChange={handleFileSelect}
+              className="hidden"
+            />
           </div>
         </div>
 

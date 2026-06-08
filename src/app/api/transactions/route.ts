@@ -71,7 +71,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { type, amount, description, category, spendingType, classification, date, isRecurring } = body
+    const { type, amount, description, category, spendingType, classification, date, isRecurring, receiptUrl } = body
 
     if (!type || !amount || !description || !category) {
       return NextResponse.json(
@@ -91,6 +91,7 @@ export async function POST(request: NextRequest) {
         classification: classification || (type === 'income' ? 'income' : 'need'),
         date: date ? new Date(date) : new Date(),
         isRecurring: isRecurring || false,
+        ...(receiptUrl ? { receiptUrl } : {}),
       },
     })
 

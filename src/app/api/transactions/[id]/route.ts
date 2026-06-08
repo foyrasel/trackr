@@ -21,7 +21,7 @@ export async function PUT(
     }
 
     const body = await request.json()
-    const { type, amount, description, category, spendingType, classification, date, isRecurring } = body
+    const { type, amount, description, category, spendingType, classification, date, isRecurring, receiptUrl } = body
 
     // If amount or spendingType changed, we need to reverse the old balance effect and apply the new one
     if (amount !== undefined || spendingType !== undefined || type !== undefined) {
@@ -81,6 +81,7 @@ export async function PUT(
     if (classification !== undefined) updateData.classification = classification
     if (date !== undefined) updateData.date = new Date(date)
     if (isRecurring !== undefined) updateData.isRecurring = isRecurring
+    if (receiptUrl !== undefined) updateData.receiptUrl = receiptUrl || null
 
     const transaction = await db.transaction.update({
       where: { id },

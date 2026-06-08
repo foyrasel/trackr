@@ -19,6 +19,7 @@ import {
   AlertTriangle, TrendingUp, TrendingDown, Lightbulb,
   Target, Zap, ArrowRight, Shield, PiggyBank, Scale,
 } from 'lucide-react'
+import { useCurrency } from './CurrencyContext'
 
 interface InsightsData {
   currentMonth: string
@@ -55,6 +56,7 @@ const CLASSIFICATION_COLORS: Record<string, string> = {
 }
 
 export default function InsightsPanel({ refreshTrigger, userName }: InsightsPanelProps) {
+  const { currencySymbol } = useCurrency()
   const [data, setData] = useState<InsightsData | null>(null)
   const [loading, setLoading] = useState(true)
   const [mounted, setMounted] = useState(false)
@@ -128,7 +130,7 @@ export default function InsightsPanel({ refreshTrigger, userName }: InsightsPane
       tips.push({
         icon: <PiggyBank className="w-5 h-5 text-amber-500" />,
         title: 'Boost Your Savings',
-        description: `Your savings rate is ${savingsRate.toFixed(1)}%. Aim for at least 20% by cutting non-essential spending. Even saving ৳${Math.round(data.totalIncome * 0.2 - (data.totalIncome - data.totalExpense))} more would help.`,
+        description: `Your savings rate is ${savingsRate.toFixed(1)}%. Aim for at least 20% by cutting non-essential spending. Even saving ${currencySymbol}${Math.round(data.totalIncome * 0.2 - (data.totalIncome - data.totalExpense))} more would help.`,
         priority: 'high',
       })
     } else {
@@ -147,7 +149,7 @@ export default function InsightsPanel({ refreshTrigger, userName }: InsightsPane
     tips.push({
       icon: <AlertTriangle className="w-5 h-5 text-red-500" />,
       title: 'Ego Spending Alert',
-      description: `${((ego / totalExpense) * 100).toFixed(1)}% of your spending is on ego/luxury items${topEgoCategory ? ` (top: ${topEgoCategory[0]})` : ''}. Try reducing this by ৳${Math.round(ego * 0.3)}/month.`,
+      description: `${((ego / totalExpense) * 100).toFixed(1)}% of your spending is on ego/luxury items${topEgoCategory ? ` (top: ${topEgoCategory[0]})` : ''}. Try reducing this by ${currencySymbol}${Math.round(ego * 0.3)}/month.`,
       priority: 'high',
     })
   }
@@ -309,7 +311,7 @@ export default function InsightsPanel({ refreshTrigger, userName }: InsightsPane
                       </span>
                       {item.name}
                     </span>
-                    <span className="font-medium">৳{item.amount.toLocaleString()}</span>
+                    <span className="font-medium">{currencySymbol}{item.amount.toLocaleString()}</span>
                   </div>
                   <Progress 
                     value={Math.min(percent, 100)} 
@@ -348,8 +350,8 @@ export default function InsightsPanel({ refreshTrigger, userName }: InsightsPane
                 }>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="month" fontSize={11} />
-                  <YAxis tickFormatter={(v: number) => `৳${(v / 1000).toFixed(0)}k`} fontSize={10} />
-                  <Tooltip formatter={(value: number) => `৳${value.toLocaleString()}`} />
+                  <YAxis tickFormatter={(v: number) => `${currencySymbol}${(v / 1000).toFixed(0)}k`} fontSize={10} />
+                  <Tooltip formatter={(value: number) => `${currencySymbol}${value.toLocaleString()}`} />
                   <Bar dataKey="income" fill="#10b981" name="Income" radius={[4, 4, 0, 0]} />
                   <Bar dataKey="expense" fill="#ef4444" name="Expense" radius={[4, 4, 0, 0]} />
                 </BarChart>
@@ -375,7 +377,7 @@ export default function InsightsPanel({ refreshTrigger, userName }: InsightsPane
                 .map(([source, amount]) => (
                   <div key={source} className="flex items-center justify-between">
                     <span className="text-sm">{source}</span>
-                    <span className="text-sm font-medium text-emerald-700">৳{amount.toLocaleString()}</span>
+                    <span className="text-sm font-medium text-emerald-700">{currencySymbol}{amount.toLocaleString()}</span>
                   </div>
                 ))}
             </div>

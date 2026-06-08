@@ -32,8 +32,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { Trash2, Edit3, ArrowUpRight, ArrowDownRight, RefreshCw, Loader2, Check, X, Search, Download } from 'lucide-react'
+import { Trash2, Edit3, ArrowUpRight, ArrowDownRight, RefreshCw, Loader2, Check, X, Search, Download, Paperclip, ImagePlus } from 'lucide-react'
 import { toast } from '@/hooks/use-toast'
+import { useCurrency } from './CurrencyContext'
 
 interface Transaction {
   id: string
@@ -45,6 +46,7 @@ interface Transaction {
   classification: string
   date: string
   isRecurring: boolean
+  receiptUrl?: string
 }
 
 interface TransactionListProps {
@@ -82,6 +84,7 @@ const CLASSIFICATION_LABELS: Record<string, string> = {
 }
 
 export default function TransactionList({ refreshTrigger, userName }: TransactionListProps) {
+  const { currencySymbol } = useCurrency()
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [loading, setLoading] = useState(true)
   const [mounted, setMounted] = useState(false)
@@ -111,6 +114,14 @@ export default function TransactionList({ refreshTrigger, userName }: Transactio
     type: string
   } | null>(null)
   const [isSaving, setIsSaving] = useState(false)
+
+  // Receipt viewer state
+  const [receiptViewerUrl, setReceiptViewerUrl] = useState<string | null>(null)
+
+  // Edit receipt state
+  const [editReceiptUrl, setEditReceiptUrl] = useState<string | undefined>(undefined)
+  const [editReceiptUploading, setEditReceiptUploading] = useState(false)
+  const editFileInputRef = React.useRef<HTMLInputElement>(null)
 
   const PAGE_SIZE = 30
 
@@ -196,6 +207,48 @@ export default function TransactionList({ refreshTrigger, userName }: Transactio
       date: tx.date ? new Date(tx.date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
       type: tx.type,
     })
+    setEditReceiptUrl(tx.receiptUrl || undefined)
+  }
+
+  const handleEditReceiptSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+      toast({ title: 'Only JPEG, PNG, and WebP images are allowed', variant: 'destructive' })
+      return
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast({ title: 'File size must be under 5MB', variant: 'destructive' })
+      return
+    }
+
+    setEditReceiptUploading(true)
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+      const response = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
+      })
+      if (response.ok) {
+        const data = await response.json()
+        setEditReceiptUrl(data.receiptUrl)
+      } else {
+        toast({ title: 'Upload failed', variant: 'destructive' })
+      }
+    } catch {
+      toast({ title: 'Failed to upload receipt', variant: 'destructive' })
+    } finally {
+      setEditReceiptUploading(false)
+      if (editFileInputRef.current) editFileInputRef.current.value = ''
+    }
+  }
+
+  const removeEditReceipt = () => {
+    setEditReceiptUrl(undefined)
+    if (editFileInputRef.current) editFileInputRef.current.value = ''
   }
 
   const handleEditSave = async () => {
@@ -205,7 +258,7 @@ export default function TransactionList({ refreshTrigger, userName }: Transactio
       const response = await fetch(`/api/transactions/${editTransaction.id}`, {
         method: 'PUT',
         headers: getAuthHeaders(),
-        body: JSON.stringify(editData),
+        body: JSON.stringify({ ...editData, receiptUrl: editReceiptUrl }),
       })
       if (response.ok) {
         toast({ title: 'Transaction updated' })
@@ -443,7 +496,7 @@ export default function TransactionList({ refreshTrigger, userName }: Transactio
                           <p className={`font-bold text-sm whitespace-nowrap ${
                             tx.type === 'income' ? 'text-emerald-600' : 'text-red-600'
                           }`}>
-                            {tx.type === 'income' ? '+' : '-'}৳{tx.amount.toLocaleString()}
+                            {tx.type === 'income' ? '+' : '-'}{currencySymbol}{tx.amount.toLocaleString()}
                           </p>
                         </div>
                         <div className="flex items-center gap-2 mt-1 flex-wrap">
@@ -457,6 +510,19 @@ export default function TransactionList({ refreshTrigger, userName }: Transactio
                           <span className="text-xs text-muted-foreground">
                             {formatDate(tx.date)}
                           </span>
+                          {tx.receiptUrl && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                setReceiptViewerUrl(tx.receiptUrl!)
+                              }}
+                              className="inline-flex items-center gap-0.5 text-xs text-emerald-600 hover:text-emerald-700 hover:underline cursor-pointer"
+                            >
+                              <Paperclip className="w-3 h-3" />
+                              Receipt
+                            </button>
+                          )}
                         </div>
                       </div>
 
@@ -555,7 +621,7 @@ export default function TransactionList({ refreshTrigger, userName }: Transactio
               <div>
                 <Label className="text-xs text-muted-foreground">Amount</Label>
                 <div className="flex items-center gap-2 mt-1">
-                  <span className="text-xl font-bold text-muted-foreground">৳</span>
+                  <span className="text-xl font-bold text-muted-foreground">{currencySymbol}</span>
                   <Input
                     type="number"
                     value={editData.amount || ''}
@@ -619,6 +685,7 @@ export default function TransactionList({ refreshTrigger, userName }: Transactio
                     <SelectItem value="cash">💵 Cash</SelectItem>
                     <SelectItem value="debit">💳 Debit Card</SelectItem>
                     <SelectItem value="credit">💳 Credit Card</SelectItem>
+                    <SelectItem value="mobile">📱 Mobile Wallet</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -649,6 +716,79 @@ export default function TransactionList({ refreshTrigger, userName }: Transactio
                 )}
               </div>
 
+              {/* Receipt Photo */}
+              <div>
+                <Label className="text-xs text-muted-foreground flex items-center gap-1">
+                  <Paperclip className="w-3 h-3" />
+                  Receipt Photo
+                  <span className="text-[10px] text-muted-foreground/60 ml-1">(max 5MB)</span>
+                </Label>
+                <div className="mt-1.5">
+                  {editReceiptUrl ? (
+                    <div className="relative group rounded-lg overflow-hidden border-2 border-emerald-200 bg-emerald-50/50">
+                      <img
+                        src={editReceiptUrl}
+                        alt="Receipt"
+                        className="w-full h-28 object-cover cursor-pointer"
+                        onClick={() => setReceiptViewerUrl(editReceiptUrl)}
+                      />
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => editFileInputRef.current?.click()}
+                          disabled={editReceiptUploading}
+                          className="h-7 text-xs"
+                        >
+                          <ImagePlus className="w-3.5 h-3.5 mr-1" />
+                          Replace
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="destructive"
+                          size="sm"
+                          onClick={removeEditReceipt}
+                          disabled={editReceiptUploading}
+                          className="h-7 text-xs"
+                        >
+                          <Trash2 className="w-3.5 h-3.5 mr-1" />
+                          Remove
+                        </Button>
+                      </div>
+                      {editReceiptUploading && (
+                        <div className="absolute inset-0 bg-white/60 flex items-center justify-center">
+                          <Loader2 className="w-5 h-5 animate-spin text-emerald-600" />
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => editFileInputRef.current?.click()}
+                      disabled={editReceiptUploading}
+                      className="w-full h-9 border-dashed border-emerald-300 text-emerald-700 hover:bg-emerald-50 hover:border-emerald-400"
+                    >
+                      {editReceiptUploading ? (
+                        <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                      ) : (
+                        <ImagePlus className="w-3.5 h-3.5 mr-1.5" />
+                      )}
+                      {editReceiptUploading ? 'Uploading...' : 'Attach Receipt'}
+                    </Button>
+                  )}
+                  <input
+                    ref={editFileInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    onChange={handleEditReceiptSelect}
+                    className="hidden"
+                  />
+                </div>
+              </div>
+
               {/* Actions */}
               <div className="flex gap-3 pt-2">
                 <Button
@@ -676,6 +816,27 @@ export default function TransactionList({ refreshTrigger, userName }: Transactio
                   Save
                 </Button>
               </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Receipt Viewer Dialog */}
+      <Dialog open={!!receiptViewerUrl} onOpenChange={(open) => { if (!open) setReceiptViewerUrl(null) }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Paperclip className="w-4 h-4" />
+              Receipt
+            </DialogTitle>
+          </DialogHeader>
+          {receiptViewerUrl && (
+            <div className="rounded-lg overflow-hidden border">
+              <img
+                src={receiptViewerUrl}
+                alt="Receipt"
+                className="w-full h-auto max-h-[70vh] object-contain bg-muted"
+              />
             </div>
           )}
         </DialogContent>

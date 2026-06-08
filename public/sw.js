@@ -36,6 +36,47 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
+// Notification click — focus the app window when user clicks a notification
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+      // If there's already an open window, focus it
+      if (clientList.length > 0) {
+        return clientList[0].focus();
+      }
+      // Otherwise open a new window
+      return clients.openWindow('/');
+    })
+  );
+});
+
+// Push event — handle incoming push messages (future server push support)
+self.addEventListener('push', (event) => {
+  if (!event.data) return;
+
+  try {
+    const data = event.data.json();
+    const title = data.title || 'Trackr';
+    const options = {
+      body: data.body || '',
+      icon: '/icons/icon-192.png',
+      badge: '/icons/icon-192.png',
+      data: data.data || {},
+    };
+    event.waitUntil(self.registration.showNotification(title, options));
+  } catch {
+    // If the push data is not JSON, show a generic notification
+    const title = 'Trackr';
+    const options = {
+      body: event.data ? event.data.text() : 'You have a new notification',
+      icon: '/icons/icon-192.png',
+      badge: '/icons/icon-192.png',
+    };
+    event.waitUntil(self.registration.showNotification(title, options));
+  }
+});
+
 // Fetch event — route requests through appropriate strategy
 self.addEventListener('fetch', (event) => {
   const { request } = event;
