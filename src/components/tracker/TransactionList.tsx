@@ -32,7 +32,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { Trash2, Edit3, ArrowUpRight, ArrowDownRight, RefreshCw, Loader2, Check, X } from 'lucide-react'
+import { Trash2, Edit3, ArrowUpRight, ArrowDownRight, RefreshCw, Loader2, Check, X, Search, Download } from 'lucide-react'
 import { toast } from '@/hooks/use-toast'
 
 interface Transaction {
@@ -91,6 +91,14 @@ export default function TransactionList({ refreshTrigger, userName }: Transactio
   const [hasMore, setHasMore] = useState(false)
   const [loadingMore, setLoadingMore] = useState(false)
 
+  // New filter states
+  const [searchText, setSearchText] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+  const [categoryFilter, setCategoryFilter] = useState<string>('all')
+  const [fromDate, setFromDate] = useState('')
+  const [toDate, setToDate] = useState('')
+  const [exporting, setExporting] = useState(false)
+
   // Edit state
   const [editTransaction, setEditTransaction] = useState<Transaction | null>(null)
   const [editData, setEditData] = useState<{
@@ -105,6 +113,14 @@ export default function TransactionList({ refreshTrigger, userName }: Transactio
   const [isSaving, setIsSaving] = useState(false)
 
   const PAGE_SIZE = 30
+
+  // Debounce search input
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchText)
+    }, 400)
+    return () => clearTimeout(timer)
+  }, [searchText])
 
   // Mark as mounted after first client render to avoid hydration mismatch
   useEffect(() => {
@@ -121,8 +137,12 @@ export default function TransactionList({ refreshTrigger, userName }: Transactio
   const fetchTransactions = useCallback(async (append = false) => {
     try {
       const typeParam = filter !== 'all' ? `&type=${filter}` : ''
+      const searchParam = debouncedSearch ? `&search=${encodeURIComponent(debouncedSearch)}` : ''
+      const categoryParam = categoryFilter !== 'all' ? `&category=${encodeURIComponent(categoryFilter)}` : ''
+      const fromDateParam = fromDate ? `&fromDate=${fromDate}` : ''
+      const toDateParam = toDate ? `&toDate=${toDate}` : ''
       const offset = append ? transactions.length : 0
-      const response = await fetch(`/api/transactions?limit=${PAGE_SIZE}&offset=${offset}${typeParam}`, {
+      const response = await fetch(`/api/transactions?limit=${PAGE_SIZE}&offset=${offset}${typeParam}${searchParam}${categoryParam}${fromDateParam}${toDateParam}`, {
         headers: getAuthHeaders(false),
       })
       if (response.ok) {
@@ -141,11 +161,11 @@ export default function TransactionList({ refreshTrigger, userName }: Transactio
       setLoading(false)
       setLoadingMore(false)
     }
-  }, [filter, transactions.length, getAuthHeaders])
+  }, [filter, debouncedSearch, categoryFilter, fromDate, toDate, transactions.length, getAuthHeaders])
 
   useEffect(() => {
     if (mounted) fetchTransactions()
-  }, [filter, refreshTrigger, mounted]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [filter, debouncedSearch, categoryFilter, fromDate, toDate, refreshTrigger, mounted, fetchTransactions])
 
   const handleDelete = async () => {
     if (!deleteId) return
@@ -208,6 +228,57 @@ export default function TransactionList({ refreshTrigger, userName }: Transactio
     fetchTransactions(true)
   }
 
+  const handleExportCsv = async () => {
+    setExporting(true)
+    try {
+      const params = new URLSearchParams()
+      params.set('format', 'csv')
+      if (filter !== 'all') params.set('type', filter)
+      if (debouncedSearch) params.set('search', debouncedSearch)
+      if (categoryFilter !== 'all') params.set('category', categoryFilter)
+      if (fromDate) params.set('fromDate', fromDate)
+      if (toDate) params.set('toDate', toDate)
+
+      const response = await fetch(`/api/export?${params.toString()}`, {
+        headers: getAuthHeaders(false),
+      })
+      if (response.ok) {
+        const blob = await response.blob()
+        const url = window.URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        const disposition = response.headers.get('Content-Disposition')
+        const filename = disposition
+          ? disposition.split('filename=')[1]?.replace(/"/g, '')
+          : 'transactions.csv'
+        a.download = filename
+        document.body.appendChild(a)
+        a.click()
+        window.URL.revokeObjectURL(url)
+        document.body.removeChild(a)
+        toast({ title: 'CSV exported' })
+      } else {
+        toast({ title: 'Export failed', variant: 'destructive' })
+      }
+    } catch (error) {
+      console.error('Error exporting:', error)
+      toast({ title: 'Export failed', variant: 'destructive' })
+    } finally {
+      setExporting(false)
+    }
+  }
+
+  const ALL_CATEGORIES = [...EXPENSE_CATEGORIES, ...INCOME_CATEGORIES]
+
+  const hasActiveFilters = debouncedSearch || categoryFilter !== 'all' || fromDate || toDate
+
+  const clearFilters = () => {
+    setSearchText('')
+    setCategoryFilter('all')
+    setFromDate('')
+    setToDate('')
+  }
+
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr)
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
@@ -238,25 +309,102 @@ export default function TransactionList({ refreshTrigger, userName }: Transactio
 
   return (
     <div className="space-y-4">
-      {/* Filter */}
-      <div className="flex items-center justify-between">
+      {/* Search Bar */}
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+        <Input
+          type="text"
+          placeholder="Search by description or person..."
+          value={searchText}
+          onChange={(e) => setSearchText(e.target.value)}
+          className="pl-9 pr-9"
+        />
+        {searchText && (
+          <button
+            type="button"
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+            onClick={() => setSearchText('')}
+          >
+            <X className="w-4 h-4" />
+          </button>
+        )}
+      </div>
+
+      {/* Filters Row */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
         <Select value={filter} onValueChange={setFilter}>
-          <SelectTrigger className="w-40">
-            <SelectValue placeholder="Filter" />
+          <SelectTrigger className="w-full sm:w-32">
+            <SelectValue placeholder="Type" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All</SelectItem>
+            <SelectItem value="all">All Types</SelectItem>
             <SelectItem value="expense">Expenses</SelectItem>
             <SelectItem value="income">Income</SelectItem>
           </SelectContent>
         </Select>
-        <div className="flex items-center gap-2">
-          {total > 0 && (
-            <span className="text-xs text-muted-foreground">{total} transactions</span>
+
+        <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+          <SelectTrigger className="w-full sm:w-40">
+            <SelectValue placeholder="Category" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Categories</SelectItem>
+            {ALL_CATEGORIES.map((cat) => (
+              <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <div className="flex items-center gap-2 flex-1">
+          <Input
+            type="date"
+            value={fromDate}
+            onChange={(e) => setFromDate(e.target.value)}
+            className="text-xs"
+          />
+          <span className="text-xs text-muted-foreground">to</span>
+          <Input
+            type="date"
+            value={toDate}
+            onChange={(e) => setToDate(e.target.value)}
+            className="text-xs"
+          />
+        </div>
+
+        <div className="flex items-center gap-1.5 shrink-0">
+          {hasActiveFilters && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-xs text-muted-foreground h-8"
+              onClick={clearFilters}
+            >
+              <X className="w-3.5 h-3.5 mr-1" />
+              Clear
+            </Button>
           )}
-          <Button variant="ghost" size="sm" onClick={() => fetchTransactions()}>
-            <RefreshCw className="w-4 h-4" />
+          <Button
+            variant="outline"
+            size="sm"
+            className="text-xs h-8 border-emerald-200 text-emerald-700 hover:bg-emerald-50"
+            onClick={handleExportCsv}
+            disabled={exporting || transactions.length === 0}
+          >
+            {exporting ? (
+              <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />
+            ) : (
+              <Download className="w-3.5 h-3.5 mr-1" />
+            )}
+            Export
           </Button>
+          <div className="flex items-center gap-2">
+            {total > 0 && (
+              <span className="text-xs text-muted-foreground whitespace-nowrap">{total} txns</span>
+            )}
+            <Button variant="ghost" size="sm" onClick={() => fetchTransactions()} className="h-8 w-8 p-0">
+              <RefreshCw className="w-3.5 h-3.5" />
+            </Button>
+          </div>
         </div>
       </div>
 

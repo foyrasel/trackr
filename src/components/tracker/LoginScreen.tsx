@@ -78,11 +78,11 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
         {/* Logo & Branding */}
         <div className="text-center mb-8">
           <div className="w-20 h-20 rounded-2xl bg-emerald-500 flex items-center justify-center mx-auto mb-4 shadow-lg shadow-emerald-500/30">
-            <span className="text-white text-4xl font-bold">৳</span>
+            <span className="text-white text-4xl font-bold">T</span>
           </div>
           <h1 className="text-3xl font-bold text-gray-900">Trackr</h1>
           <p className="text-sm text-muted-foreground mt-1">AI Voice Expense Tracker</p>
-          <p className="text-xs text-muted-foreground mt-0.5">বাংলাদেশের জন্য তৈরি • Made for Bangladesh</p>
+          <p className="text-xs text-muted-foreground mt-0.5">Track money in any currency • Works everywhere</p>
         </div>
 
         {/* Login Card */}

@@ -13,6 +13,9 @@ export async function GET(request: NextRequest) {
     const type = searchParams.get('type') // 'expense' or 'income'
     const category = searchParams.get('category')
     const month = searchParams.get('month') // format: '2026-01'
+    const search = searchParams.get('search') // search by description or person name
+    const fromDate = searchParams.get('fromDate') // format: '2026-01-01'
+    const toDate = searchParams.get('toDate') // format: '2026-01-31'
     const limit = parseInt(searchParams.get('limit') || '50')
     const offset = parseInt(searchParams.get('offset') || '0')
 
@@ -20,7 +23,23 @@ export async function GET(request: NextRequest) {
 
     if (type) where.type = type
     if (category) where.category = category
-    if (month) {
+    if (search) {
+      where.description = { contains: search, mode: 'insensitive' }
+    }
+
+    // Date range filtering
+    if (fromDate || toDate) {
+      const dateFilter: Record<string, unknown> = {}
+      if (fromDate) dateFilter.gte = new Date(fromDate)
+      if (toDate) {
+        // Include the entire end day
+        const end = new Date(toDate)
+        end.setHours(23, 59, 59, 999)
+        dateFilter.lte = end
+      }
+      // If both month and date range are specified, date range takes precedence
+      where.date = dateFilter
+    } else if (month) {
       const startDate = new Date(`${month}-01`)
       const endDate = new Date(startDate)
       endDate.setMonth(endDate.getMonth() + 1)

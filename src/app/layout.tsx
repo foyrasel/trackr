@@ -16,10 +16,17 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Trackr - AI Voice Expense Tracker",
-  description: "Voice-first, AI-assisted spending & income tracker with smart categorization. Built for Bangladesh, works everywhere.",
-  keywords: ["expense tracker", "budget", "voice input", "AI", "BDT", "Bangladesh", "50/30/20 rule"],
+  description: "Voice-first, AI-assisted spending & income tracker with smart categorization. Track expenses in any currency, anywhere in the world.",
+  keywords: ["expense tracker", "budget", "voice input", "AI", "money tracker", "finance", "50/30/20 rule", "lending", "goals"],
   icons: {
-    icon: "https://z-cdn.chatglm.cn/z-ai/static/logo.svg",
+    icon: "/icons/icon-192.png",
+    apple: "/icons/icon-192.png",
+  },
+  manifest: "/manifest.json",
+  other: {
+    "theme-color": "#10b981",
+    "apple-mobile-web-app-capable": "yes",
+    "apple-mobile-web-app-status-bar-style": "default",
   },
 };
 
