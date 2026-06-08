@@ -1,4 +1,4 @@
-﻿import { PrismaClient } from '@prisma/client'
+import { PrismaClient } from '@prisma/client'
 import { PrismaLibSql } from '@prisma/adapter-libsql'
 import { createClient } from '@libsql/client'
 
@@ -12,12 +12,15 @@ function createPrismaClient() {
 
   if (isTurso) {
     const authToken = process.env.DATABASE_AUTH_TOKEN || undefined
+    if (!authToken) {
+      console.error('DATABASE_AUTH_TOKEN is missing for Turso connection')
+    }
     const libsql = createClient({ url: tursoUrl, authToken })
     const adapter = new PrismaLibSql(libsql)
-    return new PrismaClient({ adapter, log: ['error'] })
+    return new PrismaClient({ adapter, log: process.env.NODE_ENV === 'development' ? ['query'] : ['error'] })
   }
 
-  return new PrismaClient({ log: ['query', 'error'] })
+  return new PrismaClient({ log: process.env.NODE_ENV === 'development' ? ['query'] : ['error'] })
 }
 
 export const db = globalForPrisma.prisma ?? createPrismaClient()
