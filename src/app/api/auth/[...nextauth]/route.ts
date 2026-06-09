@@ -5,7 +5,7 @@ import CredentialsProvider from 'next-auth/providers/credentials'
 import { db } from '@/lib/db'
 
 // Only include OAuth providers if they have real (non-dummy) credentials
-const providers = []
+const providers: any[] = []
 
 if (process.env.GOOGLE_ID && process.env.GOOGLE_SECRET &&
     process.env.GOOGLE_ID !== 'dummy-google-id' &&

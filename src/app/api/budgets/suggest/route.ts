@@ -1,7 +1,7 @@
 import { db } from '@/lib/db'
 import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth'
-import ZAI from 'z-ai-web-dev-sdk'
+import { getAI } from '@/lib/ai'
 
 // GET /api/budgets/suggest - AI-suggested budgets based on past spending
 export async function GET(request: NextRequest) {
@@ -64,7 +64,7 @@ export async function GET(request: NextRequest) {
       const dbUser = await db.user.findUnique({ where: { id: user.id } })
       const currencySymbol = dbUser?.currencySymbol || '$'
 
-      const zai = await ZAI.create()
+      const zai = await getAI()
       const completion = await zai.chat.completions.create({
         messages: [
           {

@@ -12,16 +12,6 @@ interface VoiceInputProps {
   onLanguageChange: (lang: 'en' | 'bn') => void
 }
 
-interface SpeechRecognitionEvent {
-  results: SpeechRecognitionResultList
-  resultIndex: number
-}
-
-interface SpeechRecognitionErrorEvent {
-  error: string
-  message?: string
-}
-
 // Language configurations with multiple fallback codes
 const LANG_CONFIG = {
   en: {
@@ -135,7 +125,7 @@ export default function VoiceInput({ onTranscript, isProcessing, language, onLan
   const [silenceTimer, setSilenceTimer] = useState<number | null>(null)
   const [autoStopCountdown, setAutoStopCountdown] = useState<number | null>(null)
   const [usedLangCode, setUsedLangCode] = useState<string>('')
-  const recognitionRef = useRef<SpeechRecognition | null>(null)
+  const recognitionRef = useRef<SpeechRecognitionInstance | null>(null)
   const onTranscriptRef = useRef(onTranscript)
   const languageRef = useRef(language)
   const finalTranscriptRef = useRef<string>('')
@@ -174,7 +164,9 @@ export default function VoiceInput({ onTranscript, isProcessing, language, onLan
       setMounted(true)
     })
 
-    if (!SpeechRecognition) return pending
+    if (!SpeechRecognition) {
+      return () => cancelAnimationFrame(pending)
+    }
 
     const recognition = new SpeechRecognition()
     recognition.continuous = true
@@ -629,11 +621,4 @@ export default function VoiceInput({ onTranscript, isProcessing, language, onLan
       )}
     </div>
   )
-}
-
-declare global {
-  interface Window {
-    SpeechRecognition: typeof SpeechRecognition
-    webkitSpeechRecognition: typeof SpeechRecognition
-  }
 }

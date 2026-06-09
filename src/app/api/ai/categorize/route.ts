@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import ZAI from 'z-ai-web-dev-sdk'
+import { getAI } from '@/lib/ai'
 
 const CATEGORIES = {
   expense: [
@@ -133,7 +133,7 @@ function extractDateFromText(text: string): string | null {
   const months: Record<string, number> = {
     'january': 0, 'february': 1, 'march': 2, 'april': 3, 'may': 4, 'june': 5,
     'july': 6, 'august': 7, 'september': 8, 'october': 9, 'november': 10, 'december': 11,
-    'jan': 0, 'feb': 1, 'mar': 2, 'apr': 3, 'may': 4, 'jun': 5,
+    'jan': 0, 'feb': 1, 'mar': 2, 'apr': 3, 'jun': 5,
     'jul': 6, 'aug': 7, 'sep': 8, 'oct': 9, 'nov': 10, 'dec': 11,
     'জানুয়ারি': 0, 'ফেব্রুয়ারি': 1, 'মার্চ': 2, 'এপ্রিল': 3, 'মে': 4, 'জুন': 5,
     'জুলাই': 6, 'আগস্ট': 7, 'সেপ্টেম্বর': 8, 'অক্টোবর': 9, 'নভেম্বর': 10, 'ডিসেম্বর': 11,
@@ -216,9 +216,9 @@ export async function POST(request: NextRequest) {
 
     let zai
     try {
-      zai = await ZAI.create()
+      zai = await getAI()
     } catch (sdkError) {
-      console.error('ZAI SDK init failed, using fallback:', sdkError)
+      console.error('[AI] SDK init failed, using fallback:', (sdkError as Error).message)
       const fallbackResult = extractBasicInfo(text)
       return NextResponse.json({ result: fallbackResult, fallback: true })
     }
