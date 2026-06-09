@@ -50,7 +50,7 @@ interface BudgetPanelProps {
 const EXPENSE_CATEGORIES = [
   'Groceries', 'Food & Dining', 'Transport', 'Utilities', 'Rent',
   'Healthcare', 'Education', 'Entertainment', 'Shopping', 'Personal Care',
-  'Insurance', 'Subscriptions', 'Travel', 'Gifts', 'Charity', 'Other',
+  'Gadgets & Electronics', 'Insurance', 'Subscriptions', 'Travel', 'Gifts', 'Charity', 'Other',
 ]
 
 const CATEGORY_COLORS: Record<string, string> = {
@@ -64,6 +64,7 @@ const CATEGORY_COLORS: Record<string, string> = {
   Entertainment: '#f97316',
   Shopping: '#14b8a6',
   'Personal Care': '#a855f7',
+  'Gadgets & Electronics': '#0284c7',
   Insurance: '#6366f1',
   Subscriptions: '#d946ef',
   Travel: '#0ea5e9',

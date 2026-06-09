@@ -12,6 +12,7 @@ import TransactionList from '@/components/tracker/TransactionList'
 import BudgetPanel from '@/components/tracker/BudgetPanel'
 import LandingPage from '@/components/tracker/LandingPage'
 import OnboardingScreen from '@/components/tracker/OnboardingScreen'
+import AccountSetup from '@/components/tracker/AccountSetup'
 import InsightsPanel from '@/components/tracker/InsightsPanel'
 import MorePanel from '@/components/tracker/MorePanel'
 import { CurrencyProvider, useCurrency } from '@/components/tracker/CurrencyContext'
@@ -31,6 +32,7 @@ export default function Home() {
   const [userImage, setUserImage] = useState<string | null>(null)
   const [userId, setUserId] = useState<string | null>(null)
   const [showOnboarding, setShowOnboarding] = useState(false)
+  const [showAccountSetup, setShowAccountSetup] = useState(false)
   const [mounted, setMounted] = useState(false)
 
   // Dark mode state
@@ -126,6 +128,36 @@ export default function Home() {
   const handleOnboardingComplete = () => {
     localStorage.setItem('trackr_onboarding_done', 'true')
     setShowOnboarding(false)
+    // Check if account setup has been done
+    const accountSetupDone = localStorage.getItem('trackr_account_setup_done')
+    if (!accountSetupDone) {
+      setShowAccountSetup(true)
+    }
+  }
+
+  const handleAccountSetupComplete = async (accounts: { name: string; type: string; balance: number; color: string; icon: string }[]) => {
+    localStorage.setItem('trackr_account_setup_done', 'true')
+    setShowAccountSetup(false)
+
+    // Save the accounts to the database
+    try {
+      for (const account of accounts) {
+        await fetch('/api/accounts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...(userName ? { 'x-user-name': userName } : {}) },
+          body: JSON.stringify(account),
+        })
+      }
+      // Trigger a refresh to load the new account data
+      setRefreshTrigger(prev => prev + 1)
+    } catch (error) {
+      console.error('Error saving accounts:', error)
+    }
+  }
+
+  const handleAccountSetupSkip = () => {
+    localStorage.setItem('trackr_account_setup_done', 'true')
+    setShowAccountSetup(false)
   }
 
   const handleLogout = async () => {
@@ -205,6 +237,11 @@ export default function Home() {
   // Show onboarding screen for first-time users
   if (showOnboarding) {
     return <OnboardingScreen onComplete={handleOnboardingComplete} />
+  }
+
+  // Show account setup wizard after onboarding
+  if (showAccountSetup) {
+    return <AccountSetup onComplete={handleAccountSetupComplete} onSkip={handleAccountSetupSkip} userName={userName} />
   }
 
   // Get user initials for avatar fallback

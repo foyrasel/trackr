@@ -49,6 +49,7 @@ async function runMigrations(url: string, authToken?: string) {
 
   const migrations = [
     { name: 'add_password_column', sql: 'ALTER TABLE User ADD COLUMN password TEXT' },
+    { name: 'add_emailVerified_column', sql: 'ALTER TABLE User ADD COLUMN emailVerified DATETIME' },
   ]
 
   for (const migration of migrations) {

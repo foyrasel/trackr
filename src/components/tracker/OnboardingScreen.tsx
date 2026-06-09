@@ -342,6 +342,11 @@ export default function OnboardingScreen({ onComplete }: OnboardingScreenProps) 
   const [currentScreen, setCurrentScreen] = useState(0)
   const [direction, setDirection] = useState(1)
 
+  const handleComplete = useCallback(() => {
+    localStorage.setItem('trackr_onboarding_done', 'true')
+    onComplete()
+  }, [onComplete])
+
   const goNext = useCallback(() => {
     if (currentScreen < screens.length - 1) {
       setDirection(1)
@@ -349,7 +354,7 @@ export default function OnboardingScreen({ onComplete }: OnboardingScreenProps) 
     } else {
       handleComplete()
     }
-  }, [currentScreen])
+  }, [currentScreen, handleComplete])
 
   const goPrev = useCallback(() => {
     if (currentScreen > 0) {
@@ -357,11 +362,6 @@ export default function OnboardingScreen({ onComplete }: OnboardingScreenProps) 
       setCurrentScreen(prev => prev - 1)
     }
   }, [currentScreen])
-
-  const handleComplete = useCallback(() => {
-    localStorage.setItem('trackr_onboarding_done', 'true')
-    onComplete()
-  }, [onComplete])
 
   const handleSkip = useCallback(() => {
     handleComplete()

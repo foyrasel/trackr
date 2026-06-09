@@ -4,6 +4,15 @@ import FacebookProvider from 'next-auth/providers/facebook'
 import CredentialsProvider from 'next-auth/providers/credentials'
 import { db } from '@/lib/db'
 
+// Simple hash function matching the one used in register
+async function hashPassword(password: string): Promise<string> {
+  const encoder = new TextEncoder()
+  const data = encoder.encode(password + (process.env.NEXTAUTH_SECRET || 'trackr-secret'))
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data)
+  const hashArray = Array.from(new Uint8Array(hashBuffer))
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('')
+}
+
 // Only include OAuth providers if they have real (non-dummy) credentials
 const providers: any[] = []
 
@@ -29,35 +38,60 @@ if (process.env.FACEBOOK_ID && process.env.FACEBOOK_SECRET &&
   )
 }
 
-// Always include the credentials provider for easy name-based login
+// Demo/Name-based credentials provider (Quick Start)
 providers.push(
   CredentialsProvider({
+    id: 'credentials',
     name: 'Demo Login',
     credentials: {
       name: { label: 'Name', type: 'text', placeholder: 'Your name' },
+      email: { label: 'Email', type: 'email', placeholder: 'Email (optional)' },
+      password: { label: 'Password', type: 'password', placeholder: 'Password (optional)' },
     },
     async authorize(credentials) {
-      if (!credentials?.name) return null
+      if (!credentials) return null
 
-      let user = await db.user.findFirst({ where: { name: credentials.name } })
-      if (!user) {
-        user = await db.user.create({
-          data: {
-            name: credentials.name,
-            provider: 'demo',
-          },
+      // Email + Password login
+      if (credentials.email && credentials.password) {
+        const user = await db.user.findUnique({
+          where: { email: credentials.email },
         })
-        // Create default accounts for new user
-        await db.account.createMany({
-          data: [
-            { userId: user.id, name: 'Cash', type: 'cash', balance: 0, color: '#10b981', icon: '💵', isDefault: true },
-            { userId: user.id, name: 'Debit Card', type: 'debit', balance: 0, color: '#3b82f6', icon: '💳', isDefault: false },
-            { userId: user.id, name: 'Credit Card', type: 'credit', balance: 0, color: '#8b5cf6', icon: '💳', isDefault: false },
-            { userId: user.id, name: 'Mobile Wallet', type: 'mobile', balance: 0, color: '#a855f7', icon: '📱', isDefault: false },
-          ],
-        })
+
+        if (!user || !user.password) return null
+
+        const hashedInput = await hashPassword(credentials.password)
+        if (user.password !== hashedInput) return null
+
+        // Check if email is verified
+        if (!user.emailVerified) return null
+
+        return { id: user.id, name: user.name, email: user.email, image: user.image }
       }
-      return { id: user.id, name: user.name, email: user.email, image: user.image }
+
+      // Name-based demo login
+      if (credentials.name) {
+        let user = await db.user.findFirst({ where: { name: credentials.name } })
+        if (!user) {
+          user = await db.user.create({
+            data: {
+              name: credentials.name,
+              provider: 'demo',
+            },
+          })
+          // Create default accounts for new user
+          await db.account.createMany({
+            data: [
+              { userId: user.id, name: 'Cash', type: 'cash', balance: 0, color: '#10b981', icon: '💵', isDefault: true },
+              { userId: user.id, name: 'Debit Card', type: 'debit', balance: 0, color: '#3b82f6', icon: '💳', isDefault: false },
+              { userId: user.id, name: 'Credit Card', type: 'credit', balance: 0, color: '#8b5cf6', icon: '💳', isDefault: false },
+              { userId: user.id, name: 'Mobile Wallet', type: 'mobile', balance: 0, color: '#a855f7', icon: '📱', isDefault: false },
+            ],
+          })
+        }
+        return { id: user.id, name: user.name, email: user.email, image: user.image }
+      }
+
+      return null
     },
   })
 )
@@ -78,6 +112,7 @@ export const authOptions: NextAuthOptions = {
               email: user.email,
               image: user.image,
               provider: account.provider,
+              emailVerified: new Date(), // OAuth emails are considered verified
             },
           })
           // Create default accounts

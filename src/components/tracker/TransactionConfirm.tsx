@@ -42,7 +42,7 @@ interface TransactionConfirmProps {
 const EXPENSE_CATEGORIES = [
   'Groceries', 'Food & Dining', 'Transport', 'Utilities', 'Rent',
   'Healthcare', 'Education', 'Entertainment', 'Shopping', 'Personal Care',
-  'Insurance', 'Subscriptions', 'Travel', 'Gifts', 'Charity', 'Other'
+  'Gadgets & Electronics', 'Insurance', 'Subscriptions', 'Travel', 'Gifts', 'Charity', 'Other'
 ]
 
 const INCOME_CATEGORIES = [

@@ -8,7 +8,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import {
   Mic, Brain, Globe, Shield, BarChart3, Target, Bell, Camera,
   ArrowRight, Check, Star, Smartphone, ChevronDown, Loader2,
-  Wallet, HandCoins, FileDown, Moon, Users, Sparkles
+  Wallet, HandCoins, FileDown, Moon, Users, Sparkles, Mail, Lock, Eye, EyeOff
 } from 'lucide-react'
 
 interface LandingPageProps {
@@ -117,6 +117,16 @@ export default function LandingPage({ onLogin }: LandingPageProps) {
   const [showLoginCard, setShowLoginCard] = useState(false)
   const loginRef = useRef<HTMLDivElement>(null)
 
+  // Email signup state
+  const [authMode, setAuthMode] = useState<'quick' | 'signup' | 'verify'>('quick')
+  const [signupName, setSignupName] = useState('')
+  const [signupEmail, setSignupEmail] = useState('')
+  const [signupPassword, setSignupPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
+  const [verifyCode, setVerifyCode] = useState('')
+  const [verificationCode, setVerificationCode] = useState('')
+  const [signupError, setSignupError] = useState('')
+
   useEffect(() => {
     setGoogleConfigured(process.env.NEXT_PUBLIC_GOOGLE_CONFIGURED === 'true')
     setFacebookConfigured(process.env.NEXT_PUBLIC_FACEBOOK_CONFIGURED === 'true')
@@ -151,6 +161,84 @@ export default function LandingPage({ onLogin }: LandingPageProps) {
     try {
       await signIn('facebook', { callbackUrl: '/' })
     } catch {
+      setIsLoading(false)
+    }
+  }
+
+  const handleEmailSignup = async () => {
+    setSignupError('')
+    if (!signupName.trim() || !signupEmail.trim() || !signupPassword.trim()) {
+      setSignupError('All fields are required')
+      return
+    }
+    if (signupPassword.length < 6) {
+      setSignupError('Password must be at least 6 characters')
+      return
+    }
+
+    setIsLoading(true)
+    try {
+      const response = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: signupName.trim(),
+          email: signupEmail.trim(),
+          password: signupPassword,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (response.ok) {
+        setVerificationCode(data.verificationCode)
+        setAuthMode('verify')
+      } else {
+        setSignupError(data.error || 'Registration failed')
+      }
+    } catch (error) {
+      console.error('Registration error:', error)
+      setSignupError('Something went wrong. Please try again.')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleVerifyCode = async () => {
+    if (!verifyCode || verifyCode.length !== 6) {
+      setSignupError('Please enter the 6-digit verification code')
+      return
+    }
+
+    setIsLoading(true)
+    setSignupError('')
+    try {
+      const response = await fetch('/api/auth/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: signupEmail.trim(),
+          code: verifyCode,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (response.ok) {
+        // Auto-login after verification
+        const result = await signIn('credentials', {
+          email: signupEmail.trim(),
+          password: signupPassword,
+          redirect: false,
+        })
+        onLogin(signupName.trim())
+      } else {
+        setSignupError(data.error || 'Verification failed')
+      }
+    } catch (error) {
+      console.error('Verification error:', error)
+      setSignupError('Something went wrong. Please try again.')
+    } finally {
       setIsLoading(false)
     }
   }
@@ -499,83 +587,227 @@ export default function LandingPage({ onLogin }: LandingPageProps) {
         </div>
       </section>
 
-      {/* Login Section */}
+      {/* Login / Signup Section */}
       <section ref={loginRef} className="py-16 bg-white dark:bg-gray-950">
         <div className="max-w-sm mx-auto px-4">
           <div className="text-center mb-6">
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Get Started in 5 Seconds</h2>
-            <p className="text-sm text-gray-500 dark:text-gray-400">No password needed. Just enter your name.</p>
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Get Started in Seconds</h2>
+            <p className="text-sm text-gray-500 dark:text-gray-400">Create an account or use Quick Start</p>
           </div>
 
           <Card className="border-2 border-emerald-100 dark:border-emerald-900 shadow-xl">
             <CardContent className="p-6 space-y-4">
-              {googleConfigured && (
-                <Button
-                  onClick={handleGoogleLogin}
-                  disabled={isLoading}
-                  variant="outline"
-                  className="w-full h-12 flex items-center justify-center gap-3 text-sm font-medium border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800"
+              {/* Auth Mode Tabs */}
+              <div className="flex gap-1 bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
+                <button
+                  onClick={() => { setAuthMode('quick'); setSignupError('') }}
+                  className={`flex-1 py-2 px-3 rounded-md text-sm font-medium transition-all ${
+                    authMode === 'quick'
+                      ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+                      : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+                  }`}
                 >
-                  {isLoading ? (
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                  ) : (
-                    <svg className="w-5 h-5" viewBox="0 0 24 24">
-                      <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/>
-                      <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
-                      <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
-                      <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
-                    </svg>
-                  )}
-                  Continue with Google
-                </Button>
-              )}
-
-              {facebookConfigured && (
-                <Button
-                  onClick={handleFacebookLogin}
-                  disabled={isLoading}
-                  className="w-full h-12 flex items-center justify-center gap-3 text-sm font-medium bg-[#1877F2] hover:bg-[#166FE5] text-white"
+                  Quick Start
+                </button>
+                <button
+                  onClick={() => { setAuthMode('signup'); setSignupError('') }}
+                  className={`flex-1 py-2 px-3 rounded-md text-sm font-medium transition-all ${
+                    authMode === 'signup'
+                      ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+                      : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+                  }`}
                 >
-                  {isLoading ? (
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                  ) : (
-                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
-                    </svg>
-                  )}
-                  Continue with Facebook
-                </Button>
-              )}
+                  Email Sign Up
+                </button>
+              </div>
 
-              {(googleConfigured || facebookConfigured) && (
-                <div className="relative">
-                  <div className="absolute inset-0 flex items-center">
-                    <span className="w-full border-t dark:border-gray-700" />
-                  </div>
-                  <div className="relative flex justify-center text-xs uppercase">
-                    <span className="bg-white dark:bg-gray-950 px-2 text-muted-foreground">or continue with name</span>
-                  </div>
+              {/* Error message */}
+              {signupError && (
+                <div className="bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-lg p-3">
+                  <p className="text-xs text-red-700 dark:text-red-300">{signupError}</p>
                 </div>
               )}
 
-              <Input
-                placeholder="Enter your name..."
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleDemoLogin()}
-                className="h-12 text-center text-lg"
-                disabled={isLoading}
-              />
-              <Button
-                onClick={handleDemoLogin}
-                disabled={isLoading}
-                className="w-full h-12 bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-lg"
-              >
-                {isLoading ? (
-                  <Loader2 className="w-5 h-5 animate-spin mr-2" />
-                ) : null}
-                Start Tracking Now
-              </Button>
+              {/* Quick Start Mode */}
+              {authMode === 'quick' && (
+                <>
+                  {googleConfigured && (
+                    <Button
+                      onClick={handleGoogleLogin}
+                      disabled={isLoading}
+                      variant="outline"
+                      className="w-full h-12 flex items-center justify-center gap-3 text-sm font-medium border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800"
+                    >
+                      {isLoading ? (
+                        <Loader2 className="w-5 h-5 animate-spin" />
+                      ) : (
+                        <svg className="w-5 h-5" viewBox="0 0 24 24">
+                          <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/>
+                          <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+                          <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+                          <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+                        </svg>
+                      )}
+                      Continue with Google
+                    </Button>
+                  )}
+
+                  {facebookConfigured && (
+                    <Button
+                      onClick={handleFacebookLogin}
+                      disabled={isLoading}
+                      className="w-full h-12 flex items-center justify-center gap-3 text-sm font-medium bg-[#1877F2] hover:bg-[#166FE5] text-white"
+                    >
+                      {isLoading ? (
+                        <Loader2 className="w-5 h-5 animate-spin" />
+                      ) : (
+                        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+                        </svg>
+                      )}
+                      Continue with Facebook
+                    </Button>
+                  )}
+
+                  {(googleConfigured || facebookConfigured) && (
+                    <div className="relative">
+                      <div className="absolute inset-0 flex items-center">
+                        <span className="w-full border-t dark:border-gray-700" />
+                      </div>
+                      <div className="relative flex justify-center text-xs uppercase">
+                        <span className="bg-white dark:bg-gray-950 px-2 text-muted-foreground">or continue with name</span>
+                      </div>
+                    </div>
+                  )}
+
+                  <Input
+                    placeholder="Enter your name..."
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleDemoLogin()}
+                    className="h-12 text-center text-lg"
+                    disabled={isLoading}
+                  />
+                  <Button
+                    onClick={handleDemoLogin}
+                    disabled={isLoading}
+                    className="w-full h-12 bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-lg"
+                  >
+                    {isLoading ? (
+                      <Loader2 className="w-5 h-5 animate-spin mr-2" />
+                    ) : null}
+                    Start Tracking Now
+                  </Button>
+                </>
+              )}
+
+              {/* Email Signup Mode */}
+              {authMode === 'signup' && (
+                <>
+                  <div className="space-y-3">
+                    <div>
+                      <Input
+                        placeholder="Full name"
+                        value={signupName}
+                        onChange={(e) => setSignupName(e.target.value)}
+                        className="h-11"
+                        disabled={isLoading}
+                      />
+                    </div>
+                    <div className="relative">
+                      <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                      <Input
+                        type="email"
+                        placeholder="Email address"
+                        value={signupEmail}
+                        onChange={(e) => setSignupEmail(e.target.value)}
+                        className="h-11 pl-10"
+                        disabled={isLoading}
+                      />
+                    </div>
+                    <div className="relative">
+                      <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                      <Input
+                        type={showPassword ? 'text' : 'password'}
+                        placeholder="Password (6+ characters)"
+                        value={signupPassword}
+                        onChange={(e) => setSignupPassword(e.target.value)}
+                        className="h-11 pl-10 pr-10"
+                        onKeyDown={(e) => e.key === 'Enter' && handleEmailSignup()}
+                        disabled={isLoading}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-gray-700"
+                      >
+                        {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <Button
+                    onClick={handleEmailSignup}
+                    disabled={isLoading}
+                    className="w-full h-12 bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-base"
+                  >
+                    {isLoading ? (
+                      <Loader2 className="w-5 h-5 animate-spin mr-2" />
+                    ) : (
+                      <Mail className="w-4 h-4 mr-2" />
+                    )}
+                    Create Account
+                  </Button>
+                </>
+              )}
+
+              {/* Verification Mode */}
+              {authMode === 'verify' && (
+                <>
+                  <div className="bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 rounded-xl p-4 text-center">
+                    <Mail className="w-8 h-8 mx-auto text-emerald-600 mb-2" />
+                    <p className="text-sm font-medium text-gray-900 dark:text-white">Verify Your Email</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      We sent a verification code to <strong>{signupEmail}</strong>
+                    </p>
+                  </div>
+
+                  {/* Show code on screen for demo */}
+                  <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-xl p-3 text-center">
+                    <p className="text-[10px] text-amber-600 dark:text-amber-400 font-medium mb-1">DEMO MODE — Verification Code</p>
+                    <p className="text-2xl font-bold text-amber-700 dark:text-amber-300 tracking-[0.3em]">{verificationCode}</p>
+                  </div>
+
+                  <Input
+                    placeholder="Enter 6-digit code"
+                    value={verifyCode}
+                    onChange={(e) => setVerifyCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                    className="h-12 text-center text-lg tracking-[0.5em] font-bold"
+                    maxLength={6}
+                    disabled={isLoading}
+                  />
+
+                  <Button
+                    onClick={handleVerifyCode}
+                    disabled={isLoading || verifyCode.length !== 6}
+                    className="w-full h-12 bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-base"
+                  >
+                    {isLoading ? (
+                      <Loader2 className="w-5 h-5 animate-spin mr-2" />
+                    ) : (
+                      <Check className="w-4 h-4 mr-2" />
+                    )}
+                    Verify & Start
+                  </Button>
+
+                  <button
+                    onClick={() => { setAuthMode('signup'); setSignupError('') }}
+                    className="w-full text-xs text-muted-foreground hover:text-gray-600"
+                  >
+                    ← Back to sign up
+                  </button>
+                </>
+              )}
 
               <div className="flex items-center justify-center gap-4 pt-2">
                 <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">

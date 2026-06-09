@@ -12,8 +12,10 @@ model User {
   id             String    @id @default(cuid())
   name           String?
   email          String?   @unique
+  emailVerified  DateTime?
+  password       String?   // hashed password for email auth
   image          String?
-  provider       String    @default("demo") // "google", "facebook", "demo"
+  provider       String    @default("demo") // "google", "facebook", "demo", "email"
   darkMode       Boolean   @default(false)
   currency       String    @default("USD") // ISO 4217 currency code
   currencySymbol String    @default("$") // Display symbol

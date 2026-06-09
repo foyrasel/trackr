@@ -14,6 +14,7 @@ import {
 import { Wallet, CreditCard, Banknote, Smartphone, Plus, ArrowUpRight, ArrowDownRight, Edit3 } from 'lucide-react'
 import { toast } from '@/hooks/use-toast'
 import { useCurrency } from './CurrencyContext'
+import TransferDialog from './TransferDialog'
 
 interface Account {
   id: string
@@ -150,6 +151,13 @@ export default function BalanceCards({ refreshTrigger, onBalanceUpdate, userName
           </div>
         </CardContent>
       </Card>
+
+      {/* Transfer Button */}
+      {accounts.length >= 2 && (
+        <div className="flex justify-center">
+          <TransferDialog accounts={accounts} userName={userName} onTransferComplete={fetchAccounts} />
+        </div>
+      )}
 
       {/* Individual Account Cards */}
       <div className="grid grid-cols-3 gap-2">
