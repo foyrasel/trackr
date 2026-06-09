@@ -25,6 +25,8 @@ async function pushSchema() {
       darkMode BOOLEAN NOT NULL DEFAULT 0,
       currency TEXT NOT NULL DEFAULT 'USD',
       currencySymbol TEXT NOT NULL DEFAULT '$',
+      emailVerified DATETIME,
+      password TEXT,
       createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
       updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
     );`,
@@ -149,6 +151,10 @@ async function pushSchema() {
       updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (userId) REFERENCES User(id) ON DELETE CASCADE
     );`,
+
+    // Add new columns to User table (for existing databases)
+    `ALTER TABLE User ADD COLUMN emailVerified DATETIME;`,
+    `ALTER TABLE User ADD COLUMN password TEXT;`,
 
     // Indexes for performance
     `CREATE INDEX IF NOT EXISTS idx_account_userId ON Account(userId);`,
