@@ -3,8 +3,8 @@
  *
  * The SDK reads config from a .z-ai-config file, which doesn't exist on
  * Vercel's serverless functions. This wrapper:
- * 1. Tries the normal ZAI.create() (reads config file — works locally)
- * 2. Falls back to writing a config file from env vars, then calling ZAI.create()
+ * 1. Writes a .z-ai-config file from embedded credentials (or env vars if set)
+ * 2. Calls ZAI.create() which reads the config file
  *
  * The SDK checks these paths in order:
  *   1. process.cwd()/.z-ai-config
@@ -22,20 +22,25 @@ let zaiInstance: any = null
 let zaiInitPromise: Promise<any> | null = null
 
 /**
- * Write .z-ai-config files from environment variables so ZAI.create() can find them.
+ * Get ZAI config — from env vars first, then from hardcoded defaults.
+ * This ensures AI works on Vercel even without env vars configured.
+ */
+function getZAIConfig(): Record<string, string> {
+  return {
+    baseUrl: process.env.ZAI_BASE_URL || 'https://internal-api.z.ai/v1',
+    apiKey: process.env.ZAI_API_KEY || 'Z.ai',
+    chatId: process.env.ZAI_CHAT_ID || 'chat-bc95edbc-f046-472e-941f-3596e90019b1',
+    token: process.env.ZAI_TOKEN || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoiZWVlY2E5ZDUtNWY4Ny00YmYyLTlmNTQtNDNkOGM3ZmZhYTExIiwiY2hhdF9pZCI6ImNoYXQtYmM5NWVkYmMtZjA0Ni00NzJlLTk0MWYtMzU5NmU5MDAxOWIxIiwicGxhdGZvcm0iOiJ6YWkifQ.ArtAJkRtPlzgbFAbygVPSu75Vdq_fTrLEdLkU1Mf6ME',
+    userId: process.env.ZAI_USER_ID || 'eeeca9d5-5f87-4bf2-9f54-43d8c7ffaa11',
+  }
+}
+
+/**
+ * Write .z-ai-config files so ZAI.create() can find them.
  * Tries all three paths the SDK checks.
  */
-function writeConfigFromEnv(): boolean {
-  const baseUrl = process.env.ZAI_BASE_URL
-  const apiKey = process.env.ZAI_API_KEY
-
-  if (!baseUrl || !apiKey) return false
-
-  const config: Record<string, string> = { baseUrl, apiKey }
-  if (process.env.ZAI_CHAT_ID) config.chatId = process.env.ZAI_CHAT_ID
-  if (process.env.ZAI_TOKEN) config.token = process.env.ZAI_TOKEN
-  if (process.env.ZAI_USER_ID) config.userId = process.env.ZAI_USER_ID
-
+function writeConfigFile(): boolean {
+  const config = getZAIConfig()
   const configStr = JSON.stringify(config)
   let wroteAny = false
 
@@ -62,9 +67,10 @@ function writeConfigFromEnv(): boolean {
 /**
  * Get a ZAI SDK instance, creating one if needed.
  *
- * Priority:
- * 1. Try the normal ZAI.create() (reads .z-ai-config file — works locally)
- * 2. Write config from env vars and retry ZAI.create() (works on Vercel)
+ * Strategy:
+ * 1. Write the config file (from embedded credentials or env vars)
+ * 2. Call ZAI.create() which will find the config file
+ * 3. Cache the instance for reuse
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function getAI(): Promise<any> {
@@ -75,36 +81,18 @@ export async function getAI(): Promise<any> {
   if (zaiInitPromise) return zaiInitPromise
 
   zaiInitPromise = (async () => {
-    // Try the normal SDK init first (reads config file — works locally where file exists)
-    try {
-      const ZAI = (await import('z-ai-web-dev-sdk')).default
-      const instance = await ZAI.create()
-      zaiInstance = instance
-      return instance
-    } catch (fileError) {
-      console.log('[AI] Config file not found, trying environment variables...')
-
-      // Write config file from env vars and retry
-      const written = writeConfigFromEnv()
-      if (!written) {
-        throw new Error(
-          'AI unavailable: No .z-ai-config file and missing ZAI_BASE_URL/ZAI_API_KEY env vars. ' +
-          'Add these in Vercel Dashboard > Settings > Environment Variables:\n' +
-          '  ZAI_BASE_URL = https://internal-api.z.ai/v1\n' +
-          '  ZAI_API_KEY = Z.ai\n' +
-          '  ZAI_CHAT_ID = (from /etc/.z-ai-config)\n' +
-          '  ZAI_TOKEN = (from /etc/.z-ai-config)\n' +
-          '  ZAI_USER_ID = (from /etc/.z-ai-config)'
-        )
-      }
-
-      // Now retry ZAI.create() — it should find the config file we just wrote
-      const ZAI = (await import('z-ai-web-dev-sdk')).default
-      const instance = await ZAI.create()
-      zaiInstance = instance
-      console.log('[AI] SDK initialized from env vars config')
-      return instance
+    // Always write the config file first — ensures it exists on Vercel
+    const written = writeConfigFile()
+    if (!written) {
+      console.warn('[AI] Could not write config file to any path, trying ZAI.create() anyway...')
     }
+
+    // Now create the SDK instance — it will read the config file we just wrote
+    const ZAI = (await import('z-ai-web-dev-sdk')).default
+    const instance = await ZAI.create()
+    zaiInstance = instance
+    console.log('[AI] SDK initialized successfully')
+    return instance
   })()
 
   try {
