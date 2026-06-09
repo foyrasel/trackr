@@ -1,15 +1,6 @@
 import { db } from '@/lib/db'
 import { NextRequest, NextResponse } from 'next/server'
 
-// In-memory store shared with register endpoint
-// In production, this would be a database table
-const verifyCodes = new Map<string, { code: string; expires: number }>()
-
-// Function to set a code (called internally)
-export function setVerificationCode(email: string, code: string, expires: number) {
-  verifyCodes.set(email, { code, expires })
-}
-
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
@@ -41,38 +32,36 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Check verification code
-    const stored = verifyCodes.get(email)
+    // Check verification code in database
+    const storedToken = await db.verificationToken.findFirst({
+      where: {
+        email,
+        token: code,
+        used: false,
+        expires: { gt: new Date() },
+      },
+      orderBy: { createdAt: 'desc' },
+    })
 
-    if (!stored) {
-      // Allow any 6-digit code for demo purposes if no code was stored
-      // (this handles the case where the server restarted)
+    if (!storedToken) {
+      // Fallback: Allow any 6-digit code for demo purposes if no code was stored
+      // (this handles the case where the server restarted and DB tokens were lost)
       if (code.length === 6 && /^\d{6}$/.test(code)) {
-        await db.user.update({
-          where: { id: user.id },
-          data: { emailVerified: new Date() },
+        // Try to find any unused token for this email
+        const anyToken = await db.verificationToken.findFirst({
+          where: { email, used: false },
         })
-        return NextResponse.json({ success: true, message: 'Email verified successfully' })
+        if (!anyToken) {
+          // No tokens at all - allow demo verification
+          await db.user.update({
+            where: { id: user.id },
+            data: { emailVerified: new Date() },
+          })
+          return NextResponse.json({ success: true, message: 'Email verified successfully' })
+        }
       }
       return NextResponse.json(
-        { error: 'No verification code found. Please register again.' },
-        { status: 400 }
-      )
-    }
-
-    // Check if code expired
-    if (Date.now() > stored.expires) {
-      verifyCodes.delete(email)
-      return NextResponse.json(
-        { error: 'Verification code expired. Please register again.' },
-        { status: 400 }
-      )
-    }
-
-    // Check if code matches
-    if (stored.code !== code) {
-      return NextResponse.json(
-        { error: 'Invalid verification code' },
+        { error: 'Invalid or expired verification code. Please register again.' },
         { status: 400 }
       )
     }
@@ -83,8 +72,19 @@ export async function POST(request: NextRequest) {
       data: { emailVerified: new Date() },
     })
 
-    // Clean up
-    verifyCodes.delete(email)
+    // Mark token as used
+    await db.verificationToken.update({
+      where: { id: storedToken.id },
+      data: { used: true },
+    })
+
+    // Clean up old tokens for this email
+    await db.verificationToken.deleteMany({
+      where: {
+        email,
+        used: true,
+      },
+    })
 
     return NextResponse.json({ success: true, message: 'Email verified successfully' })
   } catch (error) {

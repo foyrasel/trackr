@@ -10,7 +10,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { fromAccountId, toAccountId, amount } = body
+    const { fromAccountId, toAccountId, amount, description } = body
 
     if (!fromAccountId || !toAccountId || !amount) {
       return NextResponse.json({ error: 'fromAccountId, toAccountId, and amount are required' }, { status: 400 })
@@ -54,8 +54,8 @@ export async function POST(request: NextRequest) {
       ? toAccount.balance - transferAmount // For credit cards, transferring "to" means reducing debt
       : toAccount.balance + transferAmount
 
-    // Update both accounts
-    const [updatedFrom, updatedTo] = await Promise.all([
+    // Update both accounts and create transfer record
+    const [updatedFrom, updatedTo, transfer] = await Promise.all([
       db.account.update({
         where: { id: fromAccountId },
         data: { balance: newFromBalance },
@@ -64,15 +64,48 @@ export async function POST(request: NextRequest) {
         where: { id: toAccountId },
         data: { balance: newToBalance },
       }),
+      db.transfer.create({
+        data: {
+          userId: user.id,
+          fromAccountId,
+          toAccountId,
+          amount: transferAmount,
+          description: description || `Transfer: ${fromAccount.name} → ${toAccount.name}`,
+        },
+      }),
     ])
 
     return NextResponse.json({
       success: true,
       from: { id: updatedFrom.id, name: updatedFrom.name, balance: updatedFrom.balance },
       to: { id: updatedTo.id, name: updatedTo.name, balance: updatedTo.balance },
+      transfer: { id: transfer.id, amount: transfer.amount },
     })
   } catch (error) {
     console.error('Error transferring between accounts:', error)
     return NextResponse.json({ error: 'Failed to transfer' }, { status: 500 })
+  }
+}
+
+export async function GET(request: NextRequest) {
+  try {
+    const user = await getCurrentUser(request)
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const transfers = await db.transfer.findMany({
+      where: { userId: user.id },
+      include: {
+        fromAccount: { select: { id: true, name: true, type: true, icon: true, color: true } },
+        toAccount: { select: { id: true, name: true, type: true, icon: true, color: true } },
+      },
+      orderBy: { date: 'desc' },
+    })
+
+    return NextResponse.json({ transfers })
+  } catch (error) {
+    console.error('Error fetching transfers:', error)
+    return NextResponse.json({ error: 'Failed to fetch transfers' }, { status: 500 })
   }
 }

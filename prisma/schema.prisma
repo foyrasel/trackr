@@ -15,11 +15,12 @@ model User {
   emailVerified  DateTime?
   password       String?   // hashed password for email auth
   image          String?
-  provider       String    @default("demo") // "google", "facebook", "demo", "email"
+  provider       String    @default("demo") // "google", "facebook", "apple", "demo", "email"
   darkMode       Boolean   @default(false)
   currency       String    @default("USD") // ISO 4217 currency code
   currencySymbol String    @default("$") // Display symbol
   accounts       Account[]
+  transfers      Transfer[]
   budgets        Budget[]
   transactions   Transaction[]
   recurringTxns  RecurringTransaction[]
@@ -40,8 +41,34 @@ model Account {
   color     String   @default("#10b981")
   icon      String   @default("💵")
   isDefault Boolean  @default(false)
+  fromTransfers Transfer[] @relation("FromAccount")
+  toTransfers   Transfer[] @relation("ToAccount")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model Transfer {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fromAccountId String
+  fromAccount Account @relation("FromAccount", fields: [fromAccountId], references: [id], onDelete: Cascade)
+  toAccountId   String
+  toAccount   Account @relation("ToAccount", fields: [toAccountId], references: [id], onDelete: Cascade)
+  amount      Float    // Amount transferred
+  description String   @default("Transfer") // Note about the transfer
+  date        DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model VerificationToken {
+  id         String   @id @default(cuid())
+  email      String   // Email address being verified
+  token      String   // 6-digit verification code
+  expires    DateTime // When the token expires
+  used       Boolean  @default(false)
+  createdAt  DateTime @default(now())
 }
 
 model Budget {

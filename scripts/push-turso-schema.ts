@@ -152,6 +152,32 @@ async function pushSchema() {
       FOREIGN KEY (userId) REFERENCES User(id) ON DELETE CASCADE
     );`,
 
+    // Transfer
+    `CREATE TABLE IF NOT EXISTS Transfer (
+      id TEXT PRIMARY KEY NOT NULL,
+      userId TEXT NOT NULL,
+      fromAccountId TEXT NOT NULL,
+      toAccountId TEXT NOT NULL,
+      amount REAL NOT NULL,
+      description TEXT NOT NULL DEFAULT 'Transfer',
+      date DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (userId) REFERENCES User(id) ON DELETE CASCADE,
+      FOREIGN KEY (fromAccountId) REFERENCES Account(id) ON DELETE CASCADE,
+      FOREIGN KEY (toAccountId) REFERENCES Account(id) ON DELETE CASCADE
+    );`,
+
+    // VerificationToken
+    `CREATE TABLE IF NOT EXISTS VerificationToken (
+      id TEXT PRIMARY KEY NOT NULL,
+      email TEXT NOT NULL,
+      token TEXT NOT NULL,
+      expires DATETIME NOT NULL,
+      used BOOLEAN NOT NULL DEFAULT 0,
+      createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );`,
+
     // Add new columns to User table (for existing databases)
     `ALTER TABLE User ADD COLUMN emailVerified DATETIME;`,
     `ALTER TABLE User ADD COLUMN password TEXT;`,
@@ -167,6 +193,11 @@ async function pushSchema() {
     `CREATE INDEX IF NOT EXISTS idx_lendborrow_userId ON LendBorrow(userId);`,
     `CREATE INDEX IF NOT EXISTS idx_lendborrow_isSettled ON LendBorrow(isSettled);`,
     `CREATE INDEX IF NOT EXISTS idx_reminder_isPaid ON Reminder(isPaid);`,
+    `CREATE INDEX IF NOT EXISTS idx_transfer_userId ON Transfer(userId);`,
+    `CREATE INDEX IF NOT EXISTS idx_transfer_fromAccountId ON Transfer(fromAccountId);`,
+    `CREATE INDEX IF NOT EXISTS idx_transfer_toAccountId ON Transfer(toAccountId);`,
+    `CREATE INDEX IF NOT EXISTS idx_verificationtoken_email ON VerificationToken(email);`,
+    `CREATE INDEX IF NOT EXISTS idx_verificationtoken_token ON VerificationToken(token);`,
   ]
 
   console.log('Pushing schema to Turso...\n')

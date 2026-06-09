@@ -1,7 +1,6 @@
 import { db } from '@/lib/db'
 import { NextRequest, NextResponse } from 'next/server'
 
-// Simple hash function for passwords (we'll use a basic approach since bcrypt might not be available)
 async function hashPassword(password: string): Promise<string> {
   const encoder = new TextEncoder()
   const data = encoder.encode(password + (process.env.NEXTAUTH_SECRET || 'trackr-secret'))
@@ -11,12 +10,8 @@ async function hashPassword(password: string): Promise<string> {
 }
 
 function generateVerificationCode(): string {
-  // Generate a 6-digit code
   return Math.floor(100000 + Math.random() * 900000).toString()
 }
-
-// In-memory store for verification codes (in production, use a database table)
-const verificationCodes = new Map<string, { code: string; expires: number }>()
 
 export async function POST(request: NextRequest) {
   try {
@@ -65,12 +60,6 @@ export async function POST(request: NextRequest) {
     // Generate verification code
     const verificationCode = generateVerificationCode()
 
-    // Store verification code (expires in 10 minutes)
-    verificationCodes.set(email, {
-      code: verificationCode,
-      expires: Date.now() + 10 * 60 * 1000,
-    })
-
     // Create user (unverified)
     const user = await db.user.create({
       data: {
@@ -91,6 +80,23 @@ export async function POST(request: NextRequest) {
       ],
     })
 
+    // Store verification code in database (expires in 10 minutes)
+    await db.verificationToken.create({
+      data: {
+        email,
+        token: verificationCode,
+        expires: new Date(Date.now() + 10 * 60 * 1000),
+      },
+    })
+
+    // Clean up old expired tokens for this email
+    await db.verificationToken.deleteMany({
+      where: {
+        email,
+        expires: { lt: new Date() },
+      },
+    })
+
     // In production, you'd send an email here. For this demo, return the code on screen.
     return NextResponse.json({
       userId: user.id,
@@ -106,6 +112,3 @@ export async function POST(request: NextRequest) {
     )
   }
 }
-
-// Export the verification codes map for use by the verify endpoint
-export { verificationCodes }
