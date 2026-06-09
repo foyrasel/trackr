@@ -60,11 +60,13 @@ export async function GET(request: NextRequest) {
 
     // Try AI-powered budget suggestion
     try {
+      const zai = await getAI()
+      if (!zai) throw new Error('AI not available')
+
       // Get user's currency symbol for the prompt
       const dbUser = await db.user.findUnique({ where: { id: user.id } })
       const currencySymbol = dbUser?.currencySymbol || '$'
 
-      const zai = await getAI()
       const completion = await zai.chat.completions.create({
         messages: [
           {

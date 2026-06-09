@@ -74,16 +74,6 @@ export default function AddTransaction({ onTransactionAdded, userName }: AddTran
 
       const data = await response.json()
       setCategorizedData(data.result)
-      
-      if (data.fallback) {
-        toast({
-          title: language === 'bn' ? 'AI অনুপলব্ধ' : 'AI Unavailable',
-          description: language === 'bn' 
-            ? 'সাধারণ শ্রেণীবিভাগ ব্যবহার হচ্ছে।' 
-            : 'Using basic categorization. AI will improve suggestions when available.',
-          variant: 'default',
-        })
-      }
     } catch (error) {
       console.error('Error processing input:', error)
       toast({

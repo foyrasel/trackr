@@ -214,13 +214,13 @@ export async function POST(request: NextRequest) {
     // Try to extract date from the input
     const extractedDate = extractDateFromText(text)
 
-    let zai
-    try {
-      zai = await getAI()
-    } catch (sdkError) {
-      console.error('[AI] SDK init failed, using fallback:', (sdkError as Error).message)
-      const fallbackResult = extractBasicInfo(text)
-      return NextResponse.json({ result: fallbackResult, fallback: true })
+    // Try AI categorization (only works when internal API is reachable)
+    const zai = await getAI()
+
+    if (!zai) {
+      // AI not available — use enhanced regex categorization
+      const smartResult = extractBasicInfo(text)
+      return NextResponse.json({ result: smartResult })
     }
 
     const completion = await zai.chat.completions.create({
@@ -376,7 +376,7 @@ IMPORTANT RULES:
   } catch (error) {
     console.error('Error categorizing transaction:', error)
     const fallbackResult = extractBasicInfo(text || 'expense 0 other')
-    return NextResponse.json({ result: fallbackResult, fallback: true })
+    return NextResponse.json({ result: fallbackResult })
   }
 }
 
@@ -390,7 +390,9 @@ function extractBasicInfo(text: string): {
   date: string
 } {
   const preprocessed = preprocessBanglaText(text)
-  const isIncome = /income|salary|earned|received|got paid|আয়|বেতন|ব্যতন|পেয়েছি|পাইছি|সালারি|peyechi/i.test(preprocessed)
+  const lower = preprocessed.toLowerCase()
+  
+  const isIncome = /income|salary|earned|received|got paid|আয়|বেতন|ব্যতন|পেয়েছি|পাইছি|সালারি|peyechi|freelance|ব্যবসা|business|investment|rental/i.test(preprocessed)
   
   let amount = 0
   
@@ -420,18 +422,76 @@ function extractBasicInfo(text: string): {
     }
   }
   
-  // Simple Bangla category detection
+  // Enhanced category detection with priority ordering
   let category = 'Other'
-  if (/বাজার|মুদি|গ্রোসারি|bazar|grocerie/i.test(preprocessed)) category = 'Groceries'
-  else if (/ভাড়া|bhara|rent|বাসা/i.test(preprocessed)) category = 'Rent'
-  else if (/রিকশা|রিক্সা|বাস|সিএনজি|পরিবহন|transport|rickshaw|মেট্রো/i.test(preprocessed)) category = 'Transport'
-  else if (/বিদ্যুৎ|গ্যাস|পানি|utilities|bill|বিল/i.test(preprocessed)) category = 'Utilities'
-  else if (/ডাক্তার|ওষুধ|চিকিৎসা|doctor|health|medicine/i.test(preprocessed)) category = 'Healthcare'
-  else if (/শিক্ষা|পড়াশোনা|স্কুল|কলেজ|education|school/i.test(preprocessed)) category = 'Education'
-  else if (/বেতন|ব্যতন|salary|salar/i.test(preprocessed)) category = 'Salary'
-  else if (/মুভি|সিনেমা|বিনোদন|movie|entertainment/i.test(preprocessed)) category = 'Entertainment'
-  else if (/সেভ|সঞ্চয়|saving/i.test(preprocessed)) category = 'Savings'
-  else if (/লোন|কিস্তি|loan|ঋণ|কর্জ|EMI/i.test(preprocessed)) category = 'Debt'
+  
+  // Income categories
+  if (isIncome) {
+    if (/বেতন|ব্যতন|salary|salar|সালারি|paycheck|wage/i.test(preprocessed)) category = 'Salary'
+    else if (/freelance|ফ্রিল্যান্স|contract|কন্ট্রাক্ট/i.test(preprocessed)) category = 'Freelance'
+    else if (/ব্যবসা|business|প্রফিট|profit|বিক্রি|sale/i.test(preprocessed)) category = 'Business'
+    else if (/investment|ইনভেস্টমেন্ট|ইনভেস্ট|dividend|লভ্যাংশ|stock|শেয়ার/i.test(preprocessed)) category = 'Investment'
+    else if (/rental|ভাড়া আয়|ভাড়া পাওনা/i.test(preprocessed)) category = 'Rental'
+    else if (/side.hustle|সাইড|part.time|পার্ট টাইম/i.test(preprocessed)) category = 'Side Hustle'
+    else if (/gift|উপহার|gift received/i.test(preprocessed)) category = 'Gift Received'
+    else if (/refund|রিফান্ড|return|রিটার্ন|cashback|ক্যাশব্যাক/i.test(preprocessed)) category = 'Refund'
+  } else {
+    // Expense categories (ordered by specificity)
+    if (/বাজার|মুদি|গ্রোসারি|bazar|grocerie|মাছ|মাংস|সবজি|ফল|চাল|ডাল|তেল|পেঁয়াজ|আলু|market/i.test(preprocessed)) category = 'Groceries'
+    else if (/রেস্তোরাঁ|রেস্টুরেন্ট|ডাইনিং|খাবার|খেলাম|খেতে|lunch|dinner|breakfast|cafe|ক্যাফে|pizza|burger|চা|coffee|কফি|ফাস্টফুড|fast.food|eat|food|dining|মিষ্টি|বিরিয়ানি|চিকেন|রান্না|catering/i.test(preprocessed)) category = 'Food & Dining'
+    else if (/ভাড়া|bhara|rent|বাসা|flat|ফ্ল্যাট|apartment|হোস্টেল|hostel/i.test(preprocessed)) category = 'Rent'
+    else if (/রিকশা|রিক্সা|বাস|সিএনজি|পরিবহন|transport|rickshaw|মেট্রো|metro|ট্রেন|train|ক্যাব|cab|uber|পাঠাও|উবার|গাড়ি|car|পেট্রোল|petrol|ফিলিং|fuel|জ্বালানি|cng|auto|অটো|pick.up|ড্রপ/i.test(preprocessed)) category = 'Transport'
+    else if (/বিদ্যুৎ|গ্যাস|পানি|utilities|বিল|bill|electric|ইলেকট্রিক|water|ওয়াসা|wasa|wifi|ইন্টারনেট|internet|recharge|রিচার্জ|mobile|মোবাইল/i.test(preprocessed)) category = 'Utilities'
+    else if (/ডাক্তার|ওষুধ|চিকিৎসা|doctor|health|medicine|হাসপাতাল|hospital|ফার্মেসি|pharmacy|ডেন্টাল|dental|চশমা|চক্ষু|eye|tests|পরীক্ষা|vaccine|ভ্যাকসিন|থেরাপি|therapy/i.test(preprocessed)) category = 'Healthcare'
+    else if (/শিক্ষা|পড়াশোনা|স্কুল|কলেজ|education|school|university|বিশ্ববিদ্যালয়|কোর্স|course|টিউশন|tuition|বই|book|exam|পরীক্ষা|coaching|কোচিং|training|প্রশিক্ষণ/i.test(preprocessed)) category = 'Education'
+    else if (/মুভি|সিনেমা|বিনোদন|movie|entertainment|নেটফ্লিক্স|netflix|spotify|স্পটিফাই|গেম|game|concert|কনসার্ট|পার্টি|party|club|ক্লাব|show|শো|theater|থিয়েটার/i.test(preprocessed)) category = 'Entertainment'
+    else if (/কেনাকাটা|শপিং|shopping|কিনলাম|কিনেছি|bought|purchased|কেনা|buy|জামা|কাপড়|clothes|জুতা|shoes|ব্যাগ|bag|ফ্যাশন|fashion|অনলাইন|online|ডেলিভারি|delivery|amaz|flipkart|daraz|দারাজ/i.test(preprocessed)) category = 'Shopping'
+    else if (/সেলুন|salon|পার্লার|parlor|beauty|বিউটি|হেয়ার|hair|স্কিন|skin|মেকআপ|makeup|cosmetic|প্রসাধন|spa|স্পা|নেইল|nail|গ্রুমিং|grooming|personal.care/i.test(preprocessed)) category = 'Personal Care'
+    else if (/ইনস্যুরেন্স|insurance|বীমা|প্রিমিয়াম|premium|life.insurance|health.insurance/i.test(preprocessed)) category = 'Insurance'
+    else if (/সাবস্ক্রিপশন|subscription|সাবস্ক্রাইব|subscribe|membership|মেম্বারশিপ|netflix|spotify|youtube|premium|pro.plan|আনলিমিটেড/i.test(preprocessed)) category = 'Subscriptions'
+    else if (/ভ্রমণ|travel|ট্যুর|tour|ভ্যাকেশন|vacation|হোটেল|hotel|ফ্লাইট|flight|টিকেট|ticket|ভিসা|visa|পাসপোর্ট|passport|holiday|ছুটি|tripping/i.test(preprocessed)) category = 'Travel'
+    else if (/উপহার|gift|জন্মদিন|birthday|বিয়ে|wedding|অনুষ্ঠান|occasion|celebration|celebrate/i.test(preprocessed)) category = 'Gifts'
+    else if (/দান|charity|জাকাত|zakat|দাতব্য|donation|অনুদান|fundraise/i.test(preprocessed)) category = 'Charity'
+    else if (/সেভ|সঞ্চয়|saving|ডিপোজিট|deposit|এফডি|fd|rd|পিজিএস|pgs|emergency.fund|জরুরি তহবিল/i.test(preprocessed)) category = 'Savings'
+    else if (/লোন|কিস্তি|loan|ঋণ|কর্জ|EMI|emi|ক্রেডিট কার্ড বিল|credit.card.bill|mortgage|হোম লোন|কার লোন|পার্সোনাল লোন/i.test(preprocessed)) category = 'Debt'
+  }
+
+  // Smart classification
+  let classification = 'need'
+  if (isIncome) {
+    classification = 'income'
+  } else {
+    const needKeywords = /ভাড়া|rent|বাজার|grocerie|বিদ্যুৎ|গ্যাস|পানি|utilities|ডাক্তার|ওষুধ|চিকিৎসা|health|medicine|শিক্ষা|education|রিকশা|transport|ইনস্যুরেন্স|insurance|লোন|loan|কিস্তি|emi|সেভ|saving/i
+    const wantKeywords = /মুভি|সিনেমা|movie|entertainment|সাবস্ক্রিপশন|subscription|রেস্টুরেন্ট|dining|কেনাকাটা|shopping|ভ্রমণ|travel|পার্টি|party/i
+    const egoKeywords = /বিলাস|luxury|designer|প্রিমিয়াম|premium|ব্রান্ডেড|branded|designer|সেলুন|salon|spa/i
+    
+    if (egoKeywords.test(preprocessed)) classification = 'ego'
+    else if (wantKeywords.test(preprocessed)) classification = 'want'
+    else if (needKeywords.test(preprocessed)) classification = 'need'
+    else classification = 'need' // default to need for unknown categories
+  }
+
+  // Clean up description - remove amount, date refs, and common filler words
+  let description = text
+    .replace(/\b(spent|paid|bought|purchased|spent|cost|costs)\b/gi, '')
+    .replace(/\b(yesterday|today|last\s+\w+|ago|\d+\s+days?\s+ago)\b/gi, '')
+    .replace(/\b(cash|debit|credit|from|on|for|of|the|a|an|taka|টাকা|টাকার)\b/gi, '')
+    .replace(/\d+[\d,]*\.?\d*/g, '') // Remove numbers
+    .replace(/গতকাল|কালকে|গত\s*\S+|দিন\s*আগে/g, '') // Remove Bangla date refs
+    .replace(/খরচ|খরচা|খরোচ/g, '') // Remove "expense" words
+    .replace(/\s+/g, ' ')
+    .trim()
+  
+  // If description is empty or too short, use the original text
+  if (description.length < 3) {
+    description = text.replace(/\b(spent|paid|bought)\b/gi, '').replace(/\d+[\d,]*\.?\d*/g, '').replace(/টাকা|টাকার/g, '').trim()
+  }
+  if (description.length < 3) {
+    description = category
+  }
+  
+  // Capitalize first letter
+  description = description.charAt(0).toUpperCase() + description.slice(1)
   
   // Try to extract date
   const extractedDate = extractDateFromText(text)
@@ -439,10 +499,10 @@ function extractBasicInfo(text: string): {
   return {
     type: isIncome ? 'income' : 'expense',
     amount,
-    description: text,
+    description,
     category,
     spendingType: /debit|ডেবিট/i.test(preprocessed) ? 'debit' : /credit|ক্রেডিট/i.test(preprocessed) ? 'credit' : 'cash',
-    classification: isIncome ? 'income' : 'need',
+    classification,
     date: extractedDate || new Date().toISOString().split('T')[0],
   }
 }
