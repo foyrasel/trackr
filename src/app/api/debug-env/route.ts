@@ -1,10 +1,18 @@
 import { NextResponse } from 'next/server'
+import { lookup } from 'dns/promises'
 
 export async function GET() {
   // Test if internal-api.z.ai is reachable from this server
   let apiReachable = 'unknown'
   let apiError = ''
   let dnsResult = ''
+  try {
+    const result = await lookup('internal-api.z.ai')
+    dnsResult = `DNS: ${result.address} (family: ${result.family})`
+  } catch (dnsErr: any) {
+    dnsResult = `DNS failed: ${dnsErr.message}`
+  }
+
   try {
     const resp = await fetch('https://internal-api.z.ai/v1/chat/completions', {
       method: 'POST',
@@ -23,22 +31,13 @@ export async function GET() {
     })
     apiReachable = `status_${resp.status}`
     const text = await resp.text()
-    dnsResult = text.substring(0, 200)
+    if (!dnsResult) dnsResult = text.substring(0, 200)
   } catch (err: any) {
     apiReachable = 'failed'
     apiError = err?.message || String(err)
     if (err?.cause) {
       apiError += ` | cause: ${err.cause.message || err.cause.code || JSON.stringify(err.cause)}`
     }
-  }
-
-  // Also try DNS resolution
-  try {
-    const { lookup } = await import('dns').then(m => m.promises ? m : import('dns/promises'))
-    const result = await (await import('dns/promises')).lookup('internal-api.z.ai')
-    dnsResult = `DNS: ${result.address} (family: ${result.family})`
-  } catch (dnsErr: any) {
-    dnsResult = `DNS failed: ${dnsErr.message}`
   }
 
   return NextResponse.json({
