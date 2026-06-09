@@ -5,6 +5,11 @@
  * Vercel's serverless functions. This wrapper:
  * 1. Tries the normal ZAI.create() (reads config file — works locally)
  * 2. Falls back to writing a config file from env vars, then calling ZAI.create()
+ *
+ * The SDK checks these paths in order:
+ *   1. process.cwd()/.z-ai-config
+ *   2. os.homedir()/.z-ai-config
+ *   3. /etc/.z-ai-config
  */
 
 import fs from 'fs'
@@ -17,7 +22,8 @@ let zaiInstance: any = null
 let zaiInitPromise: Promise<any> | null = null
 
 /**
- * Write a .z-ai-config file from environment variables so ZAI.create() can find it
+ * Write .z-ai-config files from environment variables so ZAI.create() can find them.
+ * Tries all three paths the SDK checks.
  */
 function writeConfigFromEnv(): boolean {
   const baseUrl = process.env.ZAI_BASE_URL
@@ -30,33 +36,27 @@ function writeConfigFromEnv(): boolean {
   if (process.env.ZAI_TOKEN) config.token = process.env.ZAI_TOKEN
   if (process.env.ZAI_USER_ID) config.userId = process.env.ZAI_USER_ID
 
-  try {
-    // Write to /tmp which is writable on Vercel serverless functions
-    const tmpConfigPath = path.join(os.tmpdir(), '.z-ai-config')
-    fs.writeFileSync(tmpConfigPath, JSON.stringify(config), 'utf-8')
+  const configStr = JSON.stringify(config)
+  let wroteAny = false
 
-    // Also try the CWD which is the first place the SDK looks
-    const cwdConfigPath = path.join(process.cwd(), '.z-ai-config')
+  // Try all three paths the SDK checks
+  const paths = [
+    path.join(process.cwd(), '.z-ai-config'),
+    path.join(os.homedir(), '.z-ai-config'),
+    '/etc/.z-ai-config',
+  ]
+
+  for (const filePath of paths) {
     try {
-      fs.writeFileSync(cwdConfigPath, JSON.stringify(config), 'utf-8')
+      fs.writeFileSync(filePath, configStr, 'utf-8')
+      console.log('[AI] Config written to', filePath)
+      wroteAny = true
     } catch {
-      // CWD might not be writable, that's OK — we have /tmp
+      // Path may not be writable — that's OK as long as at least one works
     }
-
-    // Also try home dir
-    const homeConfigPath = path.join(os.homedir(), '.z-ai-config')
-    try {
-      fs.writeFileSync(homeConfigPath, JSON.stringify(config), 'utf-8')
-    } catch {
-      // Home dir might not be writable either
-    }
-
-    console.log('[AI] Config file written from env vars to', tmpConfigPath)
-    return true
-  } catch (err) {
-    console.error('[AI] Failed to write config file:', (err as Error).message)
-    return false
   }
+
+  return wroteAny
 }
 
 /**
@@ -89,35 +89,21 @@ export async function getAI(): Promise<any> {
       if (!written) {
         throw new Error(
           'AI unavailable: No .z-ai-config file and missing ZAI_BASE_URL/ZAI_API_KEY env vars. ' +
-          'Set these environment variables on Vercel: ZAI_BASE_URL, ZAI_API_KEY, ZAI_CHAT_ID (optional), ZAI_TOKEN (optional), ZAI_USER_ID (optional)'
+          'Add these in Vercel Dashboard > Settings > Environment Variables:\n' +
+          '  ZAI_BASE_URL = https://internal-api.z.ai/v1\n' +
+          '  ZAI_API_KEY = Z.ai\n' +
+          '  ZAI_CHAT_ID = (from /etc/.z-ai-config)\n' +
+          '  ZAI_TOKEN = (from /etc/.z-ai-config)\n' +
+          '  ZAI_USER_ID = (from /etc/.z-ai-config)'
         )
       }
 
       // Now retry ZAI.create() — it should find the config file we just wrote
-      try {
-        const ZAI = (await import('z-ai-web-dev-sdk')).default
-        const instance = await ZAI.create()
-        zaiInstance = instance
-
-        // Quick test to verify connection works
-        try {
-          await instance.chat.completions.create({
-            messages: [{ role: 'user', content: 'ping' }],
-            temperature: 0,
-            max_tokens: 1,
-          })
-          console.log('[AI] SDK initialized from env vars — connection verified')
-        } catch (testErr: any) {
-          zaiInstance = null
-          throw new Error(`AI connection test failed: ${testErr.message}`)
-        }
-
-        return instance
-      } catch (retryError) {
-        throw new Error(
-          `AI unavailable: Failed to initialize even with env vars. ${(retryError as Error).message}`
-        )
-      }
+      const ZAI = (await import('z-ai-web-dev-sdk')).default
+      const instance = await ZAI.create()
+      zaiInstance = instance
+      console.log('[AI] SDK initialized from env vars config')
+      return instance
     }
   })()
 
