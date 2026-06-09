@@ -1,20 +1,13 @@
 /**
  * AI SDK Wrapper for z-ai-web-dev-sdk
  *
- * The SDK reads config from a .z-ai-config file, which doesn't exist on
- * Vercel's serverless functions. This wrapper:
- * 1. Writes a .z-ai-config file from embedded credentials (or env vars if set)
- * 2. Calls ZAI.create() which reads the config file
+ * PROBLEM: The SDK's ZAI.create() only reads config from a file (.z-ai-config).
+ * On Vercel serverless, the filesystem is read-only — writing the config file fails.
  *
- * The SDK checks these paths in order:
- *   1. process.cwd()/.z-ai-config
- *   2. os.homedir()/.z-ai-config
- *   3. /etc/.z-ai-config
+ * SOLUTION: Bypass ZAI.create() entirely and instantiate ZAI directly with
+ * embedded credentials. The SDK constructor accepts a config object but is
+ * marked "private" in TypeScript — we bypass that with a type assertion.
  */
-
-import fs from 'fs'
-import path from 'path'
-import os from 'os'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let zaiInstance: any = null
@@ -23,9 +16,8 @@ let zaiInitPromise: Promise<any> | null = null
 
 /**
  * Get ZAI config — from env vars first, then from hardcoded defaults.
- * This ensures AI works on Vercel even without env vars configured.
  */
-function getZAIConfig(): Record<string, string> {
+function getZAIConfig() {
   return {
     baseUrl: process.env.ZAI_BASE_URL || 'https://internal-api.z.ai/v1',
     apiKey: process.env.ZAI_API_KEY || 'Z.ai',
@@ -36,41 +28,11 @@ function getZAIConfig(): Record<string, string> {
 }
 
 /**
- * Write .z-ai-config files so ZAI.create() can find them.
- * Tries all three paths the SDK checks.
- */
-function writeConfigFile(): boolean {
-  const config = getZAIConfig()
-  const configStr = JSON.stringify(config)
-  let wroteAny = false
-
-  // Try all three paths the SDK checks
-  const paths = [
-    path.join(process.cwd(), '.z-ai-config'),
-    path.join(os.homedir(), '.z-ai-config'),
-    '/etc/.z-ai-config',
-  ]
-
-  for (const filePath of paths) {
-    try {
-      fs.writeFileSync(filePath, configStr, 'utf-8')
-      console.log('[AI] Config written to', filePath)
-      wroteAny = true
-    } catch {
-      // Path may not be writable — that's OK as long as at least one works
-    }
-  }
-
-  return wroteAny
-}
-
-/**
  * Get a ZAI SDK instance, creating one if needed.
  *
- * Strategy:
- * 1. Write the config file (from embedded credentials or env vars)
- * 2. Call ZAI.create() which will find the config file
- * 3. Cache the instance for reuse
+ * We bypass ZAI.create() (which requires a file) and directly construct
+ * a ZAI instance with the config object. This works on Vercel's read-only
+ * filesystem because no file I/O is needed.
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function getAI(): Promise<any> {
@@ -81,17 +43,14 @@ export async function getAI(): Promise<any> {
   if (zaiInitPromise) return zaiInitPromise
 
   zaiInitPromise = (async () => {
-    // Always write the config file first — ensures it exists on Vercel
-    const written = writeConfigFile()
-    if (!written) {
-      console.warn('[AI] Could not write config file to any path, trying ZAI.create() anyway...')
-    }
-
-    // Now create the SDK instance — it will read the config file we just wrote
     const ZAI = (await import('z-ai-web-dev-sdk')).default
-    const instance = await ZAI.create()
+    const config = getZAIConfig()
+
+    // Bypass ZAI.create() which requires a file — construct directly with config
+    // The constructor is "private" in TS but fully functional in JS
+    const instance = new (ZAI as any)(config)
     zaiInstance = instance
-    console.log('[AI] SDK initialized successfully')
+    console.log('[AI] SDK initialized with direct config (no file I/O)')
     return instance
   })()
 
