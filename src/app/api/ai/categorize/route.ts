@@ -5,7 +5,7 @@ const CATEGORIES = {
   expense: [
     'Groceries', 'Food & Dining', 'Transport', 'Utilities', 'Rent',
     'Healthcare', 'Education', 'Entertainment', 'Shopping', 'Personal Care',
-    'Insurance', 'Subscriptions', 'Travel', 'Gifts', 'Charity', 'Other'
+    'Gadgets & Electronics', 'Insurance', 'Subscriptions', 'Travel', 'Gifts', 'Charity', 'Other'
   ],
   income: [
     'Salary', 'Freelance', 'Business', 'Investment', 'Rental',
@@ -446,6 +446,7 @@ function extractBasicInfo(text: string): {
     else if (/শিক্ষা|পড়াশোনা|স্কুল|কলেজ|education|school|university|বিশ্ববিদ্যালয়|কোর্স|course|টিউশন|tuition|বই|book|exam|পরীক্ষা|coaching|কোচিং|training|প্রশিক্ষণ/i.test(preprocessed)) category = 'Education'
     else if (/সাবস্ক্রিপশন|subscription|সাবস্ক্রাইব|subscribe|membership|মেম্বারশিপ|netflix|spotify|youtube|pro.plan|আনলিমিটেড/i.test(preprocessed)) category = 'Subscriptions'
     else if (/মুভি|সিনেমা|বিনোদন|movie|entertainment|গেম|game|concert|কনসার্ট|পার্টি|party|club|ক্লাব|show|শো|theater|থিয়েটার/i.test(preprocessed)) category = 'Entertainment'
+    else if (/গ্যাজেট|গ্যাজেটস|ইলেকট্রনিক্স|electronics|gadget|phone|মোবাইল|ল্যাপটপ|laptop|ট্যাবলেট|tablet|কম্পিউটার|computer|হেডফোন|headphone|চার্জার|charger|ক্যামেরা|camera|স্মার্টওয়াচ|smartwatch|smart.watch|গেমিং|gaming|কনসোল|console|প্রিন্টার|printer|মনিটর|monitor|কিবোর্ড|keyboard|মাউস|mouse|earbuds|earphones|আইপ্যাড|ipad|iphone|স্যামসাং|samsung|ওয়ানপ্লাস|oneplus|xaomi|শাওমি|রিয়েলমি|realme|ওপো|oppo|vivo|অ্যাকসেসরি|accessory|গিয়ার|gear|টেক|tech|ডিভাইস|device|ওয়্যারলেস|wireless|bluetooth|ব্লুটুথ|usb|এসডি.কার্ড|sd.card|রাউটার|router|স্পিকার|speaker|power.bank|পাওয়ার.ব্যাংক/i.test(preprocessed)) category = 'Gadgets & Electronics'
     else if (/কেনাকাটা|শপিং|shopping|কিনলাম|কিনেছি|bought|purchased|কেনা|buy|জামা|কাপড়|clothes|জুতা|shoes|ব্যাগ|bag|ফ্যাশন|fashion|অনলাইন|online|ডেলিভারি|delivery|amaz|flipkart|daraz|দারাজ/i.test(preprocessed)) category = 'Shopping'
     else if (/সেলুন|salon|পার্লার|parlor|beauty|বিউটি|হেয়ার|hair|স্কিন|skin|মেকআপ|makeup|cosmetic|প্রসাধন|spa|স্পা|নেইল|nail|গ্রুমিং|grooming|personal.care/i.test(preprocessed)) category = 'Personal Care'
     else if (/ইনস্যুরেন্স|insurance|বীমা|প্রিমিয়াম|premium|life.insurance|health.insurance/i.test(preprocessed)) category = 'Insurance'
