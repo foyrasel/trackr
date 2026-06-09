@@ -257,18 +257,21 @@ export default function Home() {
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-emerald-50/30 dark:from-gray-950 dark:via-gray-900 dark:to-emerald-950/10">
       {/* Header */}
       <header className="sticky top-0 z-50 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md border-b dark:border-gray-800">
-        <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
+        <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
+          <button
+            onClick={() => setActiveTab('dashboard')}
+            className="flex items-center gap-2.5 hover:opacity-80 transition-opacity"
+          >
             <div className="w-9 h-9 rounded-xl bg-emerald-500 flex items-center justify-center">
               <span className="text-white text-lg font-bold">T</span>
             </div>
-            <div>
+            <div className="hidden sm:block">
               <h1 className="text-lg font-bold leading-tight">Trackr</h1>
               <p className="text-[10px] text-muted-foreground leading-tight">
                 {userName ? `Hi, ${userName}` : 'AI Voice Expense Tracker'}
               </p>
             </div>
-          </div>
+          </button>
           <div className="flex items-center gap-1.5">
             <Badge variant="outline" className="text-[10px] bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800">
               <CurrencyDisplay />
@@ -297,7 +300,7 @@ export default function Home() {
       {/* Single Tabs component wrapping both content and navigation */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         {/* Main Content */}
-        <main className="max-w-2xl mx-auto px-4 pb-24 pt-4">
+        <main className="max-w-5xl mx-auto px-4 pb-24 pt-4">
           <TabsContent value="dashboard" className="mt-0">
             <Dashboard refreshTrigger={refreshTrigger} userName={userName} />
           </TabsContent>
@@ -330,7 +333,7 @@ export default function Home() {
 
         {/* Bottom Navigation */}
         <nav className="fixed bottom-0 left-0 right-0 bg-white/95 dark:bg-gray-900/95 backdrop-blur-md border-t dark:border-gray-800 z-50">
-          <div className="max-w-2xl mx-auto">
+          <div className="max-w-5xl mx-auto">
             <TabsList className="w-full h-16 bg-transparent justify-around p-0 shadow-none">
               <TabsTrigger
                 value="dashboard"

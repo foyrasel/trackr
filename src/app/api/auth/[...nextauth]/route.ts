@@ -1,6 +1,7 @@
 import NextAuth, { NextAuthOptions } from 'next-auth'
 import GoogleProvider from 'next-auth/providers/google'
 import FacebookProvider from 'next-auth/providers/facebook'
+import AppleProvider from 'next-auth/providers/apple'
 import CredentialsProvider from 'next-auth/providers/credentials'
 import { db } from '@/lib/db'
 
@@ -34,6 +35,17 @@ if (process.env.FACEBOOK_ID && process.env.FACEBOOK_SECRET &&
     FacebookProvider({
       clientId: process.env.FACEBOOK_ID,
       clientSecret: process.env.FACEBOOK_SECRET,
+    })
+  )
+}
+
+if (process.env.APPLE_ID && process.env.APPLE_SECRET &&
+    process.env.APPLE_ID !== 'dummy-apple-id' &&
+    process.env.APPLE_ID !== 'your-apple-service-id') {
+  providers.push(
+    AppleProvider({
+      clientId: process.env.APPLE_ID,
+      clientSecret: process.env.APPLE_SECRET,
     })
   )
 }
@@ -100,7 +112,7 @@ export const authOptions: NextAuthOptions = {
   providers,
   callbacks: {
     async signIn({ user, account }) {
-      if (account?.provider === 'google' || account?.provider === 'facebook') {
+      if (account?.provider === 'google' || account?.provider === 'facebook' || account?.provider === 'apple') {
         // Create or update user in DB for OAuth providers
         const existingUser = await db.user.findFirst({
           where: { email: user.email || undefined },
