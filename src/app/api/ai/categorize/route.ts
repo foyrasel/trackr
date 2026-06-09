@@ -440,15 +440,15 @@ function extractBasicInfo(text: string): {
     if (/বাজার|মুদি|গ্রোসারি|bazar|grocerie|মাছ|মাংস|সবজি|ফল|চাল|ডাল|তেল|পেঁয়াজ|আলু|market/i.test(preprocessed)) category = 'Groceries'
     else if (/রেস্তোরাঁ|রেস্টুরেন্ট|ডাইনিং|খাবার|খেলাম|খেতে|lunch|dinner|breakfast|cafe|ক্যাফে|pizza|burger|চা|coffee|কফি|ফাস্টফুড|fast.food|eat|food|dining|মিষ্টি|বিরিয়ানি|চিকেন|রান্না|catering/i.test(preprocessed)) category = 'Food & Dining'
     else if (/ভাড়া|bhara|rent|বাসা|flat|ফ্ল্যাট|apartment|হোস্টেল|hostel/i.test(preprocessed)) category = 'Rent'
-    else if (/রিকশা|রিক্সা|বাস|সিএনজি|পরিবহন|transport|rickshaw|মেট্রো|metro|ট্রেন|train|ক্যাব|cab|uber|পাঠাও|উবার|গাড়ি|car|পেট্রোল|petrol|ফিলিং|fuel|জ্বালানি|cng|auto|অটো|pick.up|ড্রপ/i.test(preprocessed)) category = 'Transport'
+    else if (/রিকশা|রিক্সা|বাস|সিএনজি|পরিবহন|transport|rickshaw|মেট্রো|metro|ট্রেন|train|ক্যাব|cab|uber|পাঠাও|উবার|গাড়ি|\bcar\b|পেট্রোল|petrol|ফিলিং|fuel|জ্বালানি|cng|auto|অটো|pick.up|ড্রপ/i.test(preprocessed)) category = 'Transport'
     else if (/বিদ্যুৎ|গ্যাস|পানি|utilities|বিল|bill|electric|ইলেকট্রিক|water|ওয়াসা|wasa|wifi|ইন্টারনেট|internet|recharge|রিচার্জ|mobile|মোবাইল/i.test(preprocessed)) category = 'Utilities'
     else if (/ডাক্তার|ওষুধ|চিকিৎসা|doctor|health|medicine|হাসপাতাল|hospital|ফার্মেসি|pharmacy|ডেন্টাল|dental|চশমা|চক্ষু|eye|tests|পরীক্ষা|vaccine|ভ্যাকসিন|থেরাপি|therapy/i.test(preprocessed)) category = 'Healthcare'
     else if (/শিক্ষা|পড়াশোনা|স্কুল|কলেজ|education|school|university|বিশ্ববিদ্যালয়|কোর্স|course|টিউশন|tuition|বই|book|exam|পরীক্ষা|coaching|কোচিং|training|প্রশিক্ষণ/i.test(preprocessed)) category = 'Education'
-    else if (/মুভি|সিনেমা|বিনোদন|movie|entertainment|নেটফ্লিক্স|netflix|spotify|স্পটিফাই|গেম|game|concert|কনসার্ট|পার্টি|party|club|ক্লাব|show|শো|theater|থিয়েটার/i.test(preprocessed)) category = 'Entertainment'
+    else if (/সাবস্ক্রিপশন|subscription|সাবস্ক্রাইব|subscribe|membership|মেম্বারশিপ|netflix|spotify|youtube|pro.plan|আনলিমিটেড/i.test(preprocessed)) category = 'Subscriptions'
+    else if (/মুভি|সিনেমা|বিনোদন|movie|entertainment|গেম|game|concert|কনসার্ট|পার্টি|party|club|ক্লাব|show|শো|theater|থিয়েটার/i.test(preprocessed)) category = 'Entertainment'
     else if (/কেনাকাটা|শপিং|shopping|কিনলাম|কিনেছি|bought|purchased|কেনা|buy|জামা|কাপড়|clothes|জুতা|shoes|ব্যাগ|bag|ফ্যাশন|fashion|অনলাইন|online|ডেলিভারি|delivery|amaz|flipkart|daraz|দারাজ/i.test(preprocessed)) category = 'Shopping'
     else if (/সেলুন|salon|পার্লার|parlor|beauty|বিউটি|হেয়ার|hair|স্কিন|skin|মেকআপ|makeup|cosmetic|প্রসাধন|spa|স্পা|নেইল|nail|গ্রুমিং|grooming|personal.care/i.test(preprocessed)) category = 'Personal Care'
     else if (/ইনস্যুরেন্স|insurance|বীমা|প্রিমিয়াম|premium|life.insurance|health.insurance/i.test(preprocessed)) category = 'Insurance'
-    else if (/সাবস্ক্রিপশন|subscription|সাবস্ক্রাইব|subscribe|membership|মেম্বারশিপ|netflix|spotify|youtube|premium|pro.plan|আনলিমিটেড/i.test(preprocessed)) category = 'Subscriptions'
     else if (/ভ্রমণ|travel|ট্যুর|tour|ভ্যাকেশন|vacation|হোটেল|hotel|ফ্লাইট|flight|টিকেট|ticket|ভিসা|visa|পাসপোর্ট|passport|holiday|ছুটি|tripping/i.test(preprocessed)) category = 'Travel'
     else if (/উপহার|gift|জন্মদিন|birthday|বিয়ে|wedding|অনুষ্ঠান|occasion|celebration|celebrate/i.test(preprocessed)) category = 'Gifts'
     else if (/দান|charity|জাকাত|zakat|দাতব্য|donation|অনুদান|fundraise/i.test(preprocessed)) category = 'Charity'
@@ -475,7 +475,7 @@ function extractBasicInfo(text: string): {
   let description = text
     .replace(/\b(spent|paid|bought|purchased|spent|cost|costs)\b/gi, '')
     .replace(/\b(yesterday|today|last\s+\w+|ago|\d+\s+days?\s+ago)\b/gi, '')
-    .replace(/\b(cash|debit|credit|from|on|for|of|the|a|an|taka|টাকা|টাকার)\b/gi, '')
+    .replace(/\b(cash|from|on|for|of|the|a|an|taka|টাকা|টাকার)\b/gi, '')
     .replace(/\d+[\d,]*\.?\d*/g, '') // Remove numbers
     .replace(/গতকাল|কালকে|গত\s*\S+|দিন\s*আগে/g, '') // Remove Bangla date refs
     .replace(/খরচ|খরচা|খরোচ/g, '') // Remove "expense" words
