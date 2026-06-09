@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Trackr - Improved Landing Page</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  @page { size: 794px 1123px; margin: 0; }
+  html, body { margin: 0; padding: 0; width: 794px; min-height: 1123px; background: #0a0f1a; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+
+  .page {
+    width: 794px;
+    min-height: 1123px;
+    background: linear-gradient(160deg, #0a0f1a 0%, #111827 40%, #0f172a 100%);
+    position: relative;
+    overflow: hidden;
+    padding: 0;
+  }
+
+  /* Subtle background pattern */
+  .bg-pattern {
+    position: absolute;
+    inset: 0;
+    opacity: 0.03;
+    background-image:
+      radial-gradient(circle at 20% 50%, #10b981 0%, transparent 50%),
+      radial-gradient(circle at 80% 20%, #06b6d4 0%, transparent 40%);
+    z-index: 0;
+  }
+
+  /* Navigation */
+  .nav {
+    position: relative;
+    z-index: 10;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 28px 48px;
+  }
+
+  .logo {
+    font-size: 28px;
+    font-weight: 800;
+    color: #ffffff;
+    letter-spacing: -0.5px;
+  }
+
+  .logo span {
+    color: #10b981;
+  }
+
+  .nav-actions {
+    display: flex;
+    gap: 16px;
+    align-items: center;
+  }
+
+  .btn-signin {
+    color: #94a3b8;
+    font-size: 15px;
+    font-weight: 500;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 8px 16px;
+  }
+
+  .btn-cta {
+    background: #10b981;
+    color: #ffffff;
+    font-size: 15px;
+    font-weight: 600;
+    border: none;
+    padding: 10px 24px;
+    border-radius: 8px;
+    cursor: pointer;
+  }
+
+  /* Hero Section */
+  .hero {
+    position: relative;
+    z-index: 10;
+    text-align: center;
+    padding: 40px 48px 0;
+  }
+
+  .badge-row {
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+    margin-bottom: 32px;
+    flex-wrap: wrap;
+  }
+
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(16, 185, 129, 0.1);
+    border: 1px solid rgba(16, 185, 129, 0.25);
+    color: #34d399;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    padding: 6px 14px;
+    border-radius: 20px;
+  }
+
+  .badge svg { width: 14px; height: 14px; }
+
+  .hero-title {
+    font-size: 56px;
+    font-weight: 800;
+    color: #ffffff;
+    line-height: 1.1;
+    margin-bottom: 16px;
+    letter-spacing: -1px;
+  }
+
+  .hero-title .accent {
+    color: #10b981;
+  }
+
+  .hero-subtitle {
+    font-size: 20px;
+    color: #94a3b8;
+    line-height: 1.6;
+    max-width: 580px;
+    margin: 0 auto 24px;
+    font-weight: 400;
+  }
+
+  .hero-example {
+    display: inline-flex;
+    flex-direction: column;
+    gap: 8px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    padding: 16px 28px;
+    margin-bottom: 36px;
+  }
+
+  .example-line {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 15px;
+  }
+
+  .example-mic {
+    width: 18px;
+    height: 18px;
+    color: #10b981;
+  }
+
+  .example-text {
+    color: #e2e8f0;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 14px;
+  }
+
+  .example-arrow {
+    color: #64748b;
+    font-size: 14px;
+    margin: 0 4px;
+  }
+
+  .example-result {
+    color: #34d399;
+    font-size: 13px;
+    font-weight: 500;
+  }
+
+  /* CTA Buttons */
+  .cta-row {
+    display: flex;
+    justify-content: center;
+    gap: 16px;
+    margin-bottom: 48px;
+  }
+
+  .btn-primary {
+    background: #10b981;
+    color: #ffffff;
+    font-size: 16px;
+    font-weight: 600;
+    border: none;
+    padding: 14px 32px;
+    border-radius: 10px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .btn-primary svg { width: 18px; height: 18px; }
+
+  .btn-secondary {
+    background: rgba(255, 255, 255, 0.06);
+    color: #e2e8f0;
+    font-size: 16px;
+    font-weight: 500;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    padding: 14px 32px;
+    border-radius: 10px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .btn-secondary svg { width: 18px; height: 18px; }
+
+  /* Stats Section */
+  .stats-section {
+    position: relative;
+    z-index: 10;
+    padding: 0 48px 40px;
+  }
+
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+  }
+
+  .stat-card {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 14px;
+    padding: 24px 20px;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .stat-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, #10b981, #06b6d4);
+    border-radius: 14px 14px 0 0;
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+
+  .stat-card:hover::before {
+    opacity: 1;
+  }
+
+  .stat-number {
+    font-size: 36px;
+    font-weight: 800;
+    color: #10b981;
+    margin-bottom: 4px;
+    letter-spacing: -1px;
+  }
+
+  .stat-label {
+    font-size: 13px;
+    color: #94a3b8;
+    font-weight: 500;
+    letter-spacing: 0.5px;
+  }
+
+  .stat-sublabel {
+    font-size: 11px;
+    color: #64748b;
+    margin-top: 4px;
+  }
+
+  /* Trust Section */
+  .trust-section {
+    position: relative;
+    z-index: 10;
+    padding: 0 48px 40px;
+  }
+
+  .trust-row {
+    display: flex;
+    justify-content: center;
+    gap: 32px;
+    align-items: center;
+  }
+
+  .trust-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: #64748b;
+  }
+
+  .trust-check {
+    width: 16px;
+    height: 16px;
+    color: #10b981;
+  }
+
+  /* Feature highlights */
+  .features-section {
+    position: relative;
+    z-index: 10;
+    padding: 0 48px 40px;
+  }
+
+  .features-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+  }
+
+  .feature-card {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 14px;
+    padding: 24px;
+  }
+
+  .feature-icon {
+    width: 40px;
+    height: 40px;
+    background: rgba(16, 185, 129, 0.1);
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 14px;
+    color: #10b981;
+    font-size: 20px;
+  }
+
+  .feature-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: #f1f5f9;
+    margin-bottom: 6px;
+  }
+
+  .feature-desc {
+    font-size: 13px;
+    color: #94a3b8;
+    line-height: 1.5;
+  }
+
+  /* Improvement callout */
+  .improvement-callout {
+    position: relative;
+    z-index: 10;
+    margin: 0 48px 32px;
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.08), rgba(6, 182, 212, 0.06));
+    border: 1px solid rgba(16, 185, 129, 0.2);
+    border-radius: 14px;
+    padding: 24px 28px;
+    display: flex;
+    gap: 16px;
+    align-items: flex-start;
+  }
+
+  .callout-icon {
+    width: 36px;
+    height: 36px;
+    background: rgba(16, 185, 129, 0.15);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    color: #34d399;
+    font-size: 18px;
+  }
+
+  .callout-content h4 {
+    font-size: 15px;
+    font-weight: 600;
+    color: #34d399;
+    margin-bottom: 4px;
+  }
+
+  .callout-content p {
+    font-size: 13px;
+    color: #cbd5e1;
+    line-height: 1.5;
+  }
+
+  /* Footer bar */
+  .footer-bar {
+    position: relative;
+    z-index: 10;
+    padding: 20px 48px;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .footer-text {
+    font-size: 12px;
+    color: #475569;
+  }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="bg-pattern"></div>
+
+  <!-- Navigation -->
+  <nav class="nav">
+    <div class="logo">Track<span>r</span></div>
+    <div class="nav-actions">
+      <button class="btn-signin">Sign In</button>
+      <button class="btn-cta">Get Started Free</button>
+    </div>
+  </nav>
+
+  <!-- Hero Section -->
+  <section class="hero">
+    <div class="badge-row">
+      <div class="badge">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg>
+        AI-Powered
+      </div>
+      <div class="badge">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg>
+        Voice-First
+      </div>
+      <div class="badge">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+        Multi-Language
+      </div>
+    </div>
+
+    <h1 class="hero-title">Track Your Money<br><span class="accent">With Your Voice</span></h1>
+
+    <p class="hero-subtitle">Speak naturally in English or Hindi. Trackr's AI understands your spending, categorizes it instantly, and keeps your finances organized without lifting a finger.</p>
+
+    <div class="hero-example">
+      <div class="example-line">
+        <svg class="example-mic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/></svg>
+        <span class="example-text">"Spent 500 on groceries"</span>
+        <span class="example-arrow">&rarr;</span>
+        <span class="example-result">Food &amp; Groceries</span>
+      </div>
+      <div class="example-line">
+        <svg class="example-mic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/></svg>
+        <span class="example-text">"गुज़र 50000 बाज़ार खर्चा"</span>
+        <span class="example-arrow">&rarr;</span>
+        <span class="example-result">Shopping</span>
+      </div>
+    </div>
+
+    <div class="cta-row">
+      <button class="btn-primary">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+        Start Free - No Sign-Up Needed
+      </button>
+      <button class="btn-secondary">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/></svg>
+        See How It Works
+      </button>
+    </div>
+  </section>
+
+  <!-- Stats Section -->
+  <section class="stats-section">
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-number">2</div>
+        <div class="stat-label">Languages</div>
+        <div class="stat-sublabel">English &amp; Hindi</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-number">INR</div>
+        <div class="stat-label">Primary Currency</div>
+        <div class="stat-sublabel">Multi-format input</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-number">16+</div>
+        <div class="stat-label">Categories</div>
+        <div class="stat-sublabel">Auto-classified</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-number">5</div>
+        <div class="stat-label">Classifications</div>
+        <div class="stat-sublabel">Smart tagging</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Improvement Callout -->
+  <div class="improvement-callout">
+    <div class="callout-icon">&#10003;</div>
+    <div class="callout-content">
+      <h4>Honest by Design</h4>
+      <p>We believe trust starts with truth. Our stats reflect actual capabilities, not inflated promises. As we expand to more languages and currencies, you'll be the first to know.</p>
+    </div>
+  </div>
+
+  <!-- Trust Section -->
+  <section class="trust-section">
+    <div class="trust-row">
+      <div class="trust-item">
+        <svg class="trust-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+        No password required
+      </div>
+      <div class="trust-item">
+        <svg class="trust-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+        Your data stays private
+      </div>
+      <div class="trust-item">
+        <svg class="trust-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+        Works offline
+      </div>
+    </div>
+  </section>
+
+  <!-- Feature highlights -->
+  <section class="features-section">
+    <div class="features-grid">
+      <div class="feature-card">
+        <div class="feature-icon">&#127908;</div>
+        <div class="feature-title">Natural Voice Input</div>
+        <div class="feature-desc">Just speak naturally. Our AI understands context, amounts, and categories from everyday language.</div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">&#9889;</div>
+        <div class="feature-title">Instant Categorization</div>
+        <div class="feature-desc">AI auto-classifies every expense into 16+ categories. No manual sorting needed.</div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">&#128274;</div>
+        <div class="feature-title">Privacy First</div>
+        <div class="feature-desc">Start without passwords. Your financial data is encrypted and never shared.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <div class="footer-bar">
+    <div class="footer-text">Trackr - Voice-powered expense tracking</div>
+    <div class="footer-text">Redesigned with honesty &amp; clarity</div>
+  </div>
+</div>
+</body>
+</html>

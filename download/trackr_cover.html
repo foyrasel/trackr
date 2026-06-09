@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Trackr Landing Page - Improvement Report</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Playfair+Display:wght@700;800;900&display=swap" rel="stylesheet">
+<style>
+  @page { size: 794px 1123px; margin: 0; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; width: 794px; height: 1123px; overflow: hidden; font-family: 'Inter', sans-serif; }
+
+  .cover {
+    position: relative;
+    width: 794px;
+    height: 1123px;
+    background: #f4f4f3;
+    overflow: hidden;
+  }
+
+  /* Layer 0: Background */
+  .bg-layer {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+  }
+
+  /* Layer 1: Decorative background grid */
+  .decor-layer {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    overflow: hidden;
+  }
+
+  .grid-pattern {
+    position: absolute;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(103, 96, 75, 0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(103, 96, 75, 0.04) 1px, transparent 1px);
+    background-size: 50px 50px;
+  }
+
+  /* Thick vertical anchor line (Template 01 style) */
+  .anchor-line {
+    position: absolute;
+    left: 95px;
+    top: 0.10 * 1123px;
+    bottom: 0.10 * 1123px;
+    width: 6px;
+    background: #67604b;
+    top: 112px;
+    height: 898px;
+  }
+
+  /* Layer 2: Structure lines */
+  .structure-layer {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+  }
+
+  .meta-line {
+    position: absolute;
+    left: 145px;
+    top: 756px;
+    width: 280px;
+    height: 1px;
+    background: rgba(103, 96, 75, 0.4);
+  }
+
+  /* Layer 3: Content */
+  .content-layer {
+    position: absolute;
+    inset: 0;
+    z-index: 3;
+  }
+
+  .kicker {
+    position: absolute;
+    left: 145px;
+    top: 168px;
+    font-family: 'Inter', sans-serif;
+    font-size: 16px;
+    font-weight: 400;
+    letter-spacing: 3px;
+    color: rgba(38, 37, 34, 0.6);
+    text-transform: uppercase;
+  }
+
+  .hero-title {
+    position: absolute;
+    left: 145px;
+    top: 310px;
+    font-family: 'Playfair Display', serif;
+    font-size: 52px;
+    font-weight: 900;
+    color: #262522;
+    line-height: 1.15;
+    max-width: 500px;
+  }
+
+  .summary {
+    position: absolute;
+    left: 145px;
+    top: 520px;
+    font-family: 'Inter', sans-serif;
+    font-size: 17px;
+    font-weight: 400;
+    color: rgba(38, 37, 34, 0.85);
+    line-height: 1.6;
+    max-width: 480px;
+  }
+
+  .meta-block {
+    position: absolute;
+    left: 145px;
+    top: 776px;
+    font-family: 'Inter', sans-serif;
+    font-size: 16px;
+    font-weight: 400;
+    color: rgba(38, 37, 34, 0.85);
+    line-height: 2.0;
+  }
+
+  .footer-block {
+    position: absolute;
+    right: 80px;
+    bottom: 60px;
+    font-family: 'Inter', sans-serif;
+    font-size: 16px;
+    font-weight: 400;
+    letter-spacing: 3px;
+    color: rgba(38, 37, 34, 0.6);
+    text-transform: uppercase;
+    text-align: right;
+  }
+
+  .accent-badge {
+    display: inline-block;
+    padding: 4px 12px;
+    background: #4623b0;
+    color: white;
+    font-size: 10px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    font-weight: 600;
+    border-radius: 3px;
+    margin-left: 8px;
+    vertical-align: middle;
+  }
+</style>
+</head>
+<body>
+<div class="cover">
+  <div class="bg-layer"></div>
+  <div class="decor-layer">
+    <div class="grid-pattern"></div>
+    <div class="anchor-line"></div>
+  </div>
+  <div class="structure-layer">
+    <div class="meta-line"></div>
+  </div>
+  <div class="content-layer">
+    <div class="kicker">UX AUDIT &amp; REDESIGN REPORT</div>
+    <div class="hero-title">Trackr<br>Landing Page<br>Improvement</div>
+    <div class="summary">A comprehensive analysis of the Trackr financial tracking website, identifying critical inconsistencies in marketing claims, messaging, and user experience, with actionable strategies for a cohesive and trustworthy redesign.</div>
+    <div class="meta-block">
+      Prepared by Z.ai<br>
+      June 2026<br>
+      Version 1.0
+    </div>
+    <div class="footer-block">
+      UX / UI / BRANDING
+    </div>
+  </div>
+</div>
+</body>
+</html>
