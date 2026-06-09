@@ -19,7 +19,7 @@ let zaiInstance: any = null
 let zaiInitPromise: Promise<any> | null = null
 let useProxy = false
 
-const PROXY_URL = 'https://acting-animals-stack-printing.trycloudflare.com'
+const PROXY_URL = 'https://provincial-consciousness-meets-outline.trycloudflare.com'
 const PROXY_KEY = 'trackr-ai-proxy-2026'
 
 /**
