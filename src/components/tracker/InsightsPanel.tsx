@@ -266,12 +266,12 @@ export default function InsightsPanel({ refreshTrigger, userName }: InsightsPane
           <CardContent>
             <div className="h-56">
               <ResponsiveContainer width="100%" height="100%">
-                <RadarChart data={radarData}>
-                  <PolarGrid />
-                  <PolarAngleAxis dataKey="subject" fontSize={11} />
-                  <PolarRadiusAxis angle={30} domain={[0, 100]} fontSize={9} />
-                  <Radar name="Your Spending" dataKey="value" stroke="#10b981" fill="#10b981" fillOpacity={0.3} />
-                  <Radar name="Ideal" dataKey="ideal" stroke="#94a3b8" fill="#94a3b8" fillOpacity={0.1} strokeDasharray="5 5" />
+                <RadarChart data={radarData} cx="50%" cy="50%" outerRadius="80%">
+                  <PolarGrid stroke="#e5e7eb" />
+                  <PolarAngleAxis dataKey="subject" fontSize={11} tick={{ fill: '#6b7280' }} />
+                  <PolarRadiusAxis angle={30} domain={[0, 100]} fontSize={9} tick={{ fill: '#9ca3af' }} />
+                  <Radar name="Your Spending" dataKey="value" stroke="#10b981" fill="#10b981" fillOpacity={0.25} strokeWidth={2} />
+                  <Radar name="Ideal" dataKey="ideal" stroke="#94a3b8" fill="#94a3b8" fillOpacity={0.08} strokeDasharray="5 5" strokeWidth={1.5} />
                   <Tooltip />
                 </RadarChart>
               </ResponsiveContainer>
@@ -292,7 +292,7 @@ export default function InsightsPanel({ refreshTrigger, userName }: InsightsPane
 
       {/* Where to Cut Spending */}
       {categoryRank.length > 0 && (
-        <Card>
+        <Card className="border border-red-100 dark:border-red-900/30 bg-gradient-to-br from-red-50/30 to-white dark:from-red-950/10 dark:to-gray-900">
           <CardHeader className="pb-2">
             <CardTitle className="text-base flex items-center gap-2">
               <TrendingDown className="w-4 h-4 text-red-500" />
@@ -339,8 +339,10 @@ export default function InsightsPanel({ refreshTrigger, userName }: InsightsPane
           <CardContent>
             <div className="h-48">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={
-                  Object.entries(data.monthlyTrend)
+                <BarChart
+                  maxBarSize={40}
+                  data={
+                    Object.entries(data.monthlyTrend)
                     .sort(([a], [b]) => a.localeCompare(b))
                     .map(([month, values]) => ({
                       month: new Date(month + '-01').toLocaleDateString('en-US', { month: 'short' }),

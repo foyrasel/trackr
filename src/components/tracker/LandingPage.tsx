@@ -442,8 +442,10 @@ export default function LandingPage({ onLogin }: LandingPageProps) {
           <a href="/" className="flex items-center gap-2.5 group">
             <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg shadow-emerald-500/25 group-hover:shadow-emerald-500/40 transition-shadow relative overflow-hidden">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="text-white">
-                <path d="M12 2L3 7v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-9-5z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                <path d="M9 12l2 2 4-4" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M3 20L8 13L13 16L21 6" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M17 6H21V10" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+                <circle cx="8" cy="13" r="1.5" fill="currentColor"/>
+                <circle cx="13" cy="16" r="1.5" fill="currentColor"/>
               </svg>
             </div>
             <span className="text-xl font-bold text-gray-900 dark:text-white tracking-tight">Trackr</span>
@@ -549,7 +551,7 @@ export default function LandingPage({ onLogin }: LandingPageProps) {
                   size="lg"
                   className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white text-lg px-8 py-7 shadow-xl shadow-emerald-500/25 hover:shadow-emerald-500/40 transition-all group"
                 >
-                  Start Free — No Sign-Up Needed
+                  Get Started Free
                   <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
                 </Button>
                 <Button
@@ -925,7 +927,7 @@ export default function LandingPage({ onLogin }: LandingPageProps) {
                     {[
                       'Voice input in English & Bangla',
                       'AI categorization & classification',
-                      '22 currencies with auto-conversion',
+                      'Auto-detect currency from your location',
                       'Unlimited transactions & goals',
                       'Budget tracking & AI suggestions',
                       'Lend/Borrow & Bill Reminders',
@@ -969,8 +971,8 @@ export default function LandingPage({ onLogin }: LandingPageProps) {
 
         <div className="relative max-w-sm mx-auto px-4">
           <AnimatedSection className="text-center mb-8">
-            <h2 className="text-3xl font-extrabold text-gray-900 dark:text-white mb-2 tracking-tight">Get Started in Seconds</h2>
-            <p className="text-sm text-gray-500 dark:text-gray-400">Create an account or use Quick Start</p>
+            <h2 className="text-3xl font-extrabold text-gray-900 dark:text-white mb-2 tracking-tight">Create Your Account</h2>
+            <p className="text-sm text-gray-500 dark:text-gray-400">Sign up with social login or email to get started</p>
           </AnimatedSection>
 
           <motion.div
@@ -1089,7 +1091,7 @@ export default function LandingPage({ onLogin }: LandingPageProps) {
                           <span className="w-full border-t dark:border-gray-700" />
                         </div>
                         <div className="relative flex justify-center text-xs uppercase">
-                          <span className="bg-white dark:bg-gray-950 px-2 text-muted-foreground">or continue with name</span>
+                          <span className="bg-white dark:bg-gray-950 px-2 text-muted-foreground">or try with a name</span>
                         </div>
                       </div>
                     )}
@@ -1244,7 +1246,7 @@ export default function LandingPage({ onLogin }: LandingPageProps) {
                   </div>
                   <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
                     <Globe className="w-3.5 h-3.5" />
-                    22 Currencies
+                    Auto Currency
                   </div>
                 </div>
               </CardContent>
@@ -1261,12 +1263,15 @@ export default function LandingPage({ onLogin }: LandingPageProps) {
             <div className="col-span-2 md:col-span-1">
               <div className="flex items-center gap-2.5 mb-4">
                 <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg shadow-emerald-500/25">
-                  <span className="text-white text-sm font-bold">T</span>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="text-white">
+                    <path d="M3 20L8 13L13 16L21 6" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
+                    <path d="M17 6H21V10" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
                 </div>
                 <span className="text-lg font-bold text-gray-900 dark:text-white tracking-tight">Trackr</span>
               </div>
               <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed">
-                AI-powered voice-first expense tracker. Free, private, and works in 22 currencies.
+                AI-powered voice-first expense tracker. Free, private, and auto-detects your currency and language.
               </p>
             </div>
 

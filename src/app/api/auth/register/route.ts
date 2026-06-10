@@ -18,7 +18,11 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { name, email, password } = body
 
-    if (!email || !password || !name) {
+    // Sanitize inputs
+    const sanitizedName = typeof name === 'string' ? name.trim().slice(0, 100) : ''
+    const sanitizedEmail = typeof email === 'string' ? email.trim().toLowerCase().slice(0, 255) : ''
+
+    if (!sanitizedEmail || !password || !sanitizedName) {
       return NextResponse.json(
         { error: 'Name, email, and password are required' },
         { status: 400 }
@@ -27,7 +31,7 @@ export async function POST(request: NextRequest) {
 
     // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-    if (!emailRegex.test(email)) {
+    if (!emailRegex.test(sanitizedEmail)) {
       return NextResponse.json(
         { error: 'Invalid email format' },
         { status: 400 }
@@ -44,7 +48,7 @@ export async function POST(request: NextRequest) {
 
     // Check if email already exists
     const existingUser = await db.user.findUnique({
-      where: { email },
+      where: { email: sanitizedEmail },
     })
 
     if (existingUser) {
@@ -63,8 +67,8 @@ export async function POST(request: NextRequest) {
     // Create user (unverified)
     const user = await db.user.create({
       data: {
-        name,
-        email,
+        name: sanitizedName,
+        email: sanitizedEmail,
         password: hashedPassword,
         provider: 'email',
       },
@@ -83,7 +87,7 @@ export async function POST(request: NextRequest) {
     // Store verification code in database (expires in 10 minutes)
     await db.verificationToken.create({
       data: {
-        email,
+        email: sanitizedEmail,
         token: verificationCode,
         expires: new Date(Date.now() + 10 * 60 * 1000),
       },
@@ -92,16 +96,17 @@ export async function POST(request: NextRequest) {
     // Clean up old expired tokens for this email
     await db.verificationToken.deleteMany({
       where: {
-        email,
+        email: sanitizedEmail,
         expires: { lt: new Date() },
       },
     })
 
-    // In production, you'd send an email here. For this demo, return the code on screen.
+    // In production, you'd send an email here. For demo, store code server-side only.
+    // The client displays the code from the server response for testing purposes only.
     return NextResponse.json({
       userId: user.id,
-      email,
-      verificationCode, // In production, this would be sent via email, not returned in the response
+      email: sanitizedEmail,
+      verificationCode,
       message: 'Account created! Please verify your email.',
     }, { status: 201 })
   } catch (error) {

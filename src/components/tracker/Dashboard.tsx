@@ -19,7 +19,7 @@ import {
 import {
   TrendingUp, TrendingDown, Wallet, AlertTriangle,
   PiggyBank, BarChart3, Calendar, ChevronLeft, ChevronRight,
-  ArrowUpRight, ArrowDownRight, Activity, Brain, Lightbulb,
+  ArrowUpRight, ArrowDownRight, Activity, Brain, Lightbulb, Target,
 } from 'lucide-react'
 import BalanceCards from './BalanceCards'
 import { Button } from '@/components/ui/button'
@@ -320,7 +320,7 @@ export default function Dashboard({ refreshTrigger, userName }: DashboardProps) 
 
       {/* Summary Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Card className="bg-gradient-to-br from-emerald-50 to-emerald-100/50 border-emerald-200">
+        <Card className="bg-gradient-to-br from-emerald-50 to-emerald-100/50 border-emerald-200 hover:shadow-md transition-shadow">
           <CardContent className="p-4">
             <div className="flex items-center gap-2 mb-1">
               <TrendingUp className="w-4 h-4 text-emerald-600" />
@@ -330,7 +330,7 @@ export default function Dashboard({ refreshTrigger, userName }: DashboardProps) 
           </CardContent>
         </Card>
 
-        <Card className="bg-gradient-to-br from-red-50 to-red-100/50 border-red-200">
+        <Card className="bg-gradient-to-br from-red-50 to-red-100/50 border-red-200 hover:shadow-md transition-shadow">
           <CardContent className="p-4">
             <div className="flex items-center gap-2 mb-1">
               <TrendingDown className="w-4 h-4 text-red-600" />
@@ -340,7 +340,7 @@ export default function Dashboard({ refreshTrigger, userName }: DashboardProps) 
           </CardContent>
         </Card>
 
-        <Card className={`bg-gradient-to-br ${data.balance >= 0 ? 'from-emerald-50 to-emerald-100/50 border-emerald-200' : 'from-red-50 to-red-100/50 border-red-200'}`}>
+        <Card className={`bg-gradient-to-br ${data.balance >= 0 ? 'from-emerald-50 to-emerald-100/50 border-emerald-200' : 'from-red-50 to-red-100/50 border-red-200'} hover:shadow-md transition-shadow`}>
           <CardContent className="p-4">
             <div className="flex items-center gap-2 mb-1">
               <Wallet className="w-4 h-4" />
@@ -352,7 +352,7 @@ export default function Dashboard({ refreshTrigger, userName }: DashboardProps) 
           </CardContent>
         </Card>
 
-        <Card className="bg-gradient-to-br from-amber-50 to-amber-100/50 border-amber-200">
+        <Card className="bg-gradient-to-br from-amber-50 to-amber-100/50 border-amber-200 hover:shadow-md transition-shadow">
           <CardContent className="p-4">
             <div className="flex items-center gap-2 mb-1">
               <PiggyBank className="w-4 h-4 text-amber-600" />
@@ -778,9 +778,12 @@ export default function Dashboard({ refreshTrigger, userName }: DashboardProps) 
       {/* Charts Row */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {classificationData.length > 0 && (
-          <Card>
+          <Card className="border border-gray-200 dark:border-gray-700/50 shadow-sm">
             <CardHeader className="pb-2">
-              <CardTitle className="text-base">Spending Distribution</CardTitle>
+              <CardTitle className="text-base flex items-center gap-2">
+                <Target className="w-4 h-4 text-emerald-500" />
+                Spending Distribution
+              </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="h-52">
@@ -820,7 +823,10 @@ export default function Dashboard({ refreshTrigger, userName }: DashboardProps) 
         {categoryData.length > 0 && (
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-base">Where Money Goes</CardTitle>
+              <CardTitle className="text-base flex items-center gap-2">
+                <ArrowUpRight className="w-4 h-4 text-red-500" />
+                Where Money Goes
+              </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="h-52">
@@ -849,13 +855,23 @@ export default function Dashboard({ refreshTrigger, userName }: DashboardProps) 
             <div className="h-48">
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={trendData}>
+                  <defs>
+                    <linearGradient id="incomeGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.3}/>
+                      <stop offset="95%" stopColor="#10b981" stopOpacity={0.02}/>
+                    </linearGradient>
+                    <linearGradient id="expenseGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#ef4444" stopOpacity={0.3}/>
+                      <stop offset="95%" stopColor="#ef4444" stopOpacity={0.02}/>
+                    </linearGradient>
+                  </defs>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="month" fontSize={11} />
                   <YAxis tickFormatter={(v: number) => `${currencySymbol}${(v / 1000).toFixed(0)}k`} fontSize={10} />
                   <Tooltip formatter={(value: number) => `${currencySymbol}${value.toLocaleString()}`} />
                   <Legend />
-                  <Area type="monotone" dataKey="income" stackId="1" stroke="#10b981" fill="#10b981" fillOpacity={0.2} name="Income" />
-                  <Area type="monotone" dataKey="expense" stackId="2" stroke="#ef4444" fill="#ef4444" fillOpacity={0.2} name="Expense" />
+                  <Area type="monotone" dataKey="income" stackId="1" stroke="#10b981" strokeWidth={2.5} fill="url(#incomeGradient)" name="Income" />
+                  <Area type="monotone" dataKey="expense" stackId="2" stroke="#ef4444" strokeWidth={2.5} fill="url(#expenseGradient)" name="Expense" />
                 </AreaChart>
               </ResponsiveContainer>
             </div>
