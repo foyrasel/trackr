@@ -268,7 +268,7 @@ export async function GET(request: NextRequest) {
       personalityDescription = 'Your spending is remarkably consistent month-to-month and you maintain a healthy savings rate. You\'re disciplined with your finances.'
     } else if (expenses.length > 0 && smallTxns > expenses.length * 0.6 && spendingConsistency < 50) {
       personalityType = 'Impulse Buyer'
-      personalityIcon = ' impuls'
+      personalityIcon = '⚡'
       personalityDescription = 'You make many small purchases with high spending variance, suggesting impulsive buying habits. Try the 24-hour rule before non-essential purchases.'
     } else if (expenses.length > 0 && largeTxns >= 1 && largeTxns / expenses.length > 0.1) {
       personalityType = 'Big Ticket Spender'
@@ -608,7 +608,7 @@ export async function GET(request: NextRequest) {
       cashFlowForecast,
     })
   } catch (error) {
-    console.error('Error fetching insights:', error)
-    return NextResponse.json({ error: 'Failed to fetch insights' }, { status: 500 })
+    console.error('Error fetching insights:', error instanceof Error ? error.message : String(error))
+    return NextResponse.json({ error: 'Failed to fetch insights', details: error instanceof Error ? error.message : String(error) }, { status: 500 })
   }
 }
