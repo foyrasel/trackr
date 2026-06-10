@@ -36,8 +36,8 @@ const features = [
   },
   {
     icon: Globe,
-    title: '22 Currencies Supported',
-    description: 'USD, BDT, INR, EUR, GBP, AED, SGD, and 15 more. Designed for international users — switch currency anytime, everything updates automatically.',
+    title: 'Auto-Detect Currency & Language',
+    description: 'Trackr automatically detects your location and sets the right currency and language. Supports BDT, INR, USD, EUR, and more — switch anytime.',
     gradient: 'from-cyan-500 to-blue-500',
     glow: 'shadow-cyan-500/20',
     iconColor: '#06b6d4'
@@ -93,7 +93,7 @@ const features = [
 ]
 
 const stats = [
-  { value: '22', label: 'Currencies', icon: Globe },
+  { value: 'Auto', label: 'Currency', icon: Globe },
   { value: '2', label: 'Languages', icon: Mic },
   { value: '16+', label: 'Categories', icon: Brain },
   { value: '5', label: 'Classifications', icon: BarChart3 },
@@ -117,7 +117,7 @@ const testimonials = [
   {
     name: 'Ahmed Hassan',
     location: 'Dubai, UAE',
-    text: 'Multi-currency support is exactly what I needed. I track expenses in AED at home and INR when visiting India.',
+    text: 'The auto-detect currency feature is brilliant. It switched to AED automatically when I landed, and back to BDT when I returned home. Seamless!',
     rating: 5,
     emoji: '🇦🇪'
   }
@@ -295,7 +295,8 @@ export default function LandingPage({ onLogin }: LandingPageProps) {
   const [signupError, setSignupError] = useState('')
 
   useEffect(() => {
-    setGoogleConfigured(process.env.NEXT_PUBLIC_GOOGLE_CONFIGURED === 'true')
+    // Always show Google login as primary social option
+    setGoogleConfigured(true)
     setFacebookConfigured(process.env.NEXT_PUBLIC_FACEBOOK_CONFIGURED === 'true')
     setAppleConfigured(process.env.NEXT_PUBLIC_APPLE_CONFIGURED === 'true')
   }, [])
@@ -439,8 +440,11 @@ export default function LandingPage({ onLogin }: LandingPageProps) {
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
           <a href="/" className="flex items-center gap-2.5 group">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg shadow-emerald-500/25 group-hover:shadow-emerald-500/40 transition-shadow">
-              <span className="text-white text-lg font-bold">T</span>
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg shadow-emerald-500/25 group-hover:shadow-emerald-500/40 transition-shadow relative overflow-hidden">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="text-white">
+                <path d="M12 2L3 7v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-9-5z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M9 12l2 2 4-4" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
             </div>
             <span className="text-xl font-bold text-gray-900 dark:text-white tracking-tight">Trackr</span>
           </a>
@@ -508,7 +512,7 @@ export default function LandingPage({ onLogin }: LandingPageProps) {
                 className="inline-flex items-center gap-2 bg-emerald-100/80 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 text-sm font-medium px-4 py-1.5 rounded-full mb-6 backdrop-blur-sm border border-emerald-200/50 dark:border-emerald-800/50"
               >
                 <Sparkles className="w-4 h-4" />
-                AI-Powered &bull; Voice-First &bull; International
+                AI-Powered &bull; Voice-First &bull; Multi-Language
               </motion.div>
 
               <motion.h1
@@ -531,7 +535,7 @@ export default function LandingPage({ onLogin }: LandingPageProps) {
                 transition={{ duration: 0.6, delay: 0.4 }}
                 className="text-lg sm:text-xl text-gray-600 dark:text-gray-300 mb-8 max-w-xl mx-auto lg:mx-0 leading-relaxed"
               >
-                Just say <em className="not-italic text-emerald-700 dark:text-emerald-400 font-medium">&ldquo;Spent 500 on groceries&rdquo;</em> or <em className="not-italic text-emerald-700 dark:text-emerald-400 font-medium">&ldquo;আয় ১০০০০ টাকা স্যালারি&rdquo;</em> — Trackr&apos;s AI understands, categorizes, and logs it instantly.
+                Just say <em className="not-italic text-emerald-700 dark:text-emerald-400 font-medium">&ldquo;Spent 500 on groceries&rdquo;</em> or <em className="not-italic text-emerald-700 dark:text-emerald-400 font-medium">&ldquo;খরচ ৫০০ টাকা বাজার&rdquo;</em> — Trackr&apos;s AI understands, categorizes, and logs it instantly. Currency and language adapt to your location automatically.
               </motion.p>
 
               <motion.div
@@ -545,7 +549,7 @@ export default function LandingPage({ onLogin }: LandingPageProps) {
                   size="lg"
                   className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white text-lg px-8 py-7 shadow-xl shadow-emerald-500/25 hover:shadow-emerald-500/40 transition-all group"
                 >
-                  Start Free — No Password Needed
+                  Start Free — No Sign-Up Needed
                   <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
                 </Button>
                 <Button

@@ -16,7 +16,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Trackr - AI Voice Expense Tracker",
-  description: "Voice-first, AI-assisted spending & income tracker with smart categorization. Track expenses in any currency, anywhere in the world.",
+  description: "Voice-first, AI-assisted spending & income tracker with smart categorization. Auto-detects your currency and language — just speak and track.",
   keywords: ["expense tracker", "budget", "voice input", "AI", "money tracker", "finance", "50/30/20 rule", "lending", "goals"],
   icons: {
     icon: "/icons/icon-192.png",
