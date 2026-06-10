@@ -57,9 +57,14 @@ async function runMigrations(url: string, authToken?: string) {
   for (const migration of migrations) {
     try {
       await libsql.execute(migration.sql)
+      console.log('[DB] Migration', migration.name, 'applied successfully')
     } catch (err: any) {
-      if (!err.message?.includes('duplicate column') && !err.message?.includes('already exists')) {
-        console.error('[DB] Migration', migration.name, 'warning:', err.message)
+      // Column already exists is fine, anything else is a real error
+      const msg = err?.message || String(err)
+      if (msg.includes('duplicate column') || msg.includes('already exists')) {
+        console.log('[DB] Migration', migration.name, 'already applied')
+      } else {
+        console.error('[DB] Migration', migration.name, 'FAILED:', msg)
       }
     }
   }

@@ -15,11 +15,20 @@ export async function GET(request: NextRequest) {
 
     const currentMonth = month || `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`
 
-    const budgets = await db.budget.findMany({
-      where: { userId: user.id, month: currentMonth },
-      orderBy: { category: 'asc' },
-      include: { goal: { select: { id: true, name: true, icon: true } } },
-    })
+    let budgets: any[]
+    try {
+      budgets = await db.budget.findMany({
+        where: { userId: user.id, month: currentMonth },
+        orderBy: { category: 'asc' },
+        include: { goal: { select: { id: true, name: true, icon: true } } },
+      })
+    } catch {
+      // Fallback if goalId column doesn't exist yet
+      budgets = await db.budget.findMany({
+        where: { userId: user.id, month: currentMonth },
+        orderBy: { category: 'asc' },
+      })
+    }
 
     // Get current month spending per category
     const startDate = new Date(`${currentMonth}-01`)

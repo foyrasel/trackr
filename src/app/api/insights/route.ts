@@ -99,14 +99,28 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    // ── Fetch budgets ──
-    const budgets = await db.budget.findMany({
-      where: {
-        userId: user.id,
-        month: currentMonth,
-        isIgnored: false,
-      },
-    })
+    // ── Fetch budgets (with fallback if goalId column doesn't exist yet) ──
+    let budgets: any[] = []
+    try {
+      budgets = await db.budget.findMany({
+        where: {
+          userId: user.id,
+          month: currentMonth,
+          isIgnored: false,
+        },
+      })
+    } catch (budgetErr: any) {
+      console.error('[Insights] Budget query failed (likely missing column):', budgetErr?.message)
+      // Fallback: fetch without include
+      try {
+        budgets = await db.budget.findMany({
+          where: { userId: user.id, month: currentMonth, isIgnored: false },
+          select: { id: true, category: true, amount: true, isIgnored: true, month: true, userId: true, createdAt: true, updatedAt: true },
+        })
+      } catch {
+        budgets = []
+      }
+    }
 
     // ── Fetch goals ──
     const goals = await db.goal.findMany({
