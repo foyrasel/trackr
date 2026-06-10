@@ -267,7 +267,6 @@ function PhoneMockup() {
 }
 
 export default function LandingPage({ onLogin }: LandingPageProps) {
-  const [name, setName] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [googleConfigured, setGoogleConfigured] = useState(false)
   const [facebookConfigured, setFacebookConfigured] = useState(false)
@@ -285,10 +284,12 @@ export default function LandingPage({ onLogin }: LandingPageProps) {
   const heroOpacity = useTransform(scrollYProgress, [0, 0.8], [1, 0])
 
   // Email signup state
-  const [authMode, setAuthMode] = useState<'quick' | 'signup' | 'verify'>('quick')
+  const [authMode, setAuthMode] = useState<'signin' | 'signup' | 'verify'>('signin')
   const [signupName, setSignupName] = useState('')
   const [signupEmail, setSignupEmail] = useState('')
   const [signupPassword, setSignupPassword] = useState('')
+  const [signinEmail, setSigninEmail] = useState('')
+  const [signinPassword, setSigninPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [verifyCode, setVerifyCode] = useState('')
   const [verificationCode, setVerificationCode] = useState('')
@@ -301,20 +302,7 @@ export default function LandingPage({ onLogin }: LandingPageProps) {
     setAppleConfigured(process.env.NEXT_PUBLIC_APPLE_CONFIGURED === 'true')
   }, [])
 
-  const handleDemoLogin = async () => {
-    const userName = name.trim() || 'User'
-    setIsLoading(true)
-    try {
-      const result = await signIn('credentials', { name: userName, redirect: false })
-      if (result?.ok) {
-        onLogin(userName)
-      } else {
-        onLogin(userName)
-      }
-    } catch {
-      onLogin(userName)
-    }
-  }
+
 
   const handleGoogleLogin = async () => {
     setIsLoading(true)
@@ -339,6 +327,32 @@ export default function LandingPage({ onLogin }: LandingPageProps) {
     try {
       await signIn('apple', { callbackUrl: '/' })
     } catch {
+      setIsLoading(false)
+    }
+  }
+
+  const handleEmailSignin = async () => {
+    setSignupError('')
+    if (!signinEmail.trim() || !signinPassword.trim()) {
+      setSignupError('Email and password are required')
+      return
+    }
+    setIsLoading(true)
+    try {
+      const result = await signIn('credentials', {
+        email: signinEmail.trim(),
+        password: signinPassword,
+        redirect: false,
+      })
+      if (result?.ok) {
+        onLogin(signinEmail.trim())
+      } else {
+        setSignupError('Invalid email or password')
+      }
+    } catch (error) {
+      console.error('Sign in error:', error)
+      setSignupError('Something went wrong. Please try again.')
+    } finally {
       setIsLoading(false)
     }
   }
@@ -986,14 +1000,14 @@ export default function LandingPage({ onLogin }: LandingPageProps) {
                 {/* Auth Mode Tabs */}
                 <div className="flex gap-1 bg-gray-100 dark:bg-gray-800 rounded-xl p-1">
                   <button
-                    onClick={() => { setAuthMode('quick'); setSignupError('') }}
+                    onClick={() => { setAuthMode('signin'); setSignupError('') }}
                     className={`flex-1 py-2.5 px-3 rounded-lg text-sm font-semibold transition-all ${
-                      authMode === 'quick'
+                      authMode === 'signin'
                         ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
                         : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
                     }`}
                   >
-                    Quick Start
+                    Sign In
                   </button>
                   <button
                     onClick={() => { setAuthMode('signup'); setSignupError('') }}
@@ -1003,7 +1017,7 @@ export default function LandingPage({ onLogin }: LandingPageProps) {
                         : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
                     }`}
                   >
-                    Email Sign Up
+                    Sign Up
                   </button>
                 </div>
 
@@ -1021,8 +1035,8 @@ export default function LandingPage({ onLogin }: LandingPageProps) {
                   )}
                 </AnimatePresence>
 
-                {/* Quick Start Mode */}
-                {authMode === 'quick' && (
+                {/* Sign In Mode */}
+                {authMode === 'signin' && (
                   <motion.div
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
@@ -1091,29 +1105,60 @@ export default function LandingPage({ onLogin }: LandingPageProps) {
                           <span className="w-full border-t dark:border-gray-700" />
                         </div>
                         <div className="relative flex justify-center text-xs uppercase">
-                          <span className="bg-white dark:bg-gray-950 px-2 text-muted-foreground">or try with a name</span>
+                          <span className="bg-white dark:bg-gray-950 px-2 text-muted-foreground">or sign in with email</span>
                         </div>
                       </div>
                     )}
 
-                    <Input
-                      placeholder="Enter your name..."
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      onKeyDown={(e) => e.key === 'Enter' && handleDemoLogin()}
-                      className="h-12 text-center text-lg border-gray-200 dark:border-gray-700 focus:border-emerald-500 dark:focus:border-emerald-500"
-                      disabled={isLoading}
-                    />
+                    <div className="relative">
+                      <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                      <Input
+                        type="email"
+                        placeholder="Email address"
+                        value={signinEmail}
+                        onChange={(e) => setSigninEmail(e.target.value)}
+                        className="h-11 pl-10 border-gray-200 dark:border-gray-700 focus:border-emerald-500 dark:focus:border-emerald-500"
+                        disabled={isLoading}
+                      />
+                    </div>
+                    <div className="relative">
+                      <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                      <Input
+                        type={showPassword ? 'text' : 'password'}
+                        placeholder="Password"
+                        value={signinPassword}
+                        onChange={(e) => setSigninPassword(e.target.value)}
+                        className="h-11 pl-10 pr-10 border-gray-200 dark:border-gray-700 focus:border-emerald-500 dark:focus:border-emerald-500"
+                        onKeyDown={(e) => e.key === 'Enter' && handleEmailSignin()}
+                        disabled={isLoading}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-gray-700"
+                      >
+                        {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
                     <Button
-                      onClick={handleDemoLogin}
+                      onClick={handleEmailSignin}
                       disabled={isLoading}
                       className="w-full h-12 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-semibold text-lg shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/40 transition-all"
                     >
                       {isLoading ? (
                         <Loader2 className="w-5 h-5 animate-spin mr-2" />
                       ) : null}
-                      Start Tracking Now
+                      Sign In
                     </Button>
+                    <p className="text-xs text-center text-muted-foreground">
+                      Don&apos;t have an account?{' '}
+                      <button
+                        onClick={() => { setAuthMode('signup'); setSignupError('') }}
+                        className="text-emerald-600 dark:text-emerald-400 font-medium hover:underline"
+                      >
+                        Sign Up
+                      </button>
+                    </p>
                   </motion.div>
                 )}
 
@@ -1179,6 +1224,15 @@ export default function LandingPage({ onLogin }: LandingPageProps) {
                       )}
                       Create Account
                     </Button>
+                    <p className="text-xs text-center text-muted-foreground">
+                      Already have an account?{' '}
+                      <button
+                        onClick={() => { setAuthMode('signin'); setSignupError('') }}
+                        className="text-emerald-600 dark:text-emerald-400 font-medium hover:underline"
+                      >
+                        Sign In
+                      </button>
+                    </p>
                   </motion.div>
                 )}
 
