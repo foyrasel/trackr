@@ -10,6 +10,13 @@ import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -39,18 +46,32 @@ import {
   Clock,
   AlertTriangle,
   CheckCircle2,
+  Wallet,
 } from 'lucide-react'
 import { toast } from '@/hooks/use-toast'
+import { useCurrency } from './CurrencyContext'
+
+interface AccountOption {
+  id: string
+  name: string
+  icon: string
+  type: string
+}
 
 interface LendBorrowRecord {
   id: string
   type: 'lent' | 'borrowed'
-  personName: string
+  person: string
   amount: number
   description: string
   date: string
   dueDate?: string
   isSettled: boolean
+  accountId?: string
+  accountName?: string
+  daysUntilDue?: number | null
+  isOverdue?: boolean
+  account?: { id: string; name: string; type: string } | null
 }
 
 interface LendBorrowSummary {
@@ -67,13 +88,13 @@ interface LendBorrowPanelProps {
 type TypeFilter = 'all' | 'lent' | 'borrowed'
 type StatusFilter = 'active' | 'settled' | 'all'
 
-const CURRENCY_SYMBOL = '$'
-
 export default function LendBorrowPanel({ userName, refreshTrigger = 0 }: LendBorrowPanelProps) {
+  const { currencySymbol } = useCurrency()
   const [records, setRecords] = useState<LendBorrowRecord[]>([])
   const [summary, setSummary] = useState<LendBorrowSummary>({ totalLent: 0, totalBorrowed: 0, overdueCount: 0 })
   const [loading, setLoading] = useState(true)
   const [mounted, setMounted] = useState(false)
+  const [accounts, setAccounts] = useState<AccountOption[]>([])
 
   // Filters
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('all')
@@ -83,18 +104,20 @@ export default function LendBorrowPanel({ userName, refreshTrigger = 0 }: LendBo
   const [showAddDialog, setShowAddDialog] = useState(false)
   const [addData, setAddData] = useState<{
     type: 'lent' | 'borrowed'
-    personName: string
+    person: string
     amount: number
     description: string
     date: string
     dueDate: string
+    accountId: string
   }>({
     type: 'lent',
-    personName: '',
+    person: '',
     amount: 0,
     description: '',
     date: new Date().toISOString().split('T')[0],
     dueDate: '',
+    accountId: 'none',
   })
   const [isSaving, setIsSaving] = useState(false)
 
@@ -102,11 +125,12 @@ export default function LendBorrowPanel({ userName, refreshTrigger = 0 }: LendBo
   const [editRecord, setEditRecord] = useState<LendBorrowRecord | null>(null)
   const [editData, setEditData] = useState<{
     type: 'lent' | 'borrowed'
-    personName: string
+    person: string
     amount: number
     description: string
     date: string
     dueDate: string
+    accountId: string
   } | null>(null)
 
   // Delete confirmation
@@ -124,6 +148,30 @@ export default function LendBorrowPanel({ userName, refreshTrigger = 0 }: LendBo
     return headers
   }, [userName])
 
+  // Fetch accounts on mount
+  useEffect(() => {
+    if (!mounted) return
+    const fetchAccounts = async () => {
+      try {
+        const response = await fetch('/api/accounts', {
+          headers: getAuthHeaders(false),
+        })
+        if (response.ok) {
+          const data = await response.json()
+          setAccounts((data.accounts || []).map((a: { id: string; name: string; icon: string; type: string }) => ({
+            id: a.id,
+            name: a.name,
+            icon: a.icon,
+            type: a.type,
+          })))
+        }
+      } catch (error) {
+        console.error('Error fetching accounts:', error)
+      }
+    }
+    fetchAccounts()
+  }, [mounted, getAuthHeaders])
+
   const fetchRecords = useCallback(async () => {
     try {
       const response = await fetch('/api/lend-borrow', {
@@ -131,12 +179,27 @@ export default function LendBorrowPanel({ userName, refreshTrigger = 0 }: LendBo
       })
       if (response.ok) {
         const data = await response.json()
-        setRecords(data.records || [])
-        setSummary({
-          totalLent: data.totalLent || 0,
-          totalBorrowed: data.totalBorrowed || 0,
-          overdueCount: data.overdueCount || 0,
-        })
+        // Map records to include accountName from the account relation
+        const mappedRecords = (data.records || []).map((r: Record<string, unknown>) => ({
+          ...r,
+          accountName: (r.account as { name?: string } | null)?.name || undefined,
+          accountId: (r.accountId as string) || (r.account as { id?: string } | null)?.id || undefined,
+        }))
+        setRecords(mappedRecords)
+        // Fix: API returns summary nested
+        if (data.summary) {
+          setSummary({
+            totalLent: data.summary.totalLent || 0,
+            totalBorrowed: data.summary.totalBorrowed || 0,
+            overdueCount: data.summary.overdueCount || 0,
+          })
+        } else {
+          setSummary({
+            totalLent: data.totalLent || 0,
+            totalBorrowed: data.totalBorrowed || 0,
+            overdueCount: data.overdueCount || 0,
+          })
+        }
       }
     } catch (error) {
       console.error('Error fetching lend/borrow records:', error)
@@ -152,23 +215,27 @@ export default function LendBorrowPanel({ userName, refreshTrigger = 0 }: LendBo
   // --- Actions ---
 
   const handleAdd = async () => {
-    if (!addData.personName.trim() || addData.amount <= 0) {
+    if (!addData.person.trim() || addData.amount <= 0) {
       toast({ title: 'Please fill in person name and amount', variant: 'destructive' })
       return
     }
     setIsSaving(true)
     try {
+      const body: Record<string, unknown> = {
+        type: addData.type === 'lent' ? 'lend' : 'borrow',
+        person: addData.person.trim(),
+        amount: addData.amount,
+        description: addData.description.trim(),
+        date: addData.date,
+        dueDate: addData.dueDate || null,
+      }
+      if (addData.accountId && addData.accountId !== 'none') {
+        body.accountId = addData.accountId
+      }
       const response = await fetch('/api/lend-borrow', {
         method: 'POST',
         headers: getAuthHeaders(),
-        body: JSON.stringify({
-          type: addData.type,
-          personName: addData.personName.trim(),
-          amount: addData.amount,
-          description: addData.description.trim(),
-          date: addData.date,
-          dueDate: addData.dueDate || null,
-        }),
+        body: JSON.stringify(body),
       })
       if (response.ok) {
         toast({ title: `${addData.type === 'lent' ? 'Lent' : 'Borrowed'} record added` })
@@ -190,33 +257,41 @@ export default function LendBorrowPanel({ userName, refreshTrigger = 0 }: LendBo
     setEditRecord(record)
     setEditData({
       type: record.type,
-      personName: record.personName,
+      person: record.person,
       amount: record.amount,
       description: record.description,
       date: record.date ? new Date(record.date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
       dueDate: record.dueDate ? new Date(record.dueDate).toISOString().split('T')[0] : '',
+      accountId: record.accountId || 'none',
     })
   }
 
   const handleEditSave = async () => {
     if (!editRecord || !editData) return
-    if (!editData.personName.trim() || editData.amount <= 0) {
+    if (!editData.person.trim() || editData.amount <= 0) {
       toast({ title: 'Please fill in person name and amount', variant: 'destructive' })
       return
     }
     setIsSaving(true)
     try {
-      const response = await fetch(`/api/lend-borrow/${editRecord.id}`, {
+      const body: Record<string, unknown> = {
+        id: editRecord.id,
+        type: editData.type === 'lent' ? 'lend' : 'borrow',
+        person: editData.person.trim(),
+        amount: editData.amount,
+        description: editData.description.trim(),
+        date: editData.date,
+        dueDate: editData.dueDate || null,
+      }
+      if (editData.accountId && editData.accountId !== 'none') {
+        body.accountId = editData.accountId
+      } else {
+        body.accountId = null
+      }
+      const response = await fetch('/api/lend-borrow', {
         method: 'PUT',
         headers: getAuthHeaders(),
-        body: JSON.stringify({
-          type: editData.type,
-          personName: editData.personName.trim(),
-          amount: editData.amount,
-          description: editData.description.trim(),
-          date: editData.date,
-          dueDate: editData.dueDate || null,
-        }),
+        body: JSON.stringify(body),
       })
       if (response.ok) {
         toast({ title: 'Record updated' })
@@ -236,10 +311,10 @@ export default function LendBorrowPanel({ userName, refreshTrigger = 0 }: LendBo
 
   const handleSettle = async (record: LendBorrowRecord) => {
     try {
-      const response = await fetch(`/api/lend-borrow/${record.id}`, {
+      const response = await fetch('/api/lend-borrow', {
         method: 'PUT',
         headers: getAuthHeaders(),
-        body: JSON.stringify({ isSettled: true }),
+        body: JSON.stringify({ id: record.id, isSettled: true }),
       })
       if (response.ok) {
         toast({ title: `${record.type === 'lent' ? 'Lent' : 'Borrowed'} record settled` })
@@ -256,9 +331,9 @@ export default function LendBorrowPanel({ userName, refreshTrigger = 0 }: LendBo
   const handleDelete = async () => {
     if (!deleteId) return
     try {
-      const response = await fetch(`/api/lend-borrow/${deleteId}`, {
+      const response = await fetch(`/api/lend-borrow?id=${deleteId}`, {
         method: 'DELETE',
-        headers: getAuthHeaders(),
+        headers: getAuthHeaders(false),
       })
       if (response.ok) {
         toast({ title: 'Record deleted' })
@@ -276,11 +351,12 @@ export default function LendBorrowPanel({ userName, refreshTrigger = 0 }: LendBo
   const resetAddForm = () => {
     setAddData({
       type: 'lent',
-      personName: '',
+      person: '',
       amount: 0,
       description: '',
       date: new Date().toISOString().split('T')[0],
       dueDate: '',
+      accountId: 'none',
     })
   }
 
@@ -349,7 +425,7 @@ export default function LendBorrowPanel({ userName, refreshTrigger = 0 }: LendBo
   // --- Record form (shared for Add & Edit) ---
 
   const renderRecordForm = (
-    data: { type: 'lent' | 'borrowed'; personName: string; amount: number; description: string; date: string; dueDate: string },
+    data: { type: 'lent' | 'borrowed'; person: string; amount: number; description: string; date: string; dueDate: string; accountId: string },
     setData: (d: typeof data) => void,
     onSave: () => void,
     onCancel: () => void,
@@ -391,8 +467,8 @@ export default function LendBorrowPanel({ userName, refreshTrigger = 0 }: LendBo
       <div>
         <Label className="text-xs text-muted-foreground">Person Name</Label>
         <Input
-          value={data.personName}
-          onChange={(e) => setData({ ...data, personName: e.target.value })}
+          value={data.person}
+          onChange={(e) => setData({ ...data, person: e.target.value })}
           className="mt-1"
           placeholder="Who did you lend to / borrow from?"
         />
@@ -402,7 +478,7 @@ export default function LendBorrowPanel({ userName, refreshTrigger = 0 }: LendBo
       <div>
         <Label className="text-xs text-muted-foreground">Amount</Label>
         <div className="flex items-center gap-2 mt-1">
-          <span className="text-xl font-bold text-muted-foreground">{CURRENCY_SYMBOL}</span>
+          <span className="text-xl font-bold text-muted-foreground">{currencySymbol}</span>
           <Input
             type="number"
             value={data.amount || ''}
@@ -423,6 +499,22 @@ export default function LendBorrowPanel({ userName, refreshTrigger = 0 }: LendBo
           className="mt-1"
           placeholder="What is this for?"
         />
+      </div>
+
+      {/* Account Dropdown */}
+      <div>
+        <Label className="text-xs text-muted-foreground">Account (optional)</Label>
+        <Select value={data.accountId} onValueChange={(v) => setData({ ...data, accountId: v })}>
+          <SelectTrigger className="h-11 mt-1">
+            <SelectValue placeholder="Select account (optional)" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="none">No account link</SelectItem>
+            {accounts.map(acc => (
+              <SelectItem key={acc.id} value={acc.id}>{acc.icon} {acc.name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       {/* Date */}
@@ -516,7 +608,7 @@ export default function LendBorrowPanel({ userName, refreshTrigger = 0 }: LendBo
               <p className="text-[10px] sm:text-xs text-muted-foreground font-medium">Total Lent</p>
             </div>
             <p className="text-base sm:text-xl font-bold text-emerald-600">
-              {CURRENCY_SYMBOL}{summary.totalLent.toLocaleString()}
+              {currencySymbol}{summary.totalLent.toLocaleString()}
             </p>
           </CardContent>
         </Card>
@@ -529,7 +621,7 @@ export default function LendBorrowPanel({ userName, refreshTrigger = 0 }: LendBo
               <p className="text-[10px] sm:text-xs text-muted-foreground font-medium">Total Borrowed</p>
             </div>
             <p className="text-base sm:text-xl font-bold text-red-600">
-              {CURRENCY_SYMBOL}{summary.totalBorrowed.toLocaleString()}
+              {currencySymbol}{summary.totalBorrowed.toLocaleString()}
             </p>
           </CardContent>
         </Card>
@@ -645,7 +737,7 @@ export default function LendBorrowPanel({ userName, refreshTrigger = 0 }: LendBo
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between gap-2">
                         <div className="flex items-center gap-2 min-w-0">
-                          <p className="font-semibold text-sm truncate">{record.personName}</p>
+                          <p className="font-semibold text-sm truncate">{record.person}</p>
                           <Badge
                             variant="outline"
                             className={`text-[10px] px-1.5 py-0 shrink-0 ${
@@ -657,11 +749,19 @@ export default function LendBorrowPanel({ userName, refreshTrigger = 0 }: LendBo
                             {isLent ? 'Lent' : 'Borrowed'}
                           </Badge>
                         </div>
-                        <p className={`font-bold text-sm whitespace-nowrap ${
-                          isLent ? 'text-emerald-600' : 'text-red-600'
-                        }`}>
-                          {CURRENCY_SYMBOL}{record.amount.toLocaleString()}
-                        </p>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <p className={`font-bold text-sm whitespace-nowrap ${
+                            isLent ? 'text-emerald-600' : 'text-red-600'
+                          }`}>
+                            {currencySymbol}{record.amount.toLocaleString()}
+                          </p>
+                          {record.accountName && (
+                            <Badge variant="outline" className="text-[9px] px-1.5 py-0 bg-slate-50 text-slate-600 border-slate-200 whitespace-nowrap">
+                              <Wallet className="w-2.5 h-2.5 mr-0.5" />
+                              via {record.accountName}
+                            </Badge>
+                          )}
+                        </div>
                       </div>
 
                       {/* Description */}

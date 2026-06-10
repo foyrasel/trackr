@@ -10,7 +10,6 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
-import { Progress } from '@/components/ui/progress'
 import {
   Select,
   SelectContent,
@@ -20,7 +19,7 @@ import {
 } from '@/components/ui/select'
 import {
   Target, Sparkles, Plus, X, Eye, EyeOff, Loader2,
-  AlertTriangle, TrendingDown, CheckCircle2,
+  AlertTriangle, TrendingDown, CheckCircle2, ArrowRight, Goal,
 } from 'lucide-react'
 import { toast } from '@/hooks/use-toast'
 import { useCurrency } from './CurrencyContext'
@@ -33,6 +32,9 @@ interface BudgetItem {
   spent: number
   remaining: number
   percentUsed: number
+  goalId?: string
+  goalName?: string
+  goalIcon?: string
 }
 
 interface BudgetSuggestion {
@@ -42,10 +44,21 @@ interface BudgetSuggestion {
   avgSpending?: number
 }
 
+interface GoalOption {
+  id: string
+  name: string
+  icon: string
+  targetAmount: number
+  savedAmount: number
+  progressPercent: number
+}
+
 interface BudgetPanelProps {
   refreshTrigger: number
   userName?: string
 }
+
+type ViewMode = 'my' | 'comparison'
 
 const EXPENSE_CATEGORIES = [
   'Groceries', 'Food & Dining', 'Transport', 'Utilities', 'Rent',
@@ -85,7 +98,10 @@ export default function BudgetPanel({ refreshTrigger, userName }: BudgetPanelPro
   const [showSuggestions, setShowSuggestions] = useState(false)
   const [newBudgetCategory, setNewBudgetCategory] = useState('')
   const [newBudgetAmount, setNewBudgetAmount] = useState('')
+  const [newBudgetGoalId, setNewBudgetGoalId] = useState('none')
   const [showAddForm, setShowAddForm] = useState(false)
+  const [viewMode, setViewMode] = useState<ViewMode>('my')
+  const [goals, setGoals] = useState<GoalOption[]>([])
 
   const currentMonth = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`
 
@@ -100,6 +116,32 @@ export default function BudgetPanel({ refreshTrigger, userName }: BudgetPanelPro
     return headers
   }, [userName])
 
+  // Fetch goals
+  useEffect(() => {
+    if (!mounted) return
+    const fetchGoals = async () => {
+      try {
+        const response = await fetch('/api/goals', {
+          headers: getAuthHeaders(false),
+        })
+        if (response.ok) {
+          const data = await response.json()
+          setGoals((data.goals || []).map((g: { id: string; name: string; icon: string; targetAmount: number; savedAmount: number; progressPercent: number }) => ({
+            id: g.id,
+            name: g.name,
+            icon: g.icon,
+            targetAmount: g.targetAmount,
+            savedAmount: g.savedAmount,
+            progressPercent: g.progressPercent,
+          })))
+        }
+      } catch (error) {
+        console.error('Error fetching goals:', error)
+      }
+    }
+    fetchGoals()
+  }, [mounted, getAuthHeaders])
+
   const fetchBudgets = useCallback(async () => {
     try {
       const response = await fetch(`/api/budgets?month=${currentMonth}`, {
@@ -107,7 +149,16 @@ export default function BudgetPanel({ refreshTrigger, userName }: BudgetPanelPro
       })
       if (response.ok) {
         const data = await response.json()
-        setBudgets(data.budgets)
+        // Map goal info into budgets
+        const enrichedBudgets = (data.budgets || []).map((b: BudgetItem & { goalId?: string }) => {
+          const linkedGoal = b.goalId ? goals.find(g => g.id === b.goalId) : null
+          return {
+            ...b,
+            goalName: linkedGoal?.name,
+            goalIcon: linkedGoal?.icon,
+          }
+        })
+        setBudgets(enrichedBudgets)
         setTotalBudget(data.totalBudget)
         setTotalSpent(data.totalSpent)
       }
@@ -116,7 +167,7 @@ export default function BudgetPanel({ refreshTrigger, userName }: BudgetPanelPro
     } finally {
       setLoading(false)
     }
-  }, [currentMonth, getAuthHeaders])
+  }, [currentMonth, getAuthHeaders, goals])
 
   useEffect(() => {
     if (mounted) fetchBudgets()
@@ -140,18 +191,22 @@ export default function BudgetPanel({ refreshTrigger, userName }: BudgetPanelPro
     }
   }
 
-  const handleCreateBudget = async (category: string, amount: number, isIgnored = false) => {
+  const handleCreateBudget = async (category: string, amount: number, isIgnored = false, goalId?: string) => {
     try {
+      const body: Record<string, unknown> = { month: currentMonth, category, amount, isIgnored }
+      if (goalId && goalId !== 'none') {
+        body.goalId = goalId
+      }
       const response = await fetch('/api/budgets', {
         method: 'POST',
         headers: getAuthHeaders(),
-        body: JSON.stringify({ month: currentMonth, category, amount, isIgnored }),
+        body: JSON.stringify(body),
       })
 
       if (response.ok) {
         toast({
           title: isIgnored ? 'Budget Skipped' : 'Budget Set',
-          description: `${category}: ${currencySymbol}${amount.toLocaleString()}/month${isIgnored ? ' (ignored)' : ''}`,
+          description: `${category}: ${currencySymbol}${amount.toLocaleString()}/month${isIgnored ? ' (ignored)' : ''}${goalId && goalId !== 'none' ? ' (linked to goal)' : ''}`,
         })
         fetchBudgets()
       }
@@ -163,9 +218,10 @@ export default function BudgetPanel({ refreshTrigger, userName }: BudgetPanelPro
 
   const handleAddBudget = () => {
     if (!newBudgetCategory || !newBudgetAmount) return
-    handleCreateBudget(newBudgetCategory, parseFloat(newBudgetAmount))
+    handleCreateBudget(newBudgetCategory, parseFloat(newBudgetAmount), false, newBudgetGoalId)
     setNewBudgetCategory('')
     setNewBudgetAmount('')
+    setNewBudgetGoalId('none')
     setShowAddForm(false)
   }
 
@@ -211,6 +267,25 @@ export default function BudgetPanel({ refreshTrigger, userName }: BudgetPanelPro
     setShowSuggestions(false)
   }
 
+  const applySuggestion = (s: BudgetSuggestion) => {
+    const existingBudget = budgets.find(b => b.category === s.category)
+    if (existingBudget) {
+      // Update existing budget
+      fetch('/api/budgets', {
+        method: 'PUT',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ budgetId: existingBudget.id, amount: s.suggestedBudget }),
+      }).then(() => {
+        toast({ title: `Applied AI suggestion for ${s.category}` })
+        fetchBudgets()
+      }).catch(() => {
+        toast({ title: 'Failed to apply suggestion', variant: 'destructive' })
+      })
+    } else {
+      handleCreateBudget(s.category, s.suggestedBudget)
+    }
+  }
+
   if (!mounted || loading) {
     return (
       <div className="space-y-4">
@@ -235,6 +310,25 @@ export default function BudgetPanel({ refreshTrigger, userName }: BudgetPanelPro
     cat => !budgets.some(b => b.category === cat)
   )
 
+  // Build comparison data for AI vs Mine view
+  const comparisonData = suggestions.map(s => {
+    const myBudget = budgets.find(b => b.category === s.category && !b.isIgnored)
+    return {
+      category: s.category,
+      myAmount: myBudget?.amount || 0,
+      aiAmount: s.suggestedBudget,
+      difference: (myBudget?.amount || 0) - s.suggestedBudget,
+      percentDiff: s.suggestedBudget > 0
+        ? Math.round((((myBudget?.amount || 0) - s.suggestedBudget) / s.suggestedBudget) * 100)
+        : 0,
+      hasBudget: !!myBudget,
+      reason: s.reason,
+      goalId: myBudget?.goalId,
+      goalName: myBudget?.goalName,
+      goalIcon: myBudget?.goalIcon,
+    }
+  })
+
   return (
     <div className="space-y-4">
       {/* Header */}
@@ -248,8 +342,38 @@ export default function BudgetPanel({ refreshTrigger, userName }: BudgetPanelPro
         </div>
       </div>
 
+      {/* View Toggle */}
+      <div className="flex gap-1 bg-muted rounded-lg p-1">
+        <button
+          type="button"
+          onClick={() => setViewMode('my')}
+          className={`flex-1 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
+            viewMode === 'my'
+              ? 'bg-white text-foreground shadow-sm'
+              : 'text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          My Budgets
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setViewMode('comparison')
+            if (suggestions.length === 0) fetchSuggestions()
+          }}
+          className={`flex-1 px-3 py-1.5 rounded-md text-sm font-medium transition-all flex items-center justify-center gap-1.5 ${
+            viewMode === 'comparison'
+              ? 'bg-white text-foreground shadow-sm'
+              : 'text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          <Sparkles className="w-3.5 h-3.5" />
+          AI vs Mine
+        </button>
+      </div>
+
       {/* Overall Budget Progress */}
-      {activeBudgets.length > 0 && (
+      {activeBudgets.length > 0 && viewMode === 'my' && (
         <Card className={`border-2 ${budgetUtilization > 90 ? 'border-red-300' : budgetUtilization > 70 ? 'border-amber-300' : 'border-emerald-300'}`}>
           <CardContent className="p-4">
             <div className="flex items-center justify-between mb-2">
@@ -288,32 +412,184 @@ export default function BudgetPanel({ refreshTrigger, userName }: BudgetPanelPro
         </Card>
       )}
 
-      {/* AI Suggestion Button */}
-      <div className="flex gap-2">
-        <Button
-          onClick={fetchSuggestions}
-          disabled={suggestionsLoading}
-          variant="outline"
-          className="flex-1 border-emerald-200 text-emerald-700 hover:bg-emerald-50"
-        >
+      {/* AI vs Mine Comparison View */}
+      {viewMode === 'comparison' && (
+        <div className="space-y-3">
           {suggestionsLoading ? (
-            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            <Card>
+              <CardContent className="p-6 flex items-center justify-center">
+                <Loader2 className="w-6 h-6 animate-spin text-amber-500 mr-2" />
+                <span className="text-sm text-muted-foreground">Loading AI suggestions...</span>
+              </CardContent>
+            </Card>
+          ) : comparisonData.length === 0 ? (
+            <Card className="border-dashed">
+              <CardContent className="p-6 text-center">
+                <Sparkles className="w-10 h-10 mx-auto text-muted-foreground mb-2" />
+                <h3 className="text-sm font-semibold mb-1">No AI Suggestions Yet</h3>
+                <p className="text-muted-foreground text-xs mb-3">
+                  Add some transactions first to get AI budget suggestions for comparison.
+                </p>
+                <Button onClick={fetchSuggestions} variant="outline" className="border-emerald-200 text-emerald-700">
+                  <Sparkles className="w-4 h-4 mr-2" />
+                  Get AI Suggestions
+                </Button>
+              </CardContent>
+            </Card>
           ) : (
-            <Sparkles className="w-4 h-4 mr-2" />
+            <>
+              {/* Comparison Table Header */}
+              <Card className="border-2 border-amber-200 bg-gradient-to-br from-amber-50/50 to-white">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm flex items-center gap-1.5">
+                    <Sparkles className="w-4 h-4 text-amber-500" />
+                    AI vs Mine — Budget Comparison
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-0">
+                  {/* Table Header */}
+                  <div className="grid grid-cols-12 gap-2 px-4 pb-2 text-[10px] text-muted-foreground font-semibold uppercase tracking-wider">
+                    <div className="col-span-3">Category</div>
+                    <div className="col-span-2 text-right">My Budget</div>
+                    <div className="col-span-2 text-right">AI Suggested</div>
+                    <div className="col-span-2 text-right">Difference</div>
+                    <div className="col-span-3 text-right">Action</div>
+                  </div>
+                  {/* Rows */}
+                  <div className="space-y-1 px-2 pb-3">
+                    {comparisonData.map((row) => {
+                      const isOver = row.difference > 0
+                      const isUnder = row.difference < 0
+                      return (
+                        <div
+                          key={row.category}
+                          className={`grid grid-cols-12 gap-2 items-center p-2 rounded-lg border ${
+                            isOver
+                              ? 'bg-red-50/50 border-red-200'
+                              : isUnder
+                                ? 'bg-emerald-50/50 border-emerald-200'
+                                : 'bg-white border-gray-200'
+                          }`}
+                        >
+                          {/* Category */}
+                          <div className="col-span-3 flex items-center gap-1.5 min-w-0">
+                            <span
+                              className="w-2.5 h-2.5 rounded-full shrink-0"
+                              style={{ backgroundColor: CATEGORY_COLORS[row.category] || '#94a3b8' }}
+                            />
+                            <span className="text-xs font-medium truncate">{row.category}</span>
+                            {row.goalName && (
+                              <span className="shrink-0" title={`Linked to: ${row.goalName}`}>
+                                <Goal className="w-3 h-3 text-amber-500" />
+                              </span>
+                            )}
+                          </div>
+                          {/* My Budget */}
+                          <div className="col-span-2 text-right">
+                            {row.hasBudget ? (
+                              <span className={`text-xs font-bold ${isOver ? 'text-red-600' : 'text-emerald-600'}`}>
+                                {currencySymbol}{row.myAmount.toLocaleString()}
+                              </span>
+                            ) : (
+                              <span className="text-[10px] text-muted-foreground italic">Not set</span>
+                            )}
+                          </div>
+                          {/* AI Suggested */}
+                          <div className="col-span-2 text-right">
+                            <span className="text-xs font-bold text-amber-700">
+                              {currencySymbol}{row.aiAmount.toLocaleString()}
+                            </span>
+                          </div>
+                          {/* Difference */}
+                          <div className="col-span-2 text-right">
+                            {row.hasBudget ? (
+                              <div>
+                                <span className={`text-xs font-bold ${isOver ? 'text-red-600' : isUnder ? 'text-emerald-600' : 'text-gray-600'}`}>
+                                  {isOver ? '+' : ''}{currencySymbol}{Math.abs(row.difference).toLocaleString()}
+                                </span>
+                                <p className={`text-[9px] ${isOver ? 'text-red-500' : isUnder ? 'text-emerald-500' : 'text-gray-400'}`}>
+                                  {isOver ? 'Over' : isUnder ? 'Under' : 'Same'} {Math.abs(row.percentDiff)}%
+                                </p>
+                              </div>
+                            ) : (
+                              <span className="text-[10px] text-muted-foreground">—</span>
+                            )}
+                          </div>
+                          {/* Action */}
+                          <div className="col-span-3 text-right">
+                            {!row.hasBudget ? (
+                              <Button
+                                size="sm"
+                                className="h-6 text-[10px] bg-emerald-600 hover:bg-emerald-700 px-2"
+                                onClick={() => handleCreateBudget(row.category, row.aiAmount)}
+                              >
+                                <Plus className="w-3 h-3 mr-0.5" />
+                                Create
+                              </Button>
+                            ) : row.difference !== 0 ? (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-6 text-[10px] px-2"
+                                onClick={() => applySuggestion({ category: row.category, suggestedBudget: row.aiAmount, reason: row.reason })}
+                              >
+                                <ArrowRight className="w-3 h-3 mr-0.5" />
+                                Apply AI
+                              </Button>
+                            ) : (
+                              <Badge variant="outline" className="text-[9px] bg-emerald-50 text-emerald-700 border-emerald-200 px-1.5">
+                                <CheckCircle2 className="w-2.5 h-2.5 mr-0.5" />
+                                Match
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
+              {/* Apply All */}
+              <Button
+                onClick={applyAllSuggestions}
+                className="w-full bg-emerald-600 hover:bg-emerald-700"
+              >
+                <CheckCircle2 className="w-4 h-4 mr-2" />
+                Apply All AI Suggestions
+              </Button>
+            </>
           )}
-          AI Budget Suggestions
-        </Button>
-        <Button
-          onClick={() => setShowAddForm(!showAddForm)}
-          variant="outline"
-          className="border-emerald-200"
-        >
-          <Plus className="w-4 h-4" />
-        </Button>
-      </div>
+        </div>
+      )}
 
-      {/* AI Suggestions Panel */}
-      {showSuggestions && (
+      {/* AI Suggestion Button & Add Button (only in My Budgets view) */}
+      {viewMode === 'my' && (
+        <div className="flex gap-2">
+          <Button
+            onClick={fetchSuggestions}
+            disabled={suggestionsLoading}
+            variant="outline"
+            className="flex-1 border-emerald-200 text-emerald-700 hover:bg-emerald-50"
+          >
+            {suggestionsLoading ? (
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            ) : (
+              <Sparkles className="w-4 h-4 mr-2" />
+            )}
+            AI Budget Suggestions
+          </Button>
+          <Button
+            onClick={() => setShowAddForm(!showAddForm)}
+            variant="outline"
+            className="border-emerald-200"
+          >
+            <Plus className="w-4 h-4" />
+          </Button>
+        </div>
+      )}
+
+      {/* AI Suggestions Panel (only in My Budgets view) */}
+      {viewMode === 'my' && showSuggestions && (
         <Card className="border-2 border-amber-200 bg-gradient-to-br from-amber-50/50 to-white">
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
@@ -404,12 +680,38 @@ export default function BudgetPanel({ refreshTrigger, userName }: BudgetPanelPro
                 Add
               </Button>
             </div>
+            {/* Link to Goal */}
+            <div>
+              <label className="text-xs text-muted-foreground font-medium">Link to Goal (optional)</label>
+              <Select value={newBudgetGoalId} onValueChange={setNewBudgetGoalId}>
+                <SelectTrigger className="h-11 mt-1">
+                  <SelectValue placeholder="Select a goal (optional)" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No goal link</SelectItem>
+                  {goals.filter(g => !g.progressPercent || g.progressPercent < 100).map(g => (
+                    <SelectItem key={g.id} value={g.id}>
+                      {g.icon} {g.name} ({g.progressPercent}%)
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {newBudgetGoalId && newBudgetGoalId !== 'none' && (() => {
+                const goal = goals.find(g => g.id === newBudgetGoalId)
+                return goal ? (
+                  <p className="text-[10px] text-amber-600 mt-1 flex items-center gap-1">
+                    <Goal className="w-3 h-3" />
+                    Staying within this budget helps reach your {goal.name} goal
+                  </p>
+                ) : null
+              })()}
+            </div>
           </CardContent>
         </Card>
       )}
 
       {/* Active Budgets */}
-      {activeBudgets.length > 0 ? (
+      {viewMode === 'my' && activeBudgets.length > 0 ? (
         <div className="space-y-2">
           <h3 className="text-sm font-semibold text-muted-foreground">Active Budgets</h3>
           {activeBudgets.map(budget => {
@@ -469,12 +771,26 @@ export default function BudgetPanel({ refreshTrigger, userName }: BudgetPanelPro
                       <span className="text-[10px] font-medium">Over by {currencySymbol}{Math.abs(budget.remaining).toLocaleString()}</span>
                     </div>
                   )}
+                  {/* Goal link info */}
+                  {budget.goalName && (
+                    <div className="flex items-center gap-1.5 mt-1.5 p-1.5 rounded-md bg-amber-50 border border-amber-200">
+                      <span className="text-sm">{budget.goalIcon || '🎯'}</span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[10px] font-medium text-amber-700 truncate">
+                          Linked to: {budget.goalName}
+                        </p>
+                        <p className="text-[9px] text-amber-600">
+                          Staying within this budget helps reach your {budget.goalName} goal
+                        </p>
+                      </div>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             )
           })}
         </div>
-      ) : (
+      ) : viewMode === 'my' && activeBudgets.length === 0 ? (
         <Card className="border-dashed">
           <CardContent className="p-6 text-center">
             <Target className="w-10 h-10 mx-auto text-muted-foreground mb-2" />
@@ -488,10 +804,10 @@ export default function BudgetPanel({ refreshTrigger, userName }: BudgetPanelPro
             </Button>
           </CardContent>
         </Card>
-      )}
+      ) : null}
 
       {/* Ignored Budgets */}
-      {ignoredBudgets.length > 0 && (
+      {viewMode === 'my' && ignoredBudgets.length > 0 && (
         <div className="space-y-2">
           <h3 className="text-sm font-semibold text-muted-foreground flex items-center gap-1.5">
             <EyeOff className="w-3.5 h-3.5" />

@@ -18,6 +18,7 @@ export async function GET(request: NextRequest) {
     const budgets = await db.budget.findMany({
       where: { userId: user.id, month: currentMonth },
       orderBy: { category: 'asc' },
+      include: { goal: { select: { id: true, name: true, icon: true } } },
     })
 
     // Get current month spending per category
@@ -72,7 +73,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { month, category, amount, isIgnored } = body
+    const { month, category, amount, isIgnored, goalId } = body
 
     // Upsert budget
     const existing = await db.budget.findFirst({
@@ -83,7 +84,12 @@ export async function POST(request: NextRequest) {
     if (existing) {
       budget = await db.budget.update({
         where: { id: existing.id },
-        data: { amount, isIgnored: isIgnored ?? existing.isIgnored },
+        data: {
+          amount,
+          isIgnored: isIgnored ?? existing.isIgnored,
+          ...(goalId !== undefined && { goalId: goalId || null }),
+        },
+        include: { goal: { select: { id: true, name: true, icon: true } } },
       })
     } else {
       budget = await db.budget.create({
@@ -93,7 +99,9 @@ export async function POST(request: NextRequest) {
           category,
           amount,
           isIgnored: isIgnored || false,
+          ...(goalId && goalId !== 'none' && { goalId }),
         },
+        include: { goal: { select: { id: true, name: true, icon: true } } },
       })
     }
 
@@ -113,7 +121,7 @@ export async function PUT(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { budgetId, isIgnored, amount } = body
+    const { budgetId, isIgnored, amount, goalId } = body
 
     // Verify budget belongs to user
     const existing = await db.budget.findUnique({ where: { id: budgetId } })
@@ -126,7 +134,9 @@ export async function PUT(request: NextRequest) {
       data: {
         ...(isIgnored !== undefined && { isIgnored }),
         ...(amount !== undefined && { amount }),
+        ...(goalId !== undefined && { goalId: goalId || null }),
       },
+      include: { goal: { select: { id: true, name: true, icon: true } } },
     })
 
     return NextResponse.json({ budget })

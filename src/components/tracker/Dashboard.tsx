@@ -119,6 +119,7 @@ export default function Dashboard({ refreshTrigger, userName }: DashboardProps) 
   const [avg1Y, setAvg1Y] = useState(true)
   const [avg2Y, setAvg2Y] = useState(false)
   const [avgAll, setAvgAll] = useState(false)
+  const [showCurrent, setShowCurrent] = useState(true)
   const [selectedCategory, setSelectedCategory] = useState<string>('all')
 
   useEffect(() => {
@@ -290,6 +291,61 @@ export default function Dashboard({ refreshTrigger, userName }: DashboardProps) 
       }))
     : chartData
 
+  // Days in current month
+  const daysInCurrentMonth = new Date(
+    parseInt(data.currentMonth.split('-')[0]),
+    parseInt(data.currentMonth.split('-')[1]),
+    0
+  ).getDate()
+
+  // Pace insight calculations
+  const currentExpenseAtToday = displayChartData.find(d => d.day === currentDayOfMonth)?.current || 0
+  const avgAtToday = data.avgVsCurrentLineData.find(d => d.day === currentDayOfMonth)?.average || 0
+  const pacePercent = avgAtToday > 0 ? ((currentExpenseAtToday - avgAtToday) / avgAtToday * 100) : 0
+  const daysRemaining = daysInCurrentMonth - currentDayOfMonth
+  const projectedEndOfMonth = daysRemaining > 0 && currentDayOfMonth > 0
+    ? currentExpenseAtToday + (currentExpenseAtToday / currentDayOfMonth) * daysRemaining
+    : currentExpenseAtToday
+
+  // Data sufficiency checks
+  const allTimeMonths = data.allTimeMonths || 0
+  const dataSufficiencyWarnings: string[] = []
+  if (avg2Y && allTimeMonths < 6) {
+    dataSufficiencyWarnings.push('Need more data for 2-year average. Showing all available data.')
+  }
+  if (avgAll && allTimeMonths < 3) {
+    dataSufficiencyWarnings.push('Need more data for all-time average. Showing all available data.')
+  }
+  if (avg1Y && allTimeMonths < 2) {
+    dataSufficiencyWarnings.push('Need more data for 1-year average. Showing all available data.')
+  }
+
+  // Custom Tooltip for the hero chart
+  const CustomTooltip = ({ active, payload, label }: any) => {
+    if (!active || !payload?.length) return null
+    const visiblePayload = payload.filter((p: any) => !p.dataKey.startsWith('_'))
+    const currentVal = visiblePayload.find((p: any) => p.dataKey === 'current')?.value
+    const avgVal = visiblePayload.find((p: any) => p.dataKey === 'average1Y')?.value
+    const diff = currentVal && avgVal ? currentVal - avgVal : null
+    const diffPct = diff !== null && avgVal > 0 ? ((diff / avgVal) * 100).toFixed(1) : null
+
+    return (
+      <div className="bg-white dark:bg-gray-800 border rounded-lg p-2 shadow-lg text-xs">
+        <p className="font-semibold mb-1">Day {label}</p>
+        {visiblePayload.map((p: any) => (
+          <p key={p.dataKey} style={{ color: p.color }}>
+            {p.name === 'current' ? 'Current Month' : p.name === 'average1Y' ? '1Y Average' : p.name === 'average2Y' ? '2Y Average' : p.name === 'averageAll' ? 'All Time Avg' : p.name}: {currencySymbol}{p.value?.toLocaleString()}
+          </p>
+        ))}
+        {diff !== null && (
+          <p className={`mt-1 font-semibold ${diff > 0 ? 'text-red-600' : 'text-emerald-600'}`}>
+            {diff > 0 ? '+' : ''}{currencySymbol}{diff.toLocaleString()} ({diffPct}% {diff > 0 ? 'above' : 'below'} avg)
+          </p>
+        )}
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-3">
       {/* Row 1: Month Navigation Header - Compact */}
@@ -428,29 +484,41 @@ export default function Dashboard({ refreshTrigger, userName }: DashboardProps) 
                 </CardTitle>
               </div>
               {/* Avg period toggles */}
-              <div className="flex items-center gap-1 flex-wrap">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <button
+                  onClick={() => setShowCurrent(!showCurrent)}
+                  className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium border transition-all ${
+                    showCurrent ? 'bg-emerald-200 text-emerald-800 border-emerald-400' : 'bg-white text-emerald-300 border-emerald-200'
+                  }`}
+                >
+                  {showCurrent && <span className="w-1.5 h-1.5 rounded-full bg-emerald-600" />}
+                  Current
+                </button>
                 <button
                   onClick={() => setAvg1Y(!avg1Y)}
-                  className={`px-2 py-0.5 rounded-full text-[10px] font-medium border transition-all ${
+                  className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium border transition-all ${
                     avg1Y ? 'bg-slate-200 text-slate-800 border-slate-400' : 'bg-white text-slate-400 border-slate-200'
                   }`}
                 >
+                  {avg1Y && <span className="w-1.5 h-1.5 rounded-full bg-slate-600" />}
                   1Y Avg
                 </button>
                 <button
                   onClick={() => setAvg2Y(!avg2Y)}
-                  className={`px-2 py-0.5 rounded-full text-[10px] font-medium border transition-all ${
+                  className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium border transition-all ${
                     avg2Y ? 'bg-blue-200 text-blue-800 border-blue-400' : 'bg-white text-blue-300 border-blue-200'
                   }`}
                 >
+                  {avg2Y && <span className="w-1.5 h-1.5 rounded-full bg-blue-600" />}
                   2Y Avg
                 </button>
                 <button
                   onClick={() => setAvgAll(!avgAll)}
-                  className={`px-2 py-0.5 rounded-full text-[10px] font-medium border transition-all ${
+                  className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium border transition-all ${
                     avgAll ? 'bg-purple-200 text-purple-800 border-purple-400' : 'bg-white text-purple-300 border-purple-200'
                   }`}
                 >
+                  {avgAll && <span className="w-1.5 h-1.5 rounded-full bg-purple-600" />}
                   All Time Avg
                 </button>
                 <div className="ml-auto">
@@ -467,6 +535,17 @@ export default function Dashboard({ refreshTrigger, userName }: DashboardProps) 
                   </Select>
                 </div>
               </div>
+              {/* Data sufficiency warnings */}
+              {dataSufficiencyWarnings.length > 0 && (
+                <div className="flex flex-col gap-0.5">
+                  {dataSufficiencyWarnings.map((warning, i) => (
+                    <p key={i} className="text-[9px] text-amber-600 flex items-center gap-1">
+                      <AlertTriangle className="w-2.5 h-2.5" />
+                      {warning}
+                    </p>
+                  ))}
+                </div>
+              )}
             </div>
           </CardHeader>
           <CardContent className="px-3 pb-3">
@@ -476,6 +555,16 @@ export default function Dashboard({ refreshTrigger, userName }: DashboardProps) 
                   data={displayChartData}
                   margin={{ top: 10, right: 10, left: 0, bottom: 5 }}
                 >
+                  <defs>
+                    <linearGradient id="overspendGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#ef4444" stopOpacity={0.25} />
+                      <stop offset="100%" stopColor="#ef4444" stopOpacity={0.02} />
+                    </linearGradient>
+                    <linearGradient id="underspendGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#10b981" stopOpacity={0.25} />
+                      <stop offset="100%" stopColor="#10b981" stopOpacity={0.02} />
+                    </linearGradient>
+                  </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                   <XAxis
                     dataKey="day"
@@ -488,19 +577,7 @@ export default function Dashboard({ refreshTrigger, userName }: DashboardProps) 
                     fontSize={9}
                     width={45}
                   />
-                  <Tooltip
-                    formatter={(value: number | undefined, name: string) => {
-                      if (value === undefined || value === null) return ['-', name]
-                      const labels: Record<string, string> = {
-                        current: 'Current Month',
-                        average1Y: '1Y Average',
-                        average2Y: '2Y Average',
-                        averageAll: 'All Time Avg',
-                      }
-                      return [`${currencySymbol}${value.toLocaleString()}`, labels[name] || name]
-                    }}
-                    labelFormatter={(label: number) => `Day ${label}`}
-                  />
+                  <Tooltip content={<CustomTooltip />} />
                   {/* Today reference line */}
                   {isCurrentMonth && (
                     <ReferenceLine
@@ -510,6 +587,29 @@ export default function Dashboard({ refreshTrigger, userName }: DashboardProps) 
                       strokeWidth={1.5}
                       label={{ value: 'Today', position: 'top', fontSize: 9, fill: '#6366f1' }}
                     />
+                  )}
+                  {/* Area fill between current and 1Y average when avg1Y is on */}
+                  {avg1Y && showCurrent && (
+                    <>
+                      <Area
+                        type="monotone"
+                        dataKey="current"
+                        stroke="none"
+                        fill="#ef4444"
+                        fillOpacity={0.12}
+                        name="_currentArea"
+                        isAnimationActive={false}
+                      />
+                      <Area
+                        type="monotone"
+                        dataKey="average1Y"
+                        stroke="none"
+                        fill="hsl(var(--background))"
+                        fillOpacity={0.88}
+                        name="_avgMask"
+                        isAnimationActive={false}
+                      />
+                    </>
                   )}
                   {/* Average lines */}
                   {avg1Y && (
@@ -549,25 +649,29 @@ export default function Dashboard({ refreshTrigger, userName }: DashboardProps) 
                     />
                   )}
                   {/* Current line */}
-                  <Line
-                    type="monotone"
-                    dataKey="current"
-                    stroke="#10b981"
-                    strokeWidth={2.5}
-                    dot={false}
-                    name="current"
-                    activeDot={{ r: 4, fill: '#10b981', stroke: '#fff', strokeWidth: 2 }}
-                    connectNulls={false}
-                  />
+                  {showCurrent && (
+                    <Line
+                      type="monotone"
+                      dataKey="current"
+                      stroke="#10b981"
+                      strokeWidth={2.5}
+                      dot={false}
+                      name="current"
+                      activeDot={{ r: 4, fill: '#10b981', stroke: '#fff', strokeWidth: 2 }}
+                      connectNulls={false}
+                    />
+                  )}
                 </LineChart>
               </ResponsiveContainer>
             </div>
             {/* Compact legend */}
             <div className="mt-2 flex items-center justify-center gap-3 flex-wrap text-[10px]">
-              <div className="flex items-center gap-1">
-                <div className="w-4 h-0.5 bg-emerald-500 rounded" />
-                <span className="text-muted-foreground">Current</span>
-              </div>
+              {showCurrent && (
+                <div className="flex items-center gap-1">
+                  <div className="w-4 h-0.5 bg-emerald-500 rounded" />
+                  <span className="text-muted-foreground">Current</span>
+                </div>
+              )}
               {avg1Y && (
                 <div className="flex items-center gap-1">
                   <div className="w-4 h-0.5 border-t-2 border-dashed border-slate-400" />
@@ -584,6 +688,12 @@ export default function Dashboard({ refreshTrigger, userName }: DashboardProps) 
                 <div className="flex items-center gap-1">
                   <div className="w-4 h-0.5 border-t-2 border-dashed border-purple-400" />
                   <span className="text-muted-foreground">All Time</span>
+                </div>
+              )}
+              {avg1Y && showCurrent && (
+                <div className="flex items-center gap-1">
+                  <div className="w-2 h-2 rounded-sm bg-red-300/50" />
+                  <span className="text-muted-foreground">Overspend</span>
                 </div>
               )}
               {isCurrentMonth && (
@@ -604,6 +714,52 @@ export default function Dashboard({ refreshTrigger, userName }: DashboardProps) 
                 <p className="text-xs font-bold text-slate-900">{currencySymbol}{Math.round(data.averageMonthlyExpense).toLocaleString()}</p>
               </div>
             </div>
+            {/* Smart Insight card */}
+            {isCurrentMonth && currentDayOfMonth > 1 && (
+              <div className={`mt-2 rounded-lg p-2 ${
+                pacePercent > 10
+                  ? 'bg-red-50 border border-red-200'
+                  : pacePercent < -10
+                    ? 'bg-emerald-50 border border-emerald-200'
+                    : 'bg-amber-50 border border-amber-200'
+              }`}>
+                <div className="flex items-start gap-1.5">
+                  <div className={`mt-0.5 w-3.5 h-3.5 rounded-full flex items-center justify-center flex-shrink-0 ${
+                    pacePercent > 10
+                      ? 'bg-red-100 text-red-600'
+                      : pacePercent < -10
+                        ? 'bg-emerald-100 text-emerald-600'
+                        : 'bg-amber-100 text-amber-600'
+                  }`}>
+                    {pacePercent > 10
+                      ? <TrendingUp className="w-2 h-2" />
+                      : pacePercent < -10
+                        ? <TrendingDown className="w-2 h-2" />
+                        : <Activity className="w-2 h-2" />
+                    }
+                  </div>
+                  <div>
+                    <p className={`text-[10px] font-semibold ${
+                      pacePercent > 10
+                        ? 'text-red-800'
+                        : pacePercent < -10
+                          ? 'text-emerald-800'
+                          : 'text-amber-800'
+                    }`}>
+                      {pacePercent > 10
+                        ? `You are spending ${Math.abs(pacePercent).toFixed(0)}% faster than your usual pace. Try to slow down to stay on track this month.`
+                        : pacePercent >= -10
+                          ? "You're on track with your usual spending pace."
+                          : `Great job! You're spending ${Math.abs(pacePercent).toFixed(0)}% less than your usual pace.`
+                      }
+                    </p>
+                    <p className="text-[9px] text-muted-foreground mt-0.5">
+                      Projected end-of-month: {currencySymbol}{Math.round(projectedEndOfMonth).toLocaleString()}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
       ) : data.totalExpense > 0 ? (
