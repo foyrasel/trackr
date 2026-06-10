@@ -370,6 +370,14 @@ export default function Home() {
               </TabsTrigger>
 
               <TabsTrigger
+                value="insights"
+                className="flex-col gap-0.5 data-[state=active]:text-emerald-600 data-[state=active]:shadow-none px-1 py-2 flex-1"
+              >
+                <Lightbulb className="w-5 h-5" />
+                <span className="text-[9px]">Insights</span>
+              </TabsTrigger>
+
+              <TabsTrigger
                 value="more"
                 className="flex-col gap-0.5 data-[state=active]:text-emerald-600 data-[state=active]:shadow-none px-1 py-2 flex-1"
               >
