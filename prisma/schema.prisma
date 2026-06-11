@@ -21,6 +21,7 @@ model User {
   currencySymbol String    @default("$") // Display symbol
   language       String    @default("en") // "en", "bn", "hi"
   onboardingDone Boolean   @default(false)
+  geminiApiKey   String?   // User's personal Gemini API key (BYOK)
   accounts       Account[]
   transfers      Transfer[]
   budgets        Budget[]

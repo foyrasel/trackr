@@ -40,6 +40,9 @@ import {
   Edit3,
   Check,
   Smartphone,
+  Eye,
+  EyeOff,
+  Sparkles,
 } from 'lucide-react'
 import { toast } from '@/hooks/use-toast'
 import { useCurrency } from './CurrencyContext'
@@ -795,6 +798,10 @@ function SettingsPanel({
   const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null)
   const [notifPermission, setNotifPermission] = useState<NotificationPermission | 'unsupported'>('unsupported')
   const { requestPermission } = useNotificationPermission()
+  const [geminiKey, setGeminiKey] = useState('')
+  const [hasGeminiKey, setHasGeminiKey] = useState(false)
+  const [showGeminiKey, setShowGeminiKey] = useState(false)
+  const [geminiKeyStatus, setGeminiKeyStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
 
   // Check for PWA install prompt on mount (only runs client-side)
   useEffect(() => {
@@ -809,6 +816,26 @@ function SettingsPanel({
   useEffect(() => {
     setNotifPermission(getNotificationPermission())
   }, [])
+
+  // Load whether user has a Gemini key saved
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const headers: Record<string, string> = {}
+        if (userName) headers['x-user-name'] = userName
+        const userEmail = localStorage.getItem('trackr_user_email')
+        const userId = localStorage.getItem('trackr_user_id')
+        if (userEmail) headers['x-user-email'] = userEmail
+        if (userId) headers['x-user-id'] = userId
+        const res = await fetch('/api/user', { headers })
+        if (res.ok) {
+          const data = await res.json()
+          setHasGeminiKey(!!data.hasGeminiKey)
+        }
+      } catch {}
+    }
+    load()
+  }, [userName])
 
   const handleEnableNotifications = async () => {
     const granted = await requestPermission()
@@ -856,6 +883,36 @@ function SettingsPanel({
       toast({ title: 'App installed!' })
     }
     setInstallPrompt(null)
+  }
+
+  const handleSaveGeminiKey = async () => {
+    setGeminiKeyStatus('saving')
+    try {
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+      if (userName) headers['x-user-name'] = userName
+      const userEmail = localStorage.getItem('trackr_user_email')
+      const userId = localStorage.getItem('trackr_user_id')
+      if (userEmail) headers['x-user-email'] = userEmail
+      if (userId) headers['x-user-id'] = userId
+      const res = await fetch('/api/user', {
+        method: 'PUT',
+        headers,
+        body: JSON.stringify({ geminiApiKey: geminiKey.trim() || null }),
+      })
+      if (res.ok) {
+        setGeminiKeyStatus('saved')
+        setHasGeminiKey(!!geminiKey.trim())
+        setGeminiKey('')
+        toast({ title: geminiKey.trim() ? 'Gemini key saved — AI is now active!' : 'Gemini key removed' })
+        setTimeout(() => setGeminiKeyStatus('idle'), 3000)
+      } else {
+        setGeminiKeyStatus('error')
+        toast({ title: 'Failed to save key', variant: 'destructive' })
+      }
+    } catch {
+      setGeminiKeyStatus('error')
+      toast({ title: 'Failed to save key', variant: 'destructive' })
+    }
   }
 
   return (
@@ -972,6 +1029,74 @@ function SettingsPanel({
           </CardContent>
         </Card>
       )}
+
+      {/* AI — Gemini API Key */}
+      <Card className="border-violet-200 dark:border-violet-900">
+        <CardContent className="p-4 space-y-3">
+          <div className="flex items-center gap-2">
+            <Sparkles className="w-4 h-4 text-violet-500" />
+            <Label className="text-xs text-muted-foreground">AI Assistant</Label>
+            {hasGeminiKey && (
+              <Badge className="bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-900/40 dark:text-emerald-300 text-xs ml-auto">
+                Active
+              </Badge>
+            )}
+          </div>
+          <p className="text-sm font-medium">Gemini API Key</p>
+          <p className="text-xs text-muted-foreground">
+            {hasGeminiKey
+              ? 'Your key is saved. Enter a new one to replace it, or clear to remove.'
+              : 'Add your free Gemini key for smarter AI categorization of your expenses.'}
+          </p>
+          <div className="flex gap-2">
+            <div className="flex-1 relative">
+              <Input
+                type={showGeminiKey ? 'text' : 'password'}
+                placeholder={hasGeminiKey ? '••••••••••••••••' : 'AIzaSy...'}
+                value={geminiKey}
+                onChange={(e) => setGeminiKey(e.target.value)}
+                className="pr-10 font-mono text-sm"
+                autoComplete="off"
+              />
+              <button
+                type="button"
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                onClick={() => setShowGeminiKey(!showGeminiKey)}
+              >
+                {showGeminiKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
+            <Button
+              size="sm"
+              onClick={handleSaveGeminiKey}
+              disabled={geminiKeyStatus === 'saving' || (!geminiKey.trim() && !hasGeminiKey)}
+              className="bg-violet-600 hover:bg-violet-700 text-white shrink-0"
+            >
+              {geminiKeyStatus === 'saving' ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : geminiKeyStatus === 'saved' ? (
+                <Check className="w-4 h-4" />
+              ) : hasGeminiKey && !geminiKey.trim() ? (
+                'Clear'
+              ) : (
+                'Save'
+              )}
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Get your free key at{' '}
+            <a
+              href="https://aistudio.google.com/app/apikey"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-violet-600 dark:text-violet-400 underline underline-offset-2"
+            >
+              aistudio.google.com
+            </a>
+            {' '}— free 1,500 requests/day
+          </p>
+        </CardContent>
+      </Card>
 
       {/* About */}
       <Card>
