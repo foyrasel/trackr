@@ -15,6 +15,7 @@ import OnboardingScreen from '@/components/tracker/OnboardingScreen'
 import AccountSetup from '@/components/tracker/AccountSetup'
 import InsightsPanel from '@/components/tracker/InsightsPanel'
 import MorePanel from '@/components/tracker/MorePanel'
+import FeatureSetupScreen from '@/components/tracker/FeatureSetupScreen'
 import { CurrencyProvider, useCurrency } from '@/components/tracker/CurrencyContext'
 import { useRecurringExecution } from '@/hooks/use-recurring-exec'
 import ErrorBoundary from '@/components/ErrorBoundary'
@@ -52,6 +53,7 @@ export default function Home() {
   const [userId, setUserId] = useState<string | null>(null)
   const [showOnboarding, setShowOnboarding] = useState(false)
   const [showAccountSetup, setShowAccountSetup] = useState(false)
+  const [showFeatureSetup, setShowFeatureSetup] = useState(false)
   const [mounted, setMounted] = useState(false)
 
   // Dark mode state
@@ -254,6 +256,17 @@ export default function Home() {
     }
   }
 
+  const showFeatureSetupIfNeeded = () => {
+    if (!localStorage.getItem('trackr_feature_setup_done')) {
+      setShowFeatureSetup(true)
+    }
+  }
+
+  const handleFeatureSetupComplete = () => {
+    localStorage.setItem('trackr_feature_setup_done', 'true')
+    setShowFeatureSetup(false)
+  }
+
   const handleAccountSetupComplete = async (accounts: { name: string; type: string; balance: number; color: string; icon: string }[]) => {
     localStorage.setItem('trackr_account_setup_done', 'true')
     setShowAccountSetup(false)
@@ -301,6 +314,7 @@ export default function Home() {
     } catch (error) {
       console.error('Error saving accounts:', error)
     }
+    showFeatureSetupIfNeeded()
   }
 
   const handleAccountSetupSkip = () => {
@@ -315,6 +329,7 @@ export default function Home() {
     }).then(res => {
       if (!res.ok) console.error('Failed to mark onboarding done in DB')
     }).catch(err => console.error('Failed to mark onboarding done:', err))
+    showFeatureSetupIfNeeded()
   }
 
   const handleLogout = async () => {
@@ -423,6 +438,11 @@ export default function Home() {
   // Show account setup wizard after onboarding
   if (showAccountSetup) {
     return <AccountSetup onComplete={handleAccountSetupComplete} onSkip={handleAccountSetupSkip} userName={userName} />
+  }
+
+  // Show optional feature setup screen once after account setup
+  if (showFeatureSetup) {
+    return <FeatureSetupScreen userName={userName} onComplete={handleFeatureSetupComplete} />
   }
 
   // Get user initials for avatar fallback

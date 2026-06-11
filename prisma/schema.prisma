@@ -21,7 +21,9 @@ model User {
   currencySymbol String    @default("$") // Display symbol
   language       String    @default("en") // "en", "bn", "hi"
   onboardingDone Boolean   @default(false)
-  geminiApiKey   String?   // User's personal Gemini API key (BYOK)
+  geminiApiKey          String?   // User's personal Gemini API key (BYOK)
+  telegramToken         String?   // Telegram bot token for logging transactions via chat
+  monthlyReportEnabled  Boolean   @default(false) // Send monthly summary email
   accounts       Account[]
   transfers      Transfer[]
   budgets        Budget[]
