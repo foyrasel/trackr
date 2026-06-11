@@ -281,6 +281,71 @@ export async function GET(request: NextRequest) {
 
     const allTimeAvgMonthlyExpense = allTimeMonths.size > 0 ? Math.round(allTimeExpense / allTimeMonths.size) : 0
 
+    // ===== DAY-OF-WEEK SPENDING (current month) =====
+    const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+    const dayFullNames = ['Sundays', 'Mondays', 'Tuesdays', 'Wednesdays', 'Thursdays', 'Fridays', 'Saturdays']
+    const dayOfWeekSpending: { day: string; amount: number }[] = dayNames.map(d => ({ day: d, amount: 0 }))
+    let weekendTotal = 0
+    let weekdayTotal = 0
+    expenses.forEach(t => {
+      const dow = new Date(t.date).getDay()
+      dayOfWeekSpending[dow].amount += t.amount
+      if (dow === 0 || dow === 6) weekendTotal += t.amount
+      else weekdayTotal += t.amount
+    })
+
+    // ===== TOP TRANSACTIONS (current month) =====
+    const topTransactions = [...expenses]
+      .sort((a, b) => b.amount - a.amount)
+      .slice(0, 5)
+      .map(t => ({
+        description: t.description,
+        amount: t.amount,
+        category: t.category,
+        classification: t.classification,
+        date: t.date,
+      }))
+
+    // ===== SPENDING PACE / PROJECTION =====
+    const realCurrentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+    const isViewingCurrentMonth = currentMonth === realCurrentMonth
+    const daysElapsed = isViewingCurrentMonth ? now.getDate() : daysInCurrentMonth
+    const avgDailySpend = daysElapsed > 0 ? Math.round(totalExpense / daysElapsed) : 0
+    const projectedMonthEnd = isViewingCurrentMonth ? avgDailySpend * daysInCurrentMonth : totalExpense
+
+    // ===== BIGGEST SPENDING DAY =====
+    let biggestDay: { date: string; amount: number } | null = null
+    Object.entries(dailySpending).forEach(([date, amount]) => {
+      if (!biggestDay || amount > biggestDay.amount) biggestDay = { date, amount }
+    })
+
+    // ===== SMART INSIGHTS (plain-English highlights) =====
+    const smartInsights: string[] = []
+    const sortedCats = Object.entries(categoryBreakdown).sort((a, b) => b[1] - a[1])
+    if (sortedCats.length > 0 && totalExpense > 0) {
+      const [topCat, topAmt] = sortedCats[0]
+      smartInsights.push(`${topCat} is your biggest category — ${Math.round((topAmt / totalExpense) * 100)}% of spending`)
+    }
+    const busiestDow = [...dayOfWeekSpending].sort((a, b) => b.amount - a.amount)[0]
+    if (busiestDow && busiestDow.amount > 0) {
+      smartInsights.push(`You spend the most on ${dayFullNames[dayNames.indexOf(busiestDow.day)]}`)
+    }
+    if (weekendTotal > 0 && weekdayTotal > 0) {
+      const weekendDailyAvg = weekendTotal / 2
+      const weekdayDailyAvg = weekdayTotal / 5
+      if (weekendDailyAvg > weekdayDailyAvg * 1.2) {
+        smartInsights.push(`Your weekend days cost ${Math.round((weekendDailyAvg / weekdayDailyAvg - 1) * 100)}% more than weekdays`)
+      }
+    }
+    if (isViewingCurrentMonth && averageMonthlyExpense > 0 && totalExpense > 0 && daysElapsed >= 3) {
+      const pct = Math.round((projectedMonthEnd / averageMonthlyExpense - 1) * 100)
+      if (pct > 10) {
+        smartInsights.push(`At this pace you'll spend ${pct}% more than your usual month`)
+      } else if (pct < -10) {
+        smartInsights.push(`Great pace — on track to spend ${Math.abs(pct)}% less than usual`)
+      }
+    }
+
     return NextResponse.json({
       currentMonth,
       monthName,
@@ -300,6 +365,17 @@ export async function GET(request: NextRequest) {
       spendingTypeBreakdown,
       spendingTypeStats,
       dailySpending,
+      dayOfWeekSpending,
+      weekendTotal,
+      weekdayTotal,
+      topTransactions,
+      avgDailySpend,
+      projectedMonthEnd,
+      daysElapsed,
+      daysInMonth: daysInCurrentMonth,
+      isViewingCurrentMonth,
+      biggestDay,
+      smartInsights,
       monthlyTrend,
       averageMonthlyExpense,
       avgCategoryBreakdown,
