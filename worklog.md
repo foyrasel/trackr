@@ -48,3 +48,36 @@ Stage Summary:
 - Key files modified: LandingPage.tsx, layout.tsx, next.config.ts, register/route.ts, Dashboard.tsx, InsightsPanel.tsx
 - New files: middleware.ts, sitemap.ts, robots.ts
 - Site ready for deployment at https://trackr-money.vercel.app
+
+---
+Task ID: 3
+Agent: Main Agent
+Task: Fix all critical auth issues, logo, branding, remove non-functional social login, and test 5x
+
+Work Log:
+- Audited entire project: auth flows, database schema, seed routes, logo, LandingPage, forgot-password, verify bypass
+- Found critical issues: password inconsistency across seed routes, Z.ai logo instead of Trackr, non-functional social login buttons, verify bypass accepting any 6-digit code, "22 Currencies" false claims still present, forgot-password error handling
+- Created db directory and initialized SQLite database (was missing)
+- Unified seed routes: changed password from Test1234 to password123, updated user names to Corporate Employee / Government Employee
+- Added idempotency check to seed route (skip if users already exist and verified)
+- Replaced Z.ai SVG logo with proper Trackr "T" emerald/teal gradient logo
+- Removed all "22 Currencies" false claims (7 locations: features, stats, pricing, badges, footer)
+- Changed hero badge from "International" to "Free Forever"
+- Removed all non-functional social login buttons (Google, Facebook, Apple) and related handlers/state
+- Fixed forgot-password API error handling with proper try/catch nesting
+- Removed verify bypass (any 6-digit code was accepted when no tokens existed)
+- Changed "Get Started in Seconds" heading to "Get Started Free"
+- Added NEXT_PUBLIC_APPLE_CONFIGURED to next.config.ts for consistency
+- Seeded test users directly: corporate@test.com/password123 and govt@test.com/password123
+- Ran comprehensive 5x testing: login, password rejection, user lookup, accounts, onboarding, forgot-password, reset-password, register+verify, verify bypass rejection
+- All 30+ auth tests passed successfully
+
+Stage Summary:
+- Build passes cleanly
+- Database initialized with 2 verified test users
+- Test credentials: corporate@test.com / password123 and govt@test.com / password123
+- Verify bypass fixed (random codes now rejected)
+- Forgot password flow works end-to-end
+- Social login buttons removed (no OAuth credentials configured)
+- All "22 Currencies" false claims removed
+- Logo properly shows Trackr "T" branding

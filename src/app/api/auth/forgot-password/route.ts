@@ -7,7 +7,16 @@ function generateResetCode(): string {
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json()
+    let body: { email?: string }
+    try {
+      body = await request.json()
+    } catch {
+      return NextResponse.json(
+        { error: 'Invalid request body' },
+        { status: 400 }
+      )
+    }
+
     const { email } = body
 
     if (!email) {
@@ -27,30 +36,51 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if user exists with this email
-    const user = await db.user.findUnique({
-      where: { email },
-    })
+    let user
+    try {
+      user = await db.user.findUnique({
+        where: { email },
+      })
+    } catch (dbError) {
+      console.error('Database error in forgot password:', dbError)
+      return NextResponse.json(
+        { error: 'Failed to process request. Please try again.' },
+        { status: 500 }
+      )
+    }
 
     if (user) {
       // Generate reset code
       const resetCode = generateResetCode()
 
       // Clean up old expired tokens for this email
-      await db.verificationToken.deleteMany({
-        where: {
-          email,
-          expires: { lt: new Date() },
-        },
-      })
+      try {
+        await db.verificationToken.deleteMany({
+          where: {
+            email,
+            expires: { lt: new Date() },
+          },
+        })
+      } catch {
+        // Non-critical: continue even if cleanup fails
+      }
 
       // Store reset code in database (expires in 10 minutes)
-      await db.verificationToken.create({
-        data: {
-          email,
-          token: resetCode,
-          expires: new Date(Date.now() + 10 * 60 * 1000),
-        },
-      })
+      try {
+        await db.verificationToken.create({
+          data: {
+            email,
+            token: resetCode,
+            expires: new Date(Date.now() + 10 * 60 * 1000),
+          },
+        })
+      } catch (dbError) {
+        console.error('Failed to store reset code:', dbError)
+        return NextResponse.json(
+          { error: 'Failed to process request. Please try again.' },
+          { status: 500 }
+        )
+      }
 
       // In production, you'd send an email here. For this demo, return the code on screen.
       return NextResponse.json({
@@ -61,15 +91,15 @@ export async function POST(request: NextRequest) {
     }
 
     // For security, don't reveal if email exists or not
-    // Still return success even if user doesn't exist
+    // Still return success even if user doesn't exist (but no resetCode)
     return NextResponse.json({
       success: true,
       message: 'If an account with that email exists, a reset code has been sent.',
     })
   } catch (error) {
-    console.error('Error in forgot password:', error)
+    console.error('Unexpected error in forgot password:', error)
     return NextResponse.json(
-      { error: 'Failed to process request' },
+      { error: 'An unexpected error occurred. Please try again.' },
       { status: 500 }
     )
   }

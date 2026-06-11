@@ -14,6 +14,11 @@ const nextConfig: NextConfig = {
       process.env.FACEBOOK_ID !== 'dummy-facebook-id' &&
       process.env.FACEBOOK_ID !== 'your-facebook-app-id'
         ? 'true' : 'false',
+    NEXT_PUBLIC_APPLE_CONFIGURED:
+      process.env.APPLE_ID && process.env.APPLE_TEAM_ID &&
+      process.env.APPLE_ID !== 'dummy-apple-id' &&
+      process.env.APPLE_ID !== 'your-apple-service-id'
+        ? 'true' : 'false',
   },
 };
 

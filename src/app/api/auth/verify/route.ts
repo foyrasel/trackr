@@ -44,22 +44,6 @@ export async function POST(request: NextRequest) {
     })
 
     if (!storedToken) {
-      // Fallback: Allow any 6-digit code for demo purposes if no code was stored
-      // (this handles the case where the server restarted and DB tokens were lost)
-      if (code.length === 6 && /^\d{6}$/.test(code)) {
-        // Try to find any unused token for this email
-        const anyToken = await db.verificationToken.findFirst({
-          where: { email, used: false },
-        })
-        if (!anyToken) {
-          // No tokens at all - allow demo verification
-          await db.user.update({
-            where: { id: user.id },
-            data: { emailVerified: new Date() },
-          })
-          return NextResponse.json({ success: true, message: 'Email verified successfully' })
-        }
-      }
       return NextResponse.json(
         { error: 'Invalid or expired verification code. Please register again.' },
         { status: 400 }

@@ -12,8 +12,8 @@ async function hashPassword(password: string): Promise<string> {
 const TEST_USERS = [
   {
     email: 'corporate@test.com',
-    name: 'Corporate User',
-    password: 'Test1234',
+    name: 'Corporate Employee',
+    password: 'password123',
     accounts: [
       { name: 'Cash', type: 'cash', balance: 5000, color: '#10b981', icon: '💵', isDefault: true },
       { name: 'DBBL Debit', type: 'debit', balance: 45000, color: '#3b82f6', icon: '💳', isDefault: false },
@@ -24,8 +24,8 @@ const TEST_USERS = [
   },
   {
     email: 'govt@test.com',
-    name: 'Government User',
-    password: 'Test1234',
+    name: 'Government Employee',
+    password: 'password123',
     accounts: [
       { name: 'Cash', type: 'cash', balance: 5000, color: '#10b981', icon: '💵', isDefault: true },
       { name: 'DBBL Debit', type: 'debit', balance: 45000, color: '#3b82f6', icon: '💳', isDefault: false },
@@ -44,6 +44,12 @@ const TEST_USERS = [
  */
 export async function POST(request: NextRequest) {
   try {
+    // Skip re-seeding if users already exist and are verified (avoid overwriting passwords)
+    const existingCorporate = await db.user.findUnique({ where: { email: 'corporate@test.com' } })
+    if (existingCorporate?.emailVerified) {
+      return NextResponse.json({ success: true, message: 'Users already seeded, skipping', skipped: true })
+    }
+
     const results: { email: string; status: string; password?: string }[] = []
 
     for (const userData of TEST_USERS) {

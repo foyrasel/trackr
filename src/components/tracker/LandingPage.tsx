@@ -36,8 +36,8 @@ const features = [
   },
   {
     icon: Globe,
-    title: '22 Currencies Supported',
-    description: 'USD, BDT, INR, EUR, GBP, AED, SGD, and 15 more. Designed for international users — switch currency anytime, everything updates automatically.',
+    title: 'Multi-Currency Support',
+    description: 'Track expenses in USD, BDT, INR, EUR, GBP, AED, and more. Switch currency anytime — everything updates automatically.',
     gradient: 'from-cyan-500 to-blue-500',
     glow: 'shadow-cyan-500/20',
     iconColor: '#06b6d4'
@@ -93,7 +93,7 @@ const features = [
 ]
 
 const stats = [
-  { value: '22', label: 'Currencies', icon: Globe },
+  { value: '7+', label: 'Currencies', icon: Globe },
   { value: '3', label: 'Languages', icon: Mic },
   { value: '16+', label: 'Categories', icon: Brain },
   { value: '5', label: 'Classifications', icon: BarChart3 },
@@ -269,9 +269,7 @@ function PhoneMockup() {
 export default function LandingPage({ onLogin }: LandingPageProps) {
   const [name, setName] = useState('')
   const [isLoading, setIsLoading] = useState(false)
-  const [googleConfigured, setGoogleConfigured] = useState(false)
-  const [facebookConfigured, setFacebookConfigured] = useState(false)
-  const [appleConfigured, setAppleConfigured] = useState(false)
+
   const [showLoginCard, setShowLoginCard] = useState(false)
   const loginRef = useRef<HTMLDivElement>(null)
   const heroRef = useRef<HTMLDivElement>(null)
@@ -305,11 +303,7 @@ export default function LandingPage({ onLogin }: LandingPageProps) {
   const [forgotStep, setForgotStep] = useState<'email' | 'reset'>('email')
   const [forgotResetCode, setForgotResetCode] = useState('')
 
-  useEffect(() => {
-    setGoogleConfigured(process.env.NEXT_PUBLIC_GOOGLE_CONFIGURED === 'true')
-    setFacebookConfigured(process.env.NEXT_PUBLIC_FACEBOOK_CONFIGURED === 'true')
-    setAppleConfigured(process.env.NEXT_PUBLIC_APPLE_CONFIGURED === 'true')
-  }, [])
+
 
   // Auto-seed test users on every app start (idempotent — safe to call repeatedly)
   useEffect(() => {
@@ -340,32 +334,7 @@ export default function LandingPage({ onLogin }: LandingPageProps) {
     }
   }
 
-  const handleGoogleLogin = async () => {
-    setIsLoading(true)
-    try {
-      await signIn('google', { callbackUrl: '/' })
-    } catch {
-      setIsLoading(false)
-    }
-  }
 
-  const handleFacebookLogin = async () => {
-    setIsLoading(true)
-    try {
-      await signIn('facebook', { callbackUrl: '/' })
-    } catch {
-      setIsLoading(false)
-    }
-  }
-
-  const handleAppleLogin = async () => {
-    setIsLoading(true)
-    try {
-      await signIn('apple', { callbackUrl: '/' })
-    } catch {
-      setIsLoading(false)
-    }
-  }
 
   const handleEmailSignup = async () => {
     setSignupError('')
@@ -592,7 +561,6 @@ export default function LandingPage({ onLogin }: LandingPageProps) {
     }, 100)
   }
 
-  const hasSocialLogin = googleConfigured || facebookConfigured || appleConfigured
 
   return (
     <div className="min-h-screen bg-white dark:bg-gray-950 overflow-x-hidden">
@@ -674,7 +642,7 @@ export default function LandingPage({ onLogin }: LandingPageProps) {
                 className="inline-flex items-center gap-2 bg-emerald-100/80 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 text-sm font-medium px-4 py-1.5 rounded-full mb-6 backdrop-blur-sm border border-emerald-200/50 dark:border-emerald-800/50"
               >
                 <Sparkles className="w-4 h-4" />
-                AI-Powered &bull; Voice-First &bull; International
+                AI-Powered &bull; Voice-First &bull; Free Forever
               </motion.div>
 
               <motion.h1
@@ -1088,7 +1056,7 @@ export default function LandingPage({ onLogin }: LandingPageProps) {
                     {[
                       'Voice input in English, Bangla & Hindi',
                       'AI categorization & classification',
-                      '22 currencies with auto-conversion',
+                      'Multi-currency with auto-conversion',
                       'Unlimited transactions & goals',
                       'Budget tracking & AI suggestions',
                       'Lend/Borrow & Bill Reminders',
@@ -1132,7 +1100,7 @@ export default function LandingPage({ onLogin }: LandingPageProps) {
 
         <div className="relative max-w-sm mx-auto px-4">
           <AnimatedSection className="text-center mb-8">
-            <h2 className="text-3xl font-extrabold text-gray-900 dark:text-white mb-2 tracking-tight">Get Started in Seconds</h2>
+            <h2 className="text-3xl font-extrabold text-gray-900 dark:text-white mb-2 tracking-tight">Get Started Free</h2>
             <p className="text-sm text-gray-500 dark:text-gray-400">Sign in or create an account</p>
           </AnimatedSection>
 
@@ -1521,7 +1489,7 @@ export default function LandingPage({ onLogin }: LandingPageProps) {
                   </div>
                   <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
                     <Globe className="w-3.5 h-3.5" />
-                    22 Currencies
+                    Multi-Currency
                   </div>
                 </div>
               </CardContent>
@@ -1543,7 +1511,7 @@ export default function LandingPage({ onLogin }: LandingPageProps) {
                 <span className="text-lg font-bold text-gray-900 dark:text-white tracking-tight">Trackr</span>
               </div>
               <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed">
-                AI-powered voice-first expense tracker. Free, private, and works in 22 currencies.
+                AI-powered voice-first expense tracker. Free, private, and supports multiple currencies.
               </p>
             </div>
 
