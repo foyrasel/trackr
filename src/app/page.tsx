@@ -100,18 +100,13 @@ export default function Home() {
    * onboarding from showing again on subsequent logins.
    */
   const checkOnboardingStatus = useCallback(async (name: string, email?: string | null, id?: string | null) => {
-    // Don't rely solely on localStorage - always verify with API for reliability
-
-    // Immediately store id and email to localStorage so subsequent API calls can use them
     if (email) localStorage.setItem('trackr_user_email', email)
     if (id) localStorage.setItem('trackr_user_id', id)
 
-    // Build headers with all available identifiers for reliable lookup
     const headers: Record<string, string> = {}
     if (name) headers['x-user-name'] = name
     if (email) headers['x-user-email'] = email
     if (id) headers['x-user-id'] = id
-    // Also include localStorage items for demo/email users
     if (typeof window !== 'undefined') {
       const savedEmail = localStorage.getItem('trackr_user_email')
       const savedId = localStorage.getItem('trackr_user_id')
@@ -119,111 +114,46 @@ export default function Home() {
       if (savedId && !headers['x-user-id']) headers['x-user-id'] = savedId
     }
 
-    try {
-      // First try the dedicated onboarding check endpoint
-      const onboardingRes = await fetch('/api/auth/check-onboarding', { headers })
-      const onboardingData = onboardingRes.ok ? await onboardingRes.json() : null
+    const markDone = (userId?: string) => {
+      localStorage.setItem('trackr_onboarding_done', 'true')
+      localStorage.setItem('trackr_account_setup_done', 'true')
+      if (userId) {
+        setUserId(userId)
+        localStorage.setItem('trackr_user_id', userId)
+      }
+    }
 
+    const checkOnce = async (): Promise<boolean> => {
+      const [onboardingRes, accountsRes] = await Promise.all([
+        fetch('/api/auth/check-onboarding', { headers }).catch(() => null),
+        fetch('/api/accounts', { headers }).catch(() => null),
+      ])
+
+      const onboardingData = onboardingRes?.ok ? await onboardingRes.json().catch(() => null) : null
       if (onboardingData?.onboardingDone) {
-        localStorage.setItem('trackr_onboarding_done', 'true')
-        localStorage.setItem('trackr_account_setup_done', 'true')
-        // Store userId if returned
-        if (onboardingData.userId) {
-          setUserId(onboardingData.userId)
-          localStorage.setItem('trackr_user_id', onboardingData.userId)
-        }
-        return
+        markDone(onboardingData.userId)
+        return true
       }
 
-      // Double-check by fetching accounts directly (more reliable than check-onboarding)
-      const accountsRes = await fetch('/api/accounts', { headers })
-      const accountsData = accountsRes.ok ? await accountsRes.json() : null
-
+      const accountsData = accountsRes?.ok ? await accountsRes.json().catch(() => null) : null
       if (accountsData?.accounts && accountsData.accounts.length > 0) {
-        // User has accounts — onboarding was already done before
-        localStorage.setItem('trackr_onboarding_done', 'true')
-        localStorage.setItem('trackr_account_setup_done', 'true')
-        // Also store userId if returned
-        if (accountsData.userId) {
-          setUserId(accountsData.userId)
-          localStorage.setItem('trackr_user_id', accountsData.userId)
-        }
-        return
+        markDone(accountsData.userId)
+        return true
       }
 
-      // Retry after a delay — the OAuth session might need a moment to propagate
-      await new Promise(resolve => setTimeout(resolve, 3000))
-      try {
-        const retryRes = await fetch('/api/auth/check-onboarding', { headers })
-        const retryData = retryRes.ok ? await retryRes.json() : null
-        if (retryData?.onboardingDone) {
-          localStorage.setItem('trackr_onboarding_done', 'true')
-          localStorage.setItem('trackr_account_setup_done', 'true')
-          if (retryData.userId) {
-            setUserId(retryData.userId)
-            localStorage.setItem('trackr_user_id', retryData.userId)
-          }
-          return
-        }
-        // Also retry accounts check
-        const retryAccountsRes = await fetch('/api/accounts', { headers })
-        const retryAccountsData = retryAccountsRes.ok ? await retryAccountsRes.json() : null
-        if (retryAccountsData?.accounts && retryAccountsData.accounts.length > 0) {
-          localStorage.setItem('trackr_onboarding_done', 'true')
-          localStorage.setItem('trackr_account_setup_done', 'true')
-          if (retryAccountsData.userId) {
-            setUserId(retryAccountsData.userId)
-            localStorage.setItem('trackr_user_id', retryAccountsData.userId)
-          }
-          return
-        }
-      } catch {
-        // Retry failed, continue to second retry
-      }
+      return false
+    }
 
-      // Second retry after another delay
-      await new Promise(resolve => setTimeout(resolve, 3000))
-      try {
-        const retry2Res = await fetch('/api/auth/check-onboarding', { headers })
-        const retry2Data = retry2Res.ok ? await retry2Res.json() : null
-        if (retry2Data?.onboardingDone) {
-          localStorage.setItem('trackr_onboarding_done', 'true')
-          localStorage.setItem('trackr_account_setup_done', 'true')
-          if (retry2Data.userId) {
-            setUserId(retry2Data.userId)
-            localStorage.setItem('trackr_user_id', retry2Data.userId)
-          }
-          return
-        }
-        const retry2AccountsRes = await fetch('/api/accounts', { headers })
-        const retry2AccountsData = retry2AccountsRes.ok ? await retry2AccountsRes.json() : null
-        if (retry2AccountsData?.accounts && retry2AccountsData.accounts.length > 0) {
-          localStorage.setItem('trackr_onboarding_done', 'true')
-          localStorage.setItem('trackr_account_setup_done', 'true')
-          if (retry2AccountsData.userId) {
-            setUserId(retry2AccountsData.userId)
-            localStorage.setItem('trackr_user_id', retry2AccountsData.userId)
-          }
-          return
-        }
-      } catch {
-        // Second retry failed, continue to show onboarding
-      }
+    try {
+      if (await checkOnce()) return
 
-      // No accounts found — show onboarding for new users
+      // One retry after a short delay — needed for OAuth session propagation
+      await new Promise(resolve => setTimeout(resolve, 1500))
+      if (await checkOnce()) return
+
       setShowOnboarding(true)
     } catch (error) {
       console.error('Error checking onboarding:', error)
-      // On error, also try accounts as final fallback
-      try {
-        const accountsRes = await fetch('/api/accounts', { headers })
-        const accountsData = accountsRes.ok ? await accountsRes.json() : null
-        if (accountsData?.accounts && accountsData.accounts.length > 0) {
-          localStorage.setItem('trackr_onboarding_done', 'true')
-          localStorage.setItem('trackr_account_setup_done', 'true')
-          return
-        }
-      } catch {}
       setShowOnboarding(true)
     }
   }, [])

@@ -269,6 +269,7 @@ function PhoneMockup() {
 export default function LandingPage({ onLogin }: LandingPageProps) {
   const [name, setName] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const [isSeeding, setIsSeeding] = useState(true)
 
   const [showLoginCard, setShowLoginCard] = useState(false)
   const loginRef = useRef<HTMLDivElement>(null)
@@ -305,7 +306,9 @@ export default function LandingPage({ onLogin }: LandingPageProps) {
 
 
 
-  // Auto-seed test users on every app start (idempotent — safe to call repeatedly)
+  // Seed test users on every app start (idempotent). isSeeding blocks form
+  // submission until this completes, preventing the race condition on Vercel
+  // cold starts where users try to log in before test accounts exist in the DB.
   useEffect(() => {
     fetch('/api/seed', { method: 'POST' })
       .then(res => res.ok ? res.json() : null)
@@ -314,9 +317,8 @@ export default function LandingPage({ onLogin }: LandingPageProps) {
           localStorage.setItem('trackr_seeded', 'true')
         }
       })
-      .catch(() => {
-        // Silently ignore seed errors
-      })
+      .catch(() => {})
+      .finally(() => setIsSeeding(false))
   }, [])
 
   const handleDemoLogin = async () => {
@@ -1150,7 +1152,13 @@ export default function LandingPage({ onLogin }: LandingPageProps) {
                   )}
                 </AnimatePresence>
 
-
+                {/* Seeding indicator — briefly shown while test accounts initialize */}
+                {isSeeding && (
+                  <div className="flex items-center justify-center gap-2 py-1 text-xs text-muted-foreground">
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                    <span>Initializing test accounts…</span>
+                  </div>
+                )}
 
                 {/* Email Signup Mode */}
                 {authMode === 'signup' && (
@@ -1167,7 +1175,7 @@ export default function LandingPage({ onLogin }: LandingPageProps) {
                           value={signupName}
                           onChange={(e) => setSignupName(e.target.value)}
                           className="h-11 border-gray-200 dark:border-gray-700 focus:border-emerald-500 dark:focus:border-emerald-500"
-                          disabled={isLoading}
+                          disabled={isLoading || isSeeding}
                         />
                       </div>
                       <div className="relative">
@@ -1178,7 +1186,7 @@ export default function LandingPage({ onLogin }: LandingPageProps) {
                           value={signupEmail}
                           onChange={(e) => setSignupEmail(e.target.value)}
                           className="h-11 pl-10 border-gray-200 dark:border-gray-700 focus:border-emerald-500 dark:focus:border-emerald-500"
-                          disabled={isLoading}
+                          disabled={isLoading || isSeeding}
                         />
                       </div>
                       <div className="relative">
@@ -1190,7 +1198,7 @@ export default function LandingPage({ onLogin }: LandingPageProps) {
                           onChange={(e) => setSignupPassword(e.target.value)}
                           className="h-11 pl-10 pr-10 border-gray-200 dark:border-gray-700 focus:border-emerald-500 dark:focus:border-emerald-500"
                           onKeyDown={(e) => e.key === 'Enter' && handleEmailSignup()}
-                          disabled={isLoading}
+                          disabled={isLoading || isSeeding}
                         />
                         <button
                           type="button"
@@ -1204,7 +1212,7 @@ export default function LandingPage({ onLogin }: LandingPageProps) {
 
                     <Button
                       onClick={handleEmailSignup}
-                      disabled={isLoading}
+                      disabled={isLoading || isSeeding}
                       className="w-full h-12 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-semibold text-base shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/40 transition-all"
                     >
                       {isLoading ? (
@@ -1249,7 +1257,7 @@ export default function LandingPage({ onLogin }: LandingPageProps) {
                           value={loginEmail}
                           onChange={(e) => setLoginEmail(e.target.value)}
                           className="h-11 pl-10 border-gray-200 dark:border-gray-700 focus:border-emerald-500 dark:focus:border-emerald-500"
-                          disabled={isLoading}
+                          disabled={isLoading || isSeeding}
                         />
                       </div>
                       <div className="relative">
@@ -1261,7 +1269,7 @@ export default function LandingPage({ onLogin }: LandingPageProps) {
                           onChange={(e) => setLoginPassword(e.target.value)}
                           className="h-11 pl-10 pr-10 border-gray-200 dark:border-gray-700 focus:border-emerald-500 dark:focus:border-emerald-500"
                           onKeyDown={(e) => e.key === 'Enter' && handleEmailLogin()}
-                          disabled={isLoading}
+                          disabled={isLoading || isSeeding}
                         />
                         <button
                           type="button"
@@ -1275,7 +1283,7 @@ export default function LandingPage({ onLogin }: LandingPageProps) {
 
                     <Button
                       onClick={handleEmailLogin}
-                      disabled={isLoading}
+                      disabled={isLoading || isSeeding}
                       className="w-full h-12 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-semibold text-base shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/40 transition-all"
                     >
                       {isLoading ? (
@@ -1330,13 +1338,13 @@ export default function LandingPage({ onLogin }: LandingPageProps) {
                             onChange={(e) => setForgotEmail(e.target.value)}
                             className="h-11 pl-10 border-gray-200 dark:border-gray-700 focus:border-emerald-500 dark:focus:border-emerald-500"
                             onKeyDown={(e) => e.key === 'Enter' && handleForgotPassword()}
-                            disabled={isLoading}
+                            disabled={isLoading || isSeeding}
                           />
                         </div>
 
                         <Button
                           onClick={handleForgotPassword}
-                          disabled={isLoading}
+                          disabled={isLoading || isSeeding}
                           className="w-full h-12 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-semibold text-base shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/40 transition-all"
                         >
                           {isLoading ? (
@@ -1371,7 +1379,7 @@ export default function LandingPage({ onLogin }: LandingPageProps) {
                           onChange={(e) => setForgotCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
                           className="h-12 text-center text-lg tracking-[0.5em] font-bold border-gray-200 dark:border-gray-700 focus:border-emerald-500 dark:focus:border-emerald-500"
                           maxLength={6}
-                          disabled={isLoading}
+                          disabled={isLoading || isSeeding}
                         />
 
                         <div className="relative">
@@ -1383,7 +1391,7 @@ export default function LandingPage({ onLogin }: LandingPageProps) {
                             onChange={(e) => setForgotNewPassword(e.target.value)}
                             className="h-11 pl-10 pr-10 border-gray-200 dark:border-gray-700 focus:border-emerald-500 dark:focus:border-emerald-500"
                             onKeyDown={(e) => e.key === 'Enter' && handleResetPassword()}
-                            disabled={isLoading}
+                            disabled={isLoading || isSeeding}
                           />
                           <button
                             type="button"
@@ -1396,7 +1404,7 @@ export default function LandingPage({ onLogin }: LandingPageProps) {
 
                         <Button
                           onClick={handleResetPassword}
-                          disabled={isLoading || forgotCode.length !== 6 || forgotNewPassword.length < 6}
+                          disabled={isLoading || isSeeding || forgotCode.length !== 6 || forgotNewPassword.length < 6}
                           className="w-full h-12 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-semibold text-base shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/40 transition-all"
                         >
                           {isLoading ? (
@@ -1453,12 +1461,12 @@ export default function LandingPage({ onLogin }: LandingPageProps) {
                       onChange={(e) => setVerifyCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
                       className="h-12 text-center text-lg tracking-[0.5em] font-bold border-gray-200 dark:border-gray-700 focus:border-emerald-500 dark:focus:border-emerald-500"
                       maxLength={6}
-                      disabled={isLoading}
+                      disabled={isLoading || isSeeding}
                     />
 
                     <Button
                       onClick={handleVerifyCode}
-                      disabled={isLoading || verifyCode.length !== 6}
+                      disabled={isLoading || isSeeding || verifyCode.length !== 6}
                       className="w-full h-12 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-semibold text-base shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/40 transition-all"
                     >
                       {isLoading ? (
@@ -1485,7 +1493,7 @@ export default function LandingPage({ onLogin }: LandingPageProps) {
                   </div>
                   <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
                     <Smartphone className="w-3.5 h-3.5" />
-                    Works Offline
+                    Mobile Friendly
                   </div>
                   <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
                     <Globe className="w-3.5 h-3.5" />

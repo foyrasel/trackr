@@ -12,6 +12,7 @@
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:reset": "prisma migrate reset",
+    "db:push-turso": "npx tsx scripts/push-turso-schema.ts",
     "seed": "npx tsx scripts/seed-test-data.ts"
   },
   "dependencies": {

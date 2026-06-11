@@ -10,6 +10,19 @@ if (!originalDbUrl || originalDbUrl.startsWith('libsql://') || originalDbUrl.sta
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined
+  dbReady: Promise<void> | undefined
+}
+
+/**
+ * Resolves once the Turso schema migration has finished (or immediately for
+ * local SQLite). Routes that perform the very first writes — like /api/seed —
+ * can await this so a freshly created Turso database has its tables ready
+ * before any query runs.
+ */
+export function ensureDbReady(): Promise<void> {
+  // Touch the proxy so the client (and its migration) is created if it hasn't been.
+  void getDb()
+  return globalForPrisma.dbReady ?? Promise.resolve()
 }
 
 function createPrismaClient(): PrismaClient {
@@ -28,8 +41,11 @@ function createPrismaClient(): PrismaClient {
     // NOT a libsql Client instance
     const adapter = new PrismaLibSql({ url: tursoUrl, authToken })
 
-    // Run migrations using libsql client directly
-    runMigrations(tursoUrl, authToken).catch(err => console.error('[DB] Migration warning:', err.message))
+    // Run migrations using libsql client directly. Store the promise so
+    // ensureDbReady() can await schema creation before the first query.
+    globalForPrisma.dbReady = runMigrations(tursoUrl, authToken).catch(err =>
+      console.error('[DB] Migration warning:', err.message)
+    )
 
     return new PrismaClient({
       adapter,
@@ -47,11 +63,202 @@ async function runMigrations(url: string, authToken?: string) {
   const { createClient } = await import('@libsql/client')
   const libsql = createClient({ url, authToken })
 
-  const migrations = [
+  // Creates all tables on first connect (idempotent — IF NOT EXISTS), then
+  // adds any columns that older databases might be missing. This means a fresh
+  // Turso database self-initializes on the first request, with no manual
+  // schema-push script required.
+  const migrations: { name: string; sql: string }[] = [
+    {
+      name: 'create_User',
+      sql: `CREATE TABLE IF NOT EXISTS User (
+        id TEXT PRIMARY KEY NOT NULL,
+        name TEXT,
+        email TEXT UNIQUE,
+        image TEXT,
+        provider TEXT NOT NULL DEFAULT 'demo',
+        darkMode BOOLEAN NOT NULL DEFAULT 0,
+        currency TEXT NOT NULL DEFAULT 'USD',
+        currencySymbol TEXT NOT NULL DEFAULT '$',
+        language TEXT NOT NULL DEFAULT 'en',
+        onboardingDone BOOLEAN NOT NULL DEFAULT 0,
+        emailVerified DATETIME,
+        password TEXT,
+        createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )`,
+    },
+    {
+      name: 'create_Account',
+      sql: `CREATE TABLE IF NOT EXISTS Account (
+        id TEXT PRIMARY KEY NOT NULL,
+        userId TEXT NOT NULL,
+        name TEXT NOT NULL,
+        type TEXT NOT NULL,
+        balance REAL NOT NULL DEFAULT 0,
+        color TEXT NOT NULL DEFAULT '#10b981',
+        icon TEXT NOT NULL DEFAULT '💵',
+        isDefault BOOLEAN NOT NULL DEFAULT 0,
+        createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (userId) REFERENCES User(id) ON DELETE CASCADE
+      )`,
+    },
+    {
+      name: 'create_Budget',
+      sql: `CREATE TABLE IF NOT EXISTS Budget (
+        id TEXT PRIMARY KEY NOT NULL,
+        userId TEXT NOT NULL,
+        month TEXT NOT NULL,
+        category TEXT NOT NULL,
+        amount REAL NOT NULL,
+        isIgnored BOOLEAN NOT NULL DEFAULT 0,
+        createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (userId) REFERENCES User(id) ON DELETE CASCADE,
+        UNIQUE(userId, month, category)
+      )`,
+    },
+    {
+      name: 'create_Transaction',
+      sql: `CREATE TABLE IF NOT EXISTS "Transaction" (
+        id TEXT PRIMARY KEY NOT NULL,
+        userId TEXT NOT NULL,
+        type TEXT NOT NULL,
+        amount REAL NOT NULL,
+        description TEXT NOT NULL,
+        category TEXT NOT NULL,
+        spendingType TEXT NOT NULL DEFAULT 'cash',
+        classification TEXT NOT NULL DEFAULT 'need',
+        date DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        isRecurring BOOLEAN NOT NULL DEFAULT 0,
+        receiptUrl TEXT,
+        recurringId TEXT,
+        createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (userId) REFERENCES User(id) ON DELETE CASCADE
+      )`,
+    },
+    {
+      name: 'create_RecurringTransaction',
+      sql: `CREATE TABLE IF NOT EXISTS RecurringTransaction (
+        id TEXT PRIMARY KEY NOT NULL,
+        userId TEXT NOT NULL,
+        type TEXT NOT NULL,
+        amount REAL NOT NULL,
+        description TEXT NOT NULL,
+        category TEXT NOT NULL,
+        spendingType TEXT NOT NULL DEFAULT 'cash',
+        classification TEXT NOT NULL DEFAULT 'need',
+        frequency TEXT NOT NULL,
+        dayOfMonth INTEGER NOT NULL DEFAULT 1,
+        dayOfWeek INTEGER,
+        startDate DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        endDate DATETIME,
+        lastExecuted DATETIME,
+        isActive BOOLEAN NOT NULL DEFAULT 1,
+        createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (userId) REFERENCES User(id) ON DELETE CASCADE
+      )`,
+    },
+    {
+      name: 'create_Goal',
+      sql: `CREATE TABLE IF NOT EXISTS Goal (
+        id TEXT PRIMARY KEY NOT NULL,
+        userId TEXT NOT NULL,
+        name TEXT NOT NULL,
+        targetAmount REAL NOT NULL,
+        savedAmount REAL NOT NULL DEFAULT 0,
+        deadline DATETIME,
+        icon TEXT NOT NULL DEFAULT '🎯',
+        color TEXT NOT NULL DEFAULT '#10b981',
+        isCompleted BOOLEAN NOT NULL DEFAULT 0,
+        createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (userId) REFERENCES User(id) ON DELETE CASCADE
+      )`,
+    },
+    {
+      name: 'create_Reminder',
+      sql: `CREATE TABLE IF NOT EXISTS Reminder (
+        id TEXT PRIMARY KEY NOT NULL,
+        userId TEXT NOT NULL,
+        title TEXT NOT NULL,
+        amount REAL,
+        category TEXT NOT NULL DEFAULT 'Utilities',
+        dueDate DATETIME NOT NULL,
+        remindDays INTEGER NOT NULL DEFAULT 3,
+        isRecurring BOOLEAN NOT NULL DEFAULT 0,
+        frequency TEXT,
+        isPaid BOOLEAN NOT NULL DEFAULT 0,
+        isDismissed BOOLEAN NOT NULL DEFAULT 0,
+        createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (userId) REFERENCES User(id) ON DELETE CASCADE
+      )`,
+    },
+    {
+      name: 'create_LendBorrow',
+      sql: `CREATE TABLE IF NOT EXISTS LendBorrow (
+        id TEXT PRIMARY KEY NOT NULL,
+        userId TEXT NOT NULL,
+        type TEXT NOT NULL,
+        amount REAL NOT NULL,
+        person TEXT NOT NULL,
+        description TEXT NOT NULL,
+        date DATETIME NOT NULL,
+        dueDate DATETIME,
+        isSettled BOOLEAN NOT NULL DEFAULT 0,
+        settledDate DATETIME,
+        createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (userId) REFERENCES User(id) ON DELETE CASCADE
+      )`,
+    },
+    {
+      name: 'create_Transfer',
+      sql: `CREATE TABLE IF NOT EXISTS Transfer (
+        id TEXT PRIMARY KEY NOT NULL,
+        userId TEXT NOT NULL,
+        fromAccountId TEXT NOT NULL,
+        toAccountId TEXT NOT NULL,
+        amount REAL NOT NULL,
+        description TEXT NOT NULL DEFAULT 'Transfer',
+        date DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (userId) REFERENCES User(id) ON DELETE CASCADE,
+        FOREIGN KEY (fromAccountId) REFERENCES Account(id) ON DELETE CASCADE,
+        FOREIGN KEY (toAccountId) REFERENCES Account(id) ON DELETE CASCADE
+      )`,
+    },
+    {
+      name: 'create_VerificationToken',
+      sql: `CREATE TABLE IF NOT EXISTS VerificationToken (
+        id TEXT PRIMARY KEY NOT NULL,
+        email TEXT NOT NULL,
+        token TEXT NOT NULL,
+        expires DATETIME NOT NULL,
+        used BOOLEAN NOT NULL DEFAULT 0,
+        createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )`,
+    },
+    // Column additions for older databases created before these fields existed
     { name: 'add_password_column', sql: 'ALTER TABLE User ADD COLUMN password TEXT' },
     { name: 'add_emailVerified_column', sql: 'ALTER TABLE User ADD COLUMN emailVerified DATETIME' },
     { name: 'add_language_column', sql: 'ALTER TABLE User ADD COLUMN language TEXT DEFAULT \'en\'' },
     { name: 'add_onboardingDone_column', sql: 'ALTER TABLE User ADD COLUMN onboardingDone BOOLEAN DEFAULT 0' },
+    // Indexes for performance
+    { name: 'idx_account_userId', sql: 'CREATE INDEX IF NOT EXISTS idx_account_userId ON Account(userId)' },
+    { name: 'idx_budget_userId', sql: 'CREATE INDEX IF NOT EXISTS idx_budget_userId ON Budget(userId)' },
+    { name: 'idx_transaction_userId', sql: 'CREATE INDEX IF NOT EXISTS idx_transaction_userId ON "Transaction"(userId)' },
+    { name: 'idx_transaction_date', sql: 'CREATE INDEX IF NOT EXISTS idx_transaction_date ON "Transaction"(date)' },
+    { name: 'idx_recurring_userId', sql: 'CREATE INDEX IF NOT EXISTS idx_recurring_userId ON RecurringTransaction(userId)' },
+    { name: 'idx_goal_userId', sql: 'CREATE INDEX IF NOT EXISTS idx_goal_userId ON Goal(userId)' },
+    { name: 'idx_reminder_userId', sql: 'CREATE INDEX IF NOT EXISTS idx_reminder_userId ON Reminder(userId)' },
+    { name: 'idx_lendborrow_userId', sql: 'CREATE INDEX IF NOT EXISTS idx_lendborrow_userId ON LendBorrow(userId)' },
+    { name: 'idx_transfer_userId', sql: 'CREATE INDEX IF NOT EXISTS idx_transfer_userId ON Transfer(userId)' },
+    { name: 'idx_verificationtoken_email', sql: 'CREATE INDEX IF NOT EXISTS idx_verificationtoken_email ON VerificationToken(email)' },
   ]
 
   for (const migration of migrations) {

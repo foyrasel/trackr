@@ -80,12 +80,15 @@ export async function POST(request: NextRequest) {
           },
         })
 
-        return NextResponse.json({
+        const reregResponse: Record<string, unknown> = {
           userId: existingUser.id,
           email,
-          verificationCode,
           message: 'Account updated! Please verify your email.',
-        }, { status: 201 })
+        }
+        if (process.env.NODE_ENV !== 'production') {
+          reregResponse.verificationCode = verificationCode
+        }
+        return NextResponse.json(reregResponse, { status: 201 })
       }
 
       // User exists and is verified — cannot re-register
@@ -138,13 +141,15 @@ export async function POST(request: NextRequest) {
       },
     })
 
-    // In production, you'd send an email here. For this demo, return the code on screen.
-    return NextResponse.json({
+    const regResponse: Record<string, unknown> = {
       userId: user.id,
       email,
-      verificationCode, // In production, this would be sent via email, not returned in the response
       message: 'Account created! Please verify your email.',
-    }, { status: 201 })
+    }
+    if (process.env.NODE_ENV !== 'production') {
+      regResponse.verificationCode = verificationCode
+    }
+    return NextResponse.json(regResponse, { status: 201 })
   } catch (error) {
     console.error('Error registering user:', error)
     return NextResponse.json(

@@ -1,22 +1,47 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
+import { getToken } from 'next-auth/jwt'
 
-export function middleware(request: NextRequest) {
-  const response = NextResponse.next()
+// API routes that are publicly accessible (no auth required)
+const PUBLIC_API_PATHS = [
+  '/api/auth',
+  '/api/seed',
+  '/api/seed-demo',
+  '/api/health',
+  '/api/debug-env',
+]
 
-  // Add security headers
-  response.headers.set('X-Response-Time', Date.now().toString())
-  
-  // Rate limiting awareness - add timestamp for client-side throttling
-  response.headers.set('X-Request-Id', crypto.randomUUID())
+export async function middleware(request: NextRequest) {
+  const pathname = request.nextUrl.pathname
 
   // Block common attack paths
-  const pathname = request.nextUrl.pathname
   const blockedPaths = ['/wp-admin', '/wp-login', '/xmlrpc.php', '/.env', '/admin/config']
-  
   if (blockedPaths.some(path => pathname.startsWith(path))) {
     return new NextResponse(null, { status: 404 })
   }
+
+  // Enforce auth on protected API routes
+  if (pathname.startsWith('/api/')) {
+    const isPublic = PUBLIC_API_PATHS.some(p => pathname.startsWith(p))
+
+    if (!isPublic) {
+      const token = await getToken({
+        req: request,
+        secret: process.env.NEXTAUTH_SECRET,
+      })
+
+      if (!token) {
+        return new NextResponse(
+          JSON.stringify({ error: 'Unauthorized' }),
+          { status: 401, headers: { 'Content-Type': 'application/json' } }
+        )
+      }
+    }
+  }
+
+  const response = NextResponse.next()
+  response.headers.set('X-Response-Time', Date.now().toString())
+  response.headers.set('X-Request-Id', crypto.randomUUID())
 
   return response
 }
