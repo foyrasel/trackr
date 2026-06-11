@@ -4,15 +4,7 @@ import FacebookProvider from 'next-auth/providers/facebook'
 import AppleProvider from 'next-auth/providers/apple'
 import CredentialsProvider from 'next-auth/providers/credentials'
 import { db } from '@/lib/db'
-
-// Simple hash function matching the one used in register
-async function hashPassword(password: string): Promise<string> {
-  const encoder = new TextEncoder()
-  const data = encoder.encode(password + (process.env.NEXTAUTH_SECRET || 'trackr-secret'))
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data)
-  const hashArray = Array.from(new Uint8Array(hashBuffer))
-  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('')
-}
+import { hashPassword, verifyPassword } from '@/lib/password'
 
 // Only include OAuth providers if they have real (non-dummy) credentials
 const providers: any[] = []
@@ -71,8 +63,21 @@ providers.push(
 
         if (!user || !user.password) return null
 
-        const hashedInput = await hashPassword(credentials.password)
-        if (user.password !== hashedInput) return null
+        const { matched, needsRehash } = await verifyPassword(credentials.password, user.password)
+        if (!matched) return null
+
+        // Transparent upgrade: re-store legacy SHA-256 passwords as bcrypt on
+        // the first successful login so they no longer depend on NEXTAUTH_SECRET.
+        if (needsRehash) {
+          try {
+            await db.user.update({
+              where: { id: user.id },
+              data: { password: await hashPassword(credentials.password) },
+            })
+          } catch {
+            // Non-critical: login still succeeds even if the rehash write fails.
+          }
+        }
 
         // Check if email is verified - allow login even if not verified (verification is a separate step)
         // Removing the hard block so seed users and newly registered users can log in
