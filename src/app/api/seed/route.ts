@@ -1,13 +1,6 @@
 import { db, ensureDbReady } from '@/lib/db'
 import { NextRequest, NextResponse } from 'next/server'
-
-async function hashPassword(password: string): Promise<string> {
-  const encoder = new TextEncoder()
-  const data = encoder.encode(password + (process.env.NEXTAUTH_SECRET || 'trackr-secret'))
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data)
-  const hashArray = Array.from(new Uint8Array(hashBuffer))
-  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('')
-}
+import { hashPassword, isBcryptHash } from '@/lib/password'
 
 const TEST_USERS = [
   {
@@ -48,9 +41,12 @@ export async function POST(request: NextRequest) {
     // freshly provisioned database.
     await ensureDbReady()
 
-    // Skip re-seeding if users already exist and are verified (avoid overwriting passwords)
+    // Skip re-seeding only once the test user exists, is verified, AND its
+    // password is already stored as a modern bcrypt hash. This guarantees that
+    // test users seeded under the old SHA-256 scheme get their passwords
+    // refreshed to bcrypt exactly once, so login works reliably afterward.
     const existingCorporate = await db.user.findUnique({ where: { email: 'corporate@test.com' } })
-    if (existingCorporate?.emailVerified) {
+    if (existingCorporate?.emailVerified && existingCorporate.password && isBcryptHash(existingCorporate.password)) {
       return NextResponse.json({ success: true, message: 'Users already seeded, skipping', skipped: true })
     }
 

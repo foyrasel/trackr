@@ -1,14 +1,7 @@
 import { db } from '@/lib/db'
 import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth'
-
-async function hashPassword(password: string): Promise<string> {
-  const encoder = new TextEncoder()
-  const data = encoder.encode(password + (process.env.NEXTAUTH_SECRET || 'trackr-secret'))
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data)
-  const hashArray = Array.from(new Uint8Array(hashBuffer))
-  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('')
-}
+import { verifyPassword } from '@/lib/password'
 
 export async function POST(request: NextRequest) {
   try {
@@ -35,12 +28,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ verified: false, error: 'Password required' }, { status: 400 })
     }
 
-    const hashedInput = await hashPassword(password)
-    if (dbUser.password === hashedInput) {
-      return NextResponse.json({ verified: true })
-    }
-
-    return NextResponse.json({ verified: false })
+    const { matched } = await verifyPassword(password, dbUser.password)
+    return NextResponse.json({ verified: matched })
   } catch (error) {
     console.error('Error verifying password:', error)
     return NextResponse.json({ error: 'Failed to verify password' }, { status: 500 })

@@ -1,13 +1,6 @@
 import { db } from '@/lib/db'
 import { NextResponse } from 'next/server'
-
-async function hashPassword(password: string): Promise<string> {
-  const encoder = new TextEncoder()
-  const data = encoder.encode(password + (process.env.NEXTAUTH_SECRET || 'trackr-secret'))
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data)
-  const hashArray = Array.from(new Uint8Array(hashBuffer))
-  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('')
-}
+import { hashPassword } from '@/lib/password'
 
 function randomBetween(min: number, max: number): number {
   return Math.floor(Math.random() * (max - min + 1)) + min
