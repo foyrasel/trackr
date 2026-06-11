@@ -20,6 +20,7 @@ import {
   TrendingUp, TrendingDown, Wallet, AlertTriangle,
   PiggyBank, BarChart3, Calendar, ChevronLeft, ChevronRight,
   ArrowUpRight, ArrowDownRight, Activity, Brain, Lightbulb,
+  Sparkles, CalendarDays, Receipt, Gauge, Flame,
 } from 'lucide-react'
 import BalanceCards from './BalanceCards'
 import { Button } from '@/components/ui/button'
@@ -49,6 +50,23 @@ interface AnalyticsData {
     mobile: { total: number; count: number; avgPerTxn: number }
   }
   dailySpending: Record<string, number>
+  dayOfWeekSpending: { day: string; amount: number }[]
+  weekendTotal: number
+  weekdayTotal: number
+  topTransactions: {
+    description: string
+    amount: number
+    category: string
+    classification: string
+    date: string
+  }[]
+  avgDailySpend: number
+  projectedMonthEnd: number
+  daysElapsed: number
+  daysInMonth: number
+  isViewingCurrentMonth: boolean
+  biggestDay: { date: string; amount: number } | null
+  smartInsights: string[]
   monthlyTrend: Record<string, { income: number; expense: number }>
   averageMonthlyExpense: number
   avgCategoryBreakdown: Record<string, number>
@@ -388,6 +406,85 @@ export default function Dashboard({ refreshTrigger, userName }: DashboardProps) 
         </Card>
       </div>
 
+      {/* Row 3b: Smart Insights — plain-English highlights */}
+      {data.smartInsights.length > 0 && (
+        <Card className="border-2 border-emerald-200 bg-gradient-to-br from-emerald-50/40 via-white to-teal-50/30 dark:from-emerald-950/20 dark:via-gray-900 dark:to-teal-950/10 dark:border-emerald-900/50">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center gap-2">
+              <div className="w-7 h-7 rounded-full bg-emerald-100 dark:bg-emerald-900/50 flex items-center justify-center">
+                <Sparkles className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+              </div>
+              Smart Insights
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {data.smartInsights.map((insight, i) => (
+                <div key={i} className="flex items-start gap-2 bg-white/60 dark:bg-gray-800/40 rounded-lg p-3 border border-emerald-100 dark:border-emerald-900/30">
+                  <Lightbulb className="w-4 h-4 text-emerald-500 flex-shrink-0 mt-0.5" />
+                  <p className="text-sm text-gray-700 dark:text-gray-200 leading-snug">{insight}</p>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Row 3c: Spending Pace key metrics */}
+      {data.totalExpense > 0 && (
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <Card className="bg-gradient-to-br from-blue-50 to-blue-100/40 border-blue-200 dark:from-blue-950/20 dark:border-blue-900/50">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2 mb-0.5">
+                <Gauge className="w-4 h-4 text-blue-600" />
+                <span className="text-sm text-blue-700 dark:text-blue-300 font-medium">Daily Average</span>
+              </div>
+              <p className="text-xl font-bold text-blue-900 dark:text-blue-100">{currencySymbol}{data.avgDailySpend.toLocaleString()}</p>
+              <p className="text-xs text-blue-600/70 dark:text-blue-400/70">over {data.daysElapsed} day{data.daysElapsed !== 1 ? 's' : ''}</p>
+            </CardContent>
+          </Card>
+
+          {data.isViewingCurrentMonth && (
+            <Card className="bg-gradient-to-br from-violet-50 to-violet-100/40 border-violet-200 dark:from-violet-950/20 dark:border-violet-900/50">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-2 mb-0.5">
+                  <Activity className="w-4 h-4 text-violet-600" />
+                  <span className="text-sm text-violet-700 dark:text-violet-300 font-medium">Projected</span>
+                </div>
+                <p className="text-xl font-bold text-violet-900 dark:text-violet-100">{currencySymbol}{data.projectedMonthEnd.toLocaleString()}</p>
+                <p className="text-xs text-violet-600/70 dark:text-violet-400/70">by month end</p>
+              </CardContent>
+            </Card>
+          )}
+
+          {data.biggestDay && (
+            <Card className="bg-gradient-to-br from-orange-50 to-orange-100/40 border-orange-200 dark:from-orange-950/20 dark:border-orange-900/50">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-2 mb-0.5">
+                  <Flame className="w-4 h-4 text-orange-600" />
+                  <span className="text-sm text-orange-700 dark:text-orange-300 font-medium">Biggest Day</span>
+                </div>
+                <p className="text-xl font-bold text-orange-900 dark:text-orange-100">{currencySymbol}{data.biggestDay.amount.toLocaleString()}</p>
+                <p className="text-xs text-orange-600/70 dark:text-orange-400/70">
+                  {new Date(data.biggestDay.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                </p>
+              </CardContent>
+            </Card>
+          )}
+
+          <Card className="bg-gradient-to-br from-teal-50 to-teal-100/40 border-teal-200 dark:from-teal-950/20 dark:border-teal-900/50">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2 mb-0.5">
+                <Receipt className="w-4 h-4 text-teal-600" />
+                <span className="text-sm text-teal-700 dark:text-teal-300 font-medium">Transactions</span>
+              </div>
+              <p className="text-xl font-bold text-teal-900 dark:text-teal-100">{data.transactionCount}</p>
+              <p className="text-xs text-teal-600/70 dark:text-teal-400/70">this month</p>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
       {/* Row 4: Average vs Current Month Line Chart - FULL WIDTH */}
       {data.avgVsCurrentLineData.length > 0 && data.averageMonthlyExpense > 0 ? (
         <Card className="border-2 border-blue-200 bg-gradient-to-br from-blue-50/30 to-white">
@@ -525,6 +622,83 @@ export default function Dashboard({ refreshTrigger, userName }: DashboardProps) 
           </Card>
         )}
       </div>
+
+      {/* Row 5b: Day-of-week pattern (LEFT) | Top transactions (RIGHT) */}
+      {data.totalExpense > 0 && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
+          {data.dayOfWeekSpending.some(d => d.amount > 0) && (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <CalendarDays className="w-4 h-4 text-indigo-500" />
+                  Spending by Day of Week
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="h-52">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={data.dayOfWeekSpending} margin={{ top: 5, right: 10, left: 5, bottom: 5 }}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                      <XAxis dataKey="day" fontSize={12} />
+                      <YAxis tickFormatter={(v: number) => `${currencySymbol}${(v / 1000).toFixed(0)}k`} fontSize={12} />
+                      <Tooltip formatter={(value: number) => [`${currencySymbol}${value.toLocaleString()}`, 'Spent']} />
+                      <Bar dataKey="amount" radius={[4, 4, 0, 0]}>
+                        {data.dayOfWeekSpending.map((entry, index) => (
+                          <Cell
+                            key={`dow-${index}`}
+                            fill={index === 0 || index === 6 ? '#f59e0b' : '#6366f1'}
+                          />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+                {data.weekendTotal > 0 && data.weekdayTotal > 0 && (
+                  <div className="flex items-center justify-center gap-4 mt-2 text-xs text-muted-foreground">
+                    <span className="flex items-center gap-1.5">
+                      <span className="w-2.5 h-2.5 rounded-full bg-indigo-500" /> Weekday {currencySymbol}{data.weekdayTotal.toLocaleString()}
+                    </span>
+                    <span className="flex items-center gap-1.5">
+                      <span className="w-2.5 h-2.5 rounded-full bg-amber-500" /> Weekend {currencySymbol}{data.weekendTotal.toLocaleString()}
+                    </span>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {data.topTransactions.length > 0 && (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Receipt className="w-4 h-4 text-rose-500" />
+                  Biggest Transactions
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  {data.topTransactions.map((txn, i) => (
+                    <div key={i} className="flex items-center gap-3">
+                      <div className="w-6 h-6 rounded-full bg-rose-100 dark:bg-rose-950/40 flex items-center justify-center flex-shrink-0">
+                        <span className="text-xs font-bold text-rose-600 dark:text-rose-400">{i + 1}</span>
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium truncate">{txn.description}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {txn.category} · {new Date(txn.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                        </p>
+                      </div>
+                      <p className="text-sm font-bold text-gray-900 dark:text-white flex-shrink-0">
+                        {currencySymbol}{txn.amount.toLocaleString()}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      )}
 
       {/* Row 6: 50/30/20 Rule Breakdown - Full Width */}
       {classificationData.length > 0 && (
