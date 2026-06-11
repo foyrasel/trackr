@@ -552,7 +552,7 @@ export default function AuthModal({ isOpen, onClose, defaultMode = 'login', onLo
                     {/* Demo code display */}
                     {verificationCode && (
                       <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-xl p-3 text-center">
-                        <p className="text-xs text-amber-600 dark:text-amber-400 font-medium mb-1">DEMO MODE — Verification Code</p>
+                        <p className="text-xs text-amber-600 dark:text-amber-400 font-medium mb-1">Your verification code (email not configured)</p>
                         <p className="text-2xl font-bold text-amber-700 dark:text-amber-300 tracking-[0.3em]">{verificationCode}</p>
                       </div>
                     )}
@@ -640,7 +640,7 @@ export default function AuthModal({ isOpen, onClose, defaultMode = 'login', onLo
                     {/* Demo code display */}
                     {forgotResetCode && (
                       <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-xl p-3 text-center">
-                        <p className="text-xs text-amber-600 dark:text-amber-400 font-medium mb-1">DEMO MODE — Reset Code</p>
+                        <p className="text-xs text-amber-600 dark:text-amber-400 font-medium mb-1">Your reset code (email not configured)</p>
                         <p className="text-2xl font-bold text-amber-700 dark:text-amber-300 tracking-[0.3em]">{forgotResetCode}</p>
                       </div>
                     )}
