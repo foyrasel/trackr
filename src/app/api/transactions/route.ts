@@ -71,7 +71,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { type, amount, description, category, spendingType, classification, date, isRecurring, receiptUrl } = body
+    const { type, amount, description, category, spendingType, classification, date, isRecurring, receiptUrl, accountId } = body
 
     if (!type || !amount || !description || !category) {
       return NextResponse.json(
@@ -80,6 +80,23 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Resolve the target account. Prefer the explicit accountId (so a specific
+    // account like bKash vs Nagad is debited); fall back to the first account
+    // matching the spendingType for older clients that don't send accountId.
+    let account: Awaited<ReturnType<typeof db.account.findFirst>> = null
+    if (accountId) {
+      account = await db.account.findFirst({ where: { id: accountId, userId: user.id } })
+    }
+    if (!account) {
+      account = await db.account.findFirst({
+        where: { userId: user.id, type: spendingType || 'cash' },
+      })
+    }
+
+    // Keep spendingType consistent with the chosen account's type so analytics
+    // (payment-method breakdown) stays accurate.
+    const resolvedSpendingType = account?.type || spendingType || 'cash'
+
     const transaction = await db.transaction.create({
       data: {
         userId: user.id,
@@ -87,7 +104,8 @@ export async function POST(request: NextRequest) {
         amount: parseFloat(amount),
         description,
         category,
-        spendingType: spendingType || 'cash',
+        spendingType: resolvedSpendingType,
+        accountId: account?.id || null,
         classification: classification || (type === 'income' ? 'income' : 'need'),
         date: date ? new Date(date) : new Date(),
         isRecurring: isRecurring || false,
@@ -96,12 +114,8 @@ export async function POST(request: NextRequest) {
     })
 
     // Update account balance
-    const accountType = spendingType || 'cash'
-    const account = await db.account.findFirst({
-      where: { userId: user.id, type: accountType },
-    })
-
     if (account) {
+      const accountType = account.type
       if (type === 'expense') {
         const newBalance = accountType === 'credit'
           ? account.balance + parseFloat(amount) // Credit card: increase balance = more debt

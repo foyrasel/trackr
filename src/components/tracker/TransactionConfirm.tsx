@@ -27,9 +27,17 @@ export interface CategorizedTransaction {
   description: string
   category: string
   spendingType: string
+  accountId?: string
   classification: string
   date: string // ISO date string (YYYY-MM-DD)
   receiptUrl?: string
+}
+
+interface Account {
+  id: string
+  name: string
+  type: string
+  icon: string
 }
 
 interface TransactionConfirmProps {
@@ -37,6 +45,15 @@ interface TransactionConfirmProps {
   onConfirm: (data: CategorizedTransaction) => void
   onReject: () => void
   isSaving: boolean
+  userName?: string
+  preloadedAccounts?: Account[]
+}
+
+const PAYMENT_TYPE_ICON: Record<string, string> = {
+  cash: '💵',
+  debit: '💳',
+  credit: '💳',
+  mobile: '📱',
 }
 
 const EXPENSE_CATEGORIES = [
@@ -59,18 +76,53 @@ const CLASSIFICATION_LABELS: Record<string, { label: string; color: string }> = 
   income: { label: 'Income', color: 'bg-emerald-100 text-emerald-800 border-emerald-300' },
 }
 
-export default function TransactionConfirm({ data, onConfirm, onReject, isSaving }: TransactionConfirmProps) {
+export default function TransactionConfirm({ data, onConfirm, onReject, isSaving, userName, preloadedAccounts }: TransactionConfirmProps) {
   const { currencySymbol } = useCurrency()
   const [editData, setEditData] = useState<CategorizedTransaction>({ ...data })
   const [receiptUrl, setReceiptUrl] = useState<string | undefined>(undefined)
   const [receiptPreview, setReceiptPreview] = useState<string | null>(null)
   const [uploading, setUploading] = useState(false)
+  const [accounts, setAccounts] = useState<Account[]>(preloadedAccounts || [])
   const fileInputRef = React.useRef<HTMLInputElement>(null)
 
   // Keep editData in sync if data prop changes
   useEffect(() => {
     setEditData({ ...data })
   }, [data])
+
+  // Apply preselection whenever accounts or data changes
+  const applyAccountPreselection = (list: Account[], prev: CategorizedTransaction) => {
+    if (prev.accountId) return prev
+    const match = list.find(a => a.type === prev.spendingType) || list[0]
+    if (!match) return prev
+    return { ...prev, accountId: match.id, spendingType: match.type }
+  }
+
+  // If parent passed pre-loaded accounts, use them immediately; otherwise fetch
+  useEffect(() => {
+    if (preloadedAccounts && preloadedAccounts.length > 0) {
+      setAccounts(preloadedAccounts)
+      setEditData(prev => applyAccountPreselection(preloadedAccounts, prev))
+      return
+    }
+    const headers: Record<string, string> = {}
+    if (userName) headers['x-user-name'] = userName
+    if (typeof window !== 'undefined') {
+      const userEmail = localStorage.getItem('trackr_user_email')
+      const userId = localStorage.getItem('trackr_user_id')
+      if (userEmail) headers['x-user-email'] = userEmail
+      if (userId) headers['x-user-id'] = userId
+    }
+    fetch('/api/accounts', { headers })
+      .then(res => res.ok ? res.json() : null)
+      .then(result => {
+        const list: Account[] = result?.accounts || []
+        setAccounts(list)
+        setEditData(prev => applyAccountPreselection(list, prev))
+      })
+      .catch(() => {})
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userName, data, preloadedAccounts])
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -229,23 +281,51 @@ export default function TransactionConfirm({ data, onConfirm, onReject, isSaving
           </Select>
         </div>
 
-        {/* Spending Type - Always Editable */}
+        {/* Account / Payment Method - populated from the user's real accounts */}
         <div>
-          <Label className="text-xs text-muted-foreground">Payment Method</Label>
-          <Select
-            value={editData.spendingType}
-            onValueChange={(value) => setEditData({ ...editData, spendingType: value })}
-          >
-            <SelectTrigger className="mt-1 border-2 border-emerald-200 focus:border-emerald-500 bg-emerald-50/50">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="cash">💵 Cash</SelectItem>
-              <SelectItem value="debit">💳 Debit Card</SelectItem>
-              <SelectItem value="credit">💳 Credit Card</SelectItem>
-              <SelectItem value="mobile">📱 Mobile Wallet</SelectItem>
-            </SelectContent>
-          </Select>
+          <Label className="text-xs text-muted-foreground">
+            {editData.type === 'income' ? 'Deposit To' : 'Pay From'}
+          </Label>
+          {accounts.length > 0 ? (
+            <Select
+              value={editData.accountId || ''}
+              onValueChange={(value) => {
+                const selected = accounts.find(a => a.id === value)
+                setEditData({
+                  ...editData,
+                  accountId: value,
+                  spendingType: selected?.type || editData.spendingType,
+                })
+              }}
+            >
+              <SelectTrigger className="mt-1 border-2 border-emerald-200 focus:border-emerald-500 bg-emerald-50/50">
+                <SelectValue placeholder="Select account" />
+              </SelectTrigger>
+              <SelectContent>
+                {accounts.map((acc) => (
+                  <SelectItem key={acc.id} value={acc.id}>
+                    {acc.icon || PAYMENT_TYPE_ICON[acc.type] || '💳'} {acc.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          ) : (
+            // Fallback to generic types if accounts haven't loaded
+            <Select
+              value={editData.spendingType}
+              onValueChange={(value) => setEditData({ ...editData, spendingType: value })}
+            >
+              <SelectTrigger className="mt-1 border-2 border-emerald-200 focus:border-emerald-500 bg-emerald-50/50">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="cash">💵 Cash</SelectItem>
+                <SelectItem value="debit">💳 Debit Card</SelectItem>
+                <SelectItem value="credit">💳 Credit Card</SelectItem>
+                <SelectItem value="mobile">📱 Mobile Wallet</SelectItem>
+              </SelectContent>
+            </Select>
+          )}
         </div>
 
         {/* Classification - Always Editable (for expenses) */}

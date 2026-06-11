@@ -248,6 +248,7 @@ async function runMigrations(url: string, authToken?: string) {
     { name: 'add_emailVerified_column', sql: 'ALTER TABLE User ADD COLUMN emailVerified DATETIME' },
     { name: 'add_language_column', sql: 'ALTER TABLE User ADD COLUMN language TEXT DEFAULT \'en\'' },
     { name: 'add_onboardingDone_column', sql: 'ALTER TABLE User ADD COLUMN onboardingDone BOOLEAN DEFAULT 0' },
+    { name: 'add_transaction_accountId_column', sql: 'ALTER TABLE "Transaction" ADD COLUMN accountId TEXT' },
     // Indexes for performance
     { name: 'idx_account_userId', sql: 'CREATE INDEX IF NOT EXISTS idx_account_userId ON Account(userId)' },
     { name: 'idx_budget_userId', sql: 'CREATE INDEX IF NOT EXISTS idx_budget_userId ON Budget(userId)' },
