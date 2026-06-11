@@ -24,11 +24,28 @@ function CurrencyDisplay() {
   return <>{currency}</>
 }
 
+/**
+ * Helper: Build auth headers from localStorage for API calls
+ * This ensures all API calls include x-user-id and x-user-email for reliable user lookup
+ */
+function buildAuthHeaders(userName?: string): Record<string, string> {
+  const headers: Record<string, string> = {}
+  if (userName) headers['x-user-name'] = userName
+  if (typeof window !== 'undefined') {
+    const userEmail = localStorage.getItem('trackr_user_email')
+    const userId = localStorage.getItem('trackr_user_id')
+    if (userEmail) headers['x-user-email'] = userEmail
+    if (userId) headers['x-user-id'] = userId
+  }
+  return headers
+}
+
 export default function Home() {
   const [activeTab, setActiveTab] = useState('dashboard')
   const [refreshTrigger, setRefreshTrigger] = useState(0)
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [userName, setUserName] = useState('')
+  const [userEmail, setUserEmail] = useState<string | null>(null)
   const [userImage, setUserImage] = useState<string | null>(null)
   const [userId, setUserId] = useState<string | null>(null)
   const [showOnboarding, setShowOnboarding] = useState(false)
@@ -45,12 +62,11 @@ export default function Home() {
     setMounted(true)
   }, [])
 
-  // Fetch user settings (dark mode) after login
+  // Fetch user settings (dark mode, language, currency) after login
   useEffect(() => {
     if (isLoggedIn) {
-      fetch('/api/user', {
-        headers: userName ? { 'x-user-name': userName } : {},
-      })
+      const headers = buildAuthHeaders(userName)
+      fetch('/api/user', { headers })
         .then(res => res.ok ? res.json() : null)
         .then(data => {
           if (data) {
@@ -62,72 +78,243 @@ export default function Home() {
                 document.documentElement.classList.remove('dark')
               }
             }
+            // Store user id and email from server response
+            if (data.id) {
+              setUserId(data.id)
+              localStorage.setItem('trackr_user_id', data.id)
+            }
+            if (data.email) {
+              setUserEmail(data.email)
+              localStorage.setItem('trackr_user_email', data.email)
+            }
           }
         })
         .catch(console.error)
     }
   }, [isLoggedIn, userName])
 
-  // Check for next-auth session (handles Google/Facebook OAuth redirect)
+  /**
+   * Check if user has completed onboarding by checking if they have accounts.
+   * Uses multiple lookup methods: x-user-id, x-user-email, x-user-name
+   * If user has accounts, immediately sets localStorage flags to prevent
+   * onboarding from showing again on subsequent logins.
+   */
+  const checkOnboardingStatus = useCallback(async (name: string, email?: string | null, id?: string | null) => {
+    // Don't rely solely on localStorage - always verify with API for reliability
+
+    // Immediately store id and email to localStorage so subsequent API calls can use them
+    if (email) localStorage.setItem('trackr_user_email', email)
+    if (id) localStorage.setItem('trackr_user_id', id)
+
+    // Build headers with all available identifiers for reliable lookup
+    const headers: Record<string, string> = {}
+    if (name) headers['x-user-name'] = name
+    if (email) headers['x-user-email'] = email
+    if (id) headers['x-user-id'] = id
+    // Also include localStorage items for demo/email users
+    if (typeof window !== 'undefined') {
+      const savedEmail = localStorage.getItem('trackr_user_email')
+      const savedId = localStorage.getItem('trackr_user_id')
+      if (savedEmail && !headers['x-user-email']) headers['x-user-email'] = savedEmail
+      if (savedId && !headers['x-user-id']) headers['x-user-id'] = savedId
+    }
+
+    try {
+      // First try the dedicated onboarding check endpoint
+      const onboardingRes = await fetch('/api/auth/check-onboarding', { headers })
+      const onboardingData = onboardingRes.ok ? await onboardingRes.json() : null
+
+      if (onboardingData?.onboardingDone) {
+        localStorage.setItem('trackr_onboarding_done', 'true')
+        localStorage.setItem('trackr_account_setup_done', 'true')
+        // Store userId if returned
+        if (onboardingData.userId) {
+          setUserId(onboardingData.userId)
+          localStorage.setItem('trackr_user_id', onboardingData.userId)
+        }
+        return
+      }
+
+      // Double-check by fetching accounts directly (more reliable than check-onboarding)
+      const accountsRes = await fetch('/api/accounts', { headers })
+      const accountsData = accountsRes.ok ? await accountsRes.json() : null
+
+      if (accountsData?.accounts && accountsData.accounts.length > 0) {
+        // User has accounts — onboarding was already done before
+        localStorage.setItem('trackr_onboarding_done', 'true')
+        localStorage.setItem('trackr_account_setup_done', 'true')
+        // Also store userId if returned
+        if (accountsData.userId) {
+          setUserId(accountsData.userId)
+          localStorage.setItem('trackr_user_id', accountsData.userId)
+        }
+        return
+      }
+
+      // Retry after a delay — the OAuth session might need a moment to propagate
+      await new Promise(resolve => setTimeout(resolve, 3000))
+      try {
+        const retryRes = await fetch('/api/auth/check-onboarding', { headers })
+        const retryData = retryRes.ok ? await retryRes.json() : null
+        if (retryData?.onboardingDone) {
+          localStorage.setItem('trackr_onboarding_done', 'true')
+          localStorage.setItem('trackr_account_setup_done', 'true')
+          if (retryData.userId) {
+            setUserId(retryData.userId)
+            localStorage.setItem('trackr_user_id', retryData.userId)
+          }
+          return
+        }
+        // Also retry accounts check
+        const retryAccountsRes = await fetch('/api/accounts', { headers })
+        const retryAccountsData = retryAccountsRes.ok ? await retryAccountsRes.json() : null
+        if (retryAccountsData?.accounts && retryAccountsData.accounts.length > 0) {
+          localStorage.setItem('trackr_onboarding_done', 'true')
+          localStorage.setItem('trackr_account_setup_done', 'true')
+          if (retryAccountsData.userId) {
+            setUserId(retryAccountsData.userId)
+            localStorage.setItem('trackr_user_id', retryAccountsData.userId)
+          }
+          return
+        }
+      } catch {
+        // Retry failed, continue to second retry
+      }
+
+      // Second retry after another delay
+      await new Promise(resolve => setTimeout(resolve, 3000))
+      try {
+        const retry2Res = await fetch('/api/auth/check-onboarding', { headers })
+        const retry2Data = retry2Res.ok ? await retry2Res.json() : null
+        if (retry2Data?.onboardingDone) {
+          localStorage.setItem('trackr_onboarding_done', 'true')
+          localStorage.setItem('trackr_account_setup_done', 'true')
+          if (retry2Data.userId) {
+            setUserId(retry2Data.userId)
+            localStorage.setItem('trackr_user_id', retry2Data.userId)
+          }
+          return
+        }
+        const retry2AccountsRes = await fetch('/api/accounts', { headers })
+        const retry2AccountsData = retry2AccountsRes.ok ? await retry2AccountsRes.json() : null
+        if (retry2AccountsData?.accounts && retry2AccountsData.accounts.length > 0) {
+          localStorage.setItem('trackr_onboarding_done', 'true')
+          localStorage.setItem('trackr_account_setup_done', 'true')
+          if (retry2AccountsData.userId) {
+            setUserId(retry2AccountsData.userId)
+            localStorage.setItem('trackr_user_id', retry2AccountsData.userId)
+          }
+          return
+        }
+      } catch {
+        // Second retry failed, continue to show onboarding
+      }
+
+      // No accounts found — show onboarding for new users
+      setShowOnboarding(true)
+    } catch (error) {
+      console.error('Error checking onboarding:', error)
+      // On error, also try accounts as final fallback
+      try {
+        const accountsRes = await fetch('/api/accounts', { headers })
+        const accountsData = accountsRes.ok ? await accountsRes.json() : null
+        if (accountsData?.accounts && accountsData.accounts.length > 0) {
+          localStorage.setItem('trackr_onboarding_done', 'true')
+          localStorage.setItem('trackr_account_setup_done', 'true')
+          return
+        }
+      } catch {}
+      setShowOnboarding(true)
+    }
+  }, [])
+
+  // Handle next-auth session (Google/Facebook/Apple OAuth redirect)
   useEffect(() => {
     if (status === 'authenticated' && session?.user) {
-      setUserName(session.user.name || 'User')
-      setUserImage(session.user.image || null)
-      setIsLoggedIn(true)
-      localStorage.setItem('trackr_user_name', session.user.name || 'User')
-      // Check if onboarding has been completed for OAuth users
-      const onboardingDone = localStorage.getItem('trackr_onboarding_done')
-      if (!onboardingDone) {
-        setShowOnboarding(true)
-      }
-    }
-  }, [session, status])
+      const name = session.user.name || 'User'
+      const email = session.user.email || null
+      const id = (session.user as any).id || null
 
-  // Check for existing session on mount (localStorage fallback for demo mode)
+      // Persist to localStorage FIRST so subsequent API calls can use them
+      localStorage.setItem('trackr_user_name', name)
+      if (email) localStorage.setItem('trackr_user_email', email)
+      if (id) localStorage.setItem('trackr_user_id', id)
+
+      // Then update state
+      setUserName(name)
+      setUserEmail(email)
+      setUserImage(session.user.image || null)
+      if (id) setUserId(id)
+      setIsLoggedIn(true)
+
+      // Check onboarding status (now localStorage has id/email for reliable API calls)
+      checkOnboardingStatus(name, email, id)
+    }
+  }, [session, status, checkOnboardingStatus])
+
+  // Check for existing session on mount (localStorage fallback for demo/email users)
   useEffect(() => {
     if (status !== 'authenticated' && status !== 'loading') {
       const savedName = localStorage.getItem('trackr_user_name')
       if (savedName) {
-        const onboardingDone = localStorage.getItem('trackr_onboarding_done')
-        requestAnimationFrame(() => {
-          setUserName(savedName)
-          setIsLoggedIn(true)
-          if (!onboardingDone) {
-            setShowOnboarding(true)
-          }
-        })
+        const savedEmail = localStorage.getItem('trackr_user_email')
+        const savedId = localStorage.getItem('trackr_user_id')
+
+        setUserName(savedName)
+        if (savedEmail) setUserEmail(savedEmail)
+        setIsLoggedIn(true)
+
+        // Check onboarding
+        checkOnboardingStatus(savedName, savedEmail, savedId)
       }
     }
-  }, [status])
+  }, [status, checkOnboardingStatus])
 
-  // Fetch userId after login
+  // Fetch userId after login if not yet available
   useEffect(() => {
     if (isLoggedIn && !userId) {
-      fetch('/api/accounts', {
-        headers: { 'x-user-name': userName },
-      })
+      const headers = buildAuthHeaders(userName)
+      fetch('/api/accounts', { headers })
         .then(res => res.json())
         .then(data => {
-          if (data.userId) setUserId(data.userId)
+          if (data.userId) {
+            setUserId(data.userId)
+            localStorage.setItem('trackr_user_id', data.userId)
+          }
         })
         .catch(console.error)
     }
   }, [isLoggedIn, userId, userName])
 
-  const handleLogin = (name: string) => {
+  const handleLogin = (name: string, email?: string | null, id?: string | null) => {
     setUserName(name)
     setIsLoggedIn(true)
     localStorage.setItem('trackr_user_name', name)
-    // Check if onboarding has been completed before
-    const onboardingDone = localStorage.getItem('trackr_onboarding_done')
-    if (!onboardingDone) {
-      setShowOnboarding(true)
+    if (email) {
+      setUserEmail(email)
+      localStorage.setItem('trackr_user_email', email)
     }
+    if (id) {
+      setUserId(id)
+      localStorage.setItem('trackr_user_id', id)
+    }
+
+    // Check onboarding status
+    checkOnboardingStatus(name, email, id)
   }
 
   const handleOnboardingComplete = () => {
     localStorage.setItem('trackr_onboarding_done', 'true')
     setShowOnboarding(false)
+    // Mark onboardingDone in the database so it persists across sessions/devices
+    const headers = buildAuthHeaders(userName)
+    fetch('/api/user', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', ...headers },
+      body: JSON.stringify({ onboardingDone: true }),
+    }).then(res => {
+      if (!res.ok) console.error('Failed to mark onboarding done in DB')
+    }).catch(err => console.error('Failed to mark onboarding done:', err))
     // Check if account setup has been done
     const accountSetupDone = localStorage.getItem('trackr_account_setup_done')
     if (!accountSetupDone) {
@@ -139,16 +326,45 @@ export default function Home() {
     localStorage.setItem('trackr_account_setup_done', 'true')
     setShowAccountSetup(false)
 
-    // Save the accounts to the database
+    // Mark onboardingDone in the database so it persists across sessions/devices
+    const headers = buildAuthHeaders(userName)
+    fetch('/api/user', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', ...headers },
+      body: JSON.stringify({ onboardingDone: true }),
+    }).then(res => {
+      if (!res.ok) console.error('Failed to mark onboarding done in DB')
+    }).catch(err => console.error('Failed to mark onboarding done:', err))
+
+    // Save the accounts to the database, updating existing ones instead of creating duplicates
     try {
-      for (const account of accounts) {
-        await fetch('/api/accounts', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', ...(userName ? { 'x-user-name': userName } : {}) },
-          body: JSON.stringify(account),
-        })
+      const existingRes = await fetch('/api/accounts', { headers })
+      const existingData = existingRes.ok ? await existingRes.json() : null
+      const existingAccounts = existingData?.accounts || []
+
+      if (existingAccounts.length > 0) {
+        // Only create accounts that don't exist yet (match by name, not type)
+        for (const account of accounts) {
+          const existingByName = existingAccounts.find((a: { name: string; id: string }) => a.name === account.name)
+          if (!existingByName) {
+            await fetch('/api/accounts', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', ...headers },
+              body: JSON.stringify(account),
+            })
+          }
+        }
+      } else {
+        // No existing accounts — create all from setup
+        for (const account of accounts) {
+          await fetch('/api/accounts', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', ...headers },
+            body: JSON.stringify(account),
+          })
+        }
       }
-      // Trigger a refresh to load the new account data
+
       setRefreshTrigger(prev => prev + 1)
     } catch (error) {
       console.error('Error saving accounts:', error)
@@ -158,11 +374,28 @@ export default function Home() {
   const handleAccountSetupSkip = () => {
     localStorage.setItem('trackr_account_setup_done', 'true')
     setShowAccountSetup(false)
+    // Mark onboardingDone in the database so it persists across sessions/devices
+    const headers = buildAuthHeaders(userName)
+    fetch('/api/user', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', ...headers },
+      body: JSON.stringify({ onboardingDone: true }),
+    }).then(res => {
+      if (!res.ok) console.error('Failed to mark onboarding done in DB')
+    }).catch(err => console.error('Failed to mark onboarding done:', err))
   }
 
   const handleLogout = async () => {
+    // Clear user identity from localStorage but KEEP onboarding flags
+    // so returning users don't see setup screens again
     localStorage.removeItem('trackr_user_name')
+    localStorage.removeItem('trackr_user_email')
+    localStorage.removeItem('trackr_user_id')
+    // DO NOT clear these — they prevent onboarding from showing again for returning users
+    // localStorage.removeItem('trackr_onboarding_done')
+    // localStorage.removeItem('trackr_account_setup_done')
     setUserName('')
+    setUserEmail(null)
     setUserImage(null)
     setUserId(null)
     setIsLoggedIn(false)
@@ -196,12 +429,12 @@ export default function Home() {
       document.documentElement.classList.remove('dark')
     }
     // Persist to server
+    const headers = buildAuthHeaders(userName)
     fetch('/api/user', {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json', ...(userName ? { 'x-user-name': userName } : {}) },
+      headers: { 'Content-Type': 'application/json', ...headers },
       body: JSON.stringify({ darkMode: newMode }),
     }).catch(console.error)
-    // Also save to localStorage for quick load
     localStorage.setItem('trackr_dark_mode', newMode ? 'true' : 'false')
   }, [isDarkMode, userName])
 
@@ -236,7 +469,11 @@ export default function Home() {
 
   // Show onboarding screen for first-time users
   if (showOnboarding) {
-    return <OnboardingScreen onComplete={handleOnboardingComplete} />
+    return (
+      <CurrencyProvider>
+        <OnboardingScreen onComplete={handleOnboardingComplete} />
+      </CurrencyProvider>
+    )
   }
 
   // Show account setup wizard after onboarding
@@ -254,10 +491,10 @@ export default function Home() {
 
   return (
     <CurrencyProvider>
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-emerald-50/30 dark:from-gray-950 dark:via-gray-900 dark:to-emerald-950/10">
+    <div className="min-h-screen flex flex-col bg-gradient-to-br from-gray-50 via-white to-emerald-50/30 dark:from-gray-950 dark:via-gray-900 dark:to-emerald-950/10">
       {/* Header */}
       <header className="sticky top-0 z-50 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md border-b dark:border-gray-800">
-        <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
+        <div className="w-full mx-auto px-3 sm:px-4 py-3 flex items-center justify-between">
           <button
             onClick={() => setActiveTab('dashboard')}
             className="flex items-center gap-2.5 hover:opacity-80 transition-opacity"
@@ -267,13 +504,13 @@ export default function Home() {
             </div>
             <div className="hidden sm:block">
               <h1 className="text-lg font-bold leading-tight">Trackr</h1>
-              <p className="text-[10px] text-muted-foreground leading-tight">
+              <p className="text-sm text-muted-foreground leading-tight">
                 {userName ? `Hi, ${userName}` : 'AI Voice Expense Tracker'}
               </p>
             </div>
           </button>
           <div className="flex items-center gap-1.5">
-            <Badge variant="outline" className="text-[10px] bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800">
+            <Badge variant="outline" className="text-xs bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800">
               <CurrencyDisplay />
             </Badge>
             <Button
@@ -287,7 +524,7 @@ export default function Home() {
             {userImage && (
               <Avatar className="h-7 w-7">
                 <AvatarImage src={userImage} alt={userName} />
-                <AvatarFallback className="text-[10px] bg-emerald-100 dark:bg-emerald-900 text-emerald-700 dark:text-emerald-300">{userInitials}</AvatarFallback>
+                <AvatarFallback className="text-xs bg-emerald-100 dark:bg-emerald-900 text-emerald-700 dark:text-emerald-300">{userInitials}</AvatarFallback>
               </Avatar>
             )}
             <Button variant="ghost" size="sm" onClick={handleLogout} className="text-muted-foreground hover:text-destructive h-8 w-8 p-0">
@@ -300,7 +537,7 @@ export default function Home() {
       {/* Single Tabs component wrapping both content and navigation */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         {/* Main Content */}
-        <main className="max-w-5xl mx-auto px-4 pb-24 pt-4">
+        <main className="w-full mx-auto px-2 sm:px-4 pb-24 pt-2 sm:pt-4 flex-1">
           <TabsContent value="dashboard" className="mt-0">
             <Dashboard refreshTrigger={refreshTrigger} userName={userName} />
           </TabsContent>
@@ -333,14 +570,14 @@ export default function Home() {
 
         {/* Bottom Navigation */}
         <nav className="fixed bottom-0 left-0 right-0 bg-white/95 dark:bg-gray-900/95 backdrop-blur-md border-t dark:border-gray-800 z-50">
-          <div className="max-w-5xl mx-auto">
+          <div className="w-full mx-auto">
             <TabsList className="w-full h-16 bg-transparent justify-around p-0 shadow-none">
               <TabsTrigger
                 value="dashboard"
                 className="flex-col gap-0.5 data-[state=active]:text-emerald-600 data-[state=active]:shadow-none px-1 py-2 flex-1"
               >
                 <LayoutDashboard className="w-5 h-5" />
-                <span className="text-[9px]">Dashboard</span>
+                <span className="text-sm">Dashboard</span>
               </TabsTrigger>
 
               <TabsTrigger
@@ -348,7 +585,7 @@ export default function Home() {
                 className="flex-col gap-0.5 data-[state=active]:text-emerald-600 data-[state=active]:shadow-none px-1 py-2 flex-1"
               >
                 <Target className="w-5 h-5" />
-                <span className="text-[9px]">Budget</span>
+                <span className="text-sm">Budget</span>
               </TabsTrigger>
 
               <TabsTrigger
@@ -358,7 +595,7 @@ export default function Home() {
                 <div className="w-10 h-10 rounded-full bg-emerald-500 flex items-center justify-center -mt-5 shadow-lg shadow-emerald-500/30">
                   <Plus className="w-6 h-6 text-white" />
                 </div>
-                <span className="text-[9px]">Add</span>
+                <span className="text-sm">Add</span>
               </TabsTrigger>
 
               <TabsTrigger
@@ -366,15 +603,7 @@ export default function Home() {
                 className="flex-col gap-0.5 data-[state=active]:text-emerald-600 data-[state=active]:shadow-none px-1 py-2 flex-1"
               >
                 <History className="w-5 h-5" />
-                <span className="text-[9px]">History</span>
-              </TabsTrigger>
-
-              <TabsTrigger
-                value="insights"
-                className="flex-col gap-0.5 data-[state=active]:text-emerald-600 data-[state=active]:shadow-none px-1 py-2 flex-1"
-              >
-                <Lightbulb className="w-5 h-5" />
-                <span className="text-[9px]">Insights</span>
+                <span className="text-sm">History</span>
               </TabsTrigger>
 
               <TabsTrigger
@@ -382,7 +611,7 @@ export default function Home() {
                 className="flex-col gap-0.5 data-[state=active]:text-emerald-600 data-[state=active]:shadow-none px-1 py-2 flex-1"
               >
                 <MoreHorizontal className="w-5 h-5" />
-                <span className="text-[9px]">More</span>
+                <span className="text-sm">More</span>
               </TabsTrigger>
             </TabsList>
           </div>

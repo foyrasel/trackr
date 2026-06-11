@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
 import { Banknote, Building2, Smartphone, Plus, X, ArrowRight, ArrowLeft, Check, Sparkles, Wallet } from 'lucide-react'
+import { useCurrency } from './CurrencyContext'
 
 interface AccountSetupProps {
   onComplete: (accounts: SetupAccount[]) => void
@@ -64,6 +65,7 @@ const STEPS = [
 ]
 
 export default function AccountSetup({ onComplete, onSkip, userName }: AccountSetupProps) {
+  const { currencySymbol } = useCurrency()
   const [currentStep, setCurrentStep] = useState(0)
   const [direction, setDirection] = useState(1)
 
@@ -220,7 +222,7 @@ export default function AccountSetup({ onComplete, onSkip, userName }: AccountSe
             />
           ))}
         </div>
-        <p className="text-[10px] text-muted-foreground text-center">
+        <p className="text-xs text-muted-foreground text-center">
           Step {currentStep + 1} of {STEPS.length}
         </p>
       </div>
@@ -264,7 +266,7 @@ export default function AccountSetup({ onComplete, onSkip, userName }: AccountSe
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="text-2xl font-bold text-emerald-600">$</span>
+                      <span className="text-2xl font-bold text-emerald-600">{currencySymbol}</span>
                       <Input
                         type="number"
                         placeholder="0"
@@ -358,7 +360,7 @@ export default function AccountSetup({ onComplete, onSkip, userName }: AccountSe
                             </div>
                             <span className="text-sm font-medium text-gray-900 dark:text-white flex-1">{bank.name}</span>
                             <div className="flex items-center gap-1">
-                              <span className="text-sm text-muted-foreground">$</span>
+                              <span className="text-sm text-muted-foreground">{currencySymbol}</span>
                               <Input
                                 type="number"
                                 placeholder="0"
@@ -465,7 +467,7 @@ export default function AccountSetup({ onComplete, onSkip, userName }: AccountSe
                             </div>
                             <span className="text-sm font-medium text-gray-900 dark:text-white flex-1">{wallet.name}</span>
                             <div className="flex items-center gap-1">
-                              <span className="text-sm text-muted-foreground">$</span>
+                              <span className="text-sm text-muted-foreground">{currencySymbol}</span>
                               <Input
                                 type="number"
                                 placeholder="0"
@@ -506,7 +508,7 @@ export default function AccountSetup({ onComplete, onSkip, userName }: AccountSe
                     <Sparkles className="w-8 h-8 mx-auto text-emerald-500 mb-2" />
                     <p className="text-sm text-muted-foreground">Total Across All Accounts</p>
                     <p className="text-4xl font-bold text-emerald-700 dark:text-emerald-300">
-                      ${totalBalance.toLocaleString()}
+                      {currencySymbol}{totalBalance.toLocaleString()}
                     </p>
                   </CardContent>
                 </Card>
@@ -520,7 +522,7 @@ export default function AccountSetup({ onComplete, onSkip, userName }: AccountSe
                         <Banknote className="w-4 h-4 text-emerald-600" />
                       </div>
                       <span className="text-sm font-medium flex-1">Cash</span>
-                      <span className="text-sm font-bold">${(parseFloat(cashBalance) || 0).toLocaleString()}</span>
+                      <span className="text-sm font-bold">{currencySymbol}{(parseFloat(cashBalance) || 0).toLocaleString()}</span>
                     </CardContent>
                   </Card>
 
@@ -537,7 +539,7 @@ export default function AccountSetup({ onComplete, onSkip, userName }: AccountSe
                             {bank.name[0]}
                           </div>
                           <span className="text-sm font-medium flex-1">{bank.name}</span>
-                          <span className="text-sm font-bold">${(parseFloat(bank.balance) || 0).toLocaleString()}</span>
+                          <span className="text-sm font-bold">{currencySymbol}{(parseFloat(bank.balance) || 0).toLocaleString()}</span>
                         </CardContent>
                       </Card>
                     )
@@ -556,7 +558,7 @@ export default function AccountSetup({ onComplete, onSkip, userName }: AccountSe
                             {wallet.name[0]}
                           </div>
                           <span className="text-sm font-medium flex-1">{wallet.name}</span>
-                          <span className="text-sm font-bold">${(parseFloat(wallet.balance) || 0).toLocaleString()}</span>
+                          <span className="text-sm font-bold">{currencySymbol}{(parseFloat(wallet.balance) || 0).toLocaleString()}</span>
                         </CardContent>
                       </Card>
                     )

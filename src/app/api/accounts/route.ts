@@ -43,7 +43,8 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// POST /api/accounts - Create or update account balance
+// POST /api/accounts - Create a new account (always creates, never upserts)
+// If `updateExistingId` is provided, updates that account instead (used by AccountSetup wizard)
 export async function POST(request: NextRequest) {
   try {
     const user = await getCurrentUser(request)
@@ -52,21 +53,28 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { type, balance, name, color, icon } = body
+    const { type, balance, name, color, icon, updateExistingId } = body
 
-    // Check if account type already exists for this user
-    const existing = await db.account.findFirst({
-      where: { userId: user.id, type },
-    })
-
-    if (existing) {
+    // If updateExistingId is provided, update that specific account (for AccountSetup wizard)
+    if (updateExistingId) {
+      const existing = await db.account.findUnique({ where: { id: updateExistingId } })
+      if (!existing || existing.userId !== user.id) {
+        return NextResponse.json({ error: 'Account not found' }, { status: 404 })
+      }
       const updated = await db.account.update({
-        where: { id: existing.id },
-        data: { balance, name: name || existing.name, color: color || existing.color, icon: icon || existing.icon },
+        where: { id: updateExistingId },
+        data: {
+          balance: balance !== undefined ? balance : existing.balance,
+          name: name || existing.name,
+          color: color || existing.color,
+          icon: icon || existing.icon,
+          type: type || existing.type,
+        },
       })
       return NextResponse.json({ account: updated })
     }
 
+    // Always create a new account - allow multiple accounts of the same type
     const account = await db.account.create({
       data: {
         userId: user.id,
@@ -75,7 +83,7 @@ export async function POST(request: NextRequest) {
         balance: balance || 0,
         color: color || '#10b981',
         icon: icon || '💵',
-        isDefault: type === 'cash',
+        isDefault: false, // New accounts are never default
       },
     })
 

@@ -62,6 +62,7 @@ import {
 } from 'lucide-react'
 import { toast } from '@/hooks/use-toast'
 import { format } from 'date-fns'
+import { useCurrency } from './CurrencyContext'
 
 interface RecurringTransaction {
   id: string
@@ -159,6 +160,7 @@ const emptyForm: FormState = {
 }
 
 export default function RecurringPanel({ userName, refreshTrigger }: RecurringPanelProps) {
+  const { currencySymbol } = useCurrency()
   const [recurring, setRecurring] = useState<RecurringTransaction[]>([])
   const [autoCreatedCount, setAutoCreatedCount] = useState(0)
   const [loading, setLoading] = useState(true)
@@ -180,6 +182,12 @@ export default function RecurringPanel({ userName, refreshTrigger }: RecurringPa
     const headers: Record<string, string> = {}
     if (contentType) headers['Content-Type'] = 'application/json'
     if (userName) headers['x-user-name'] = userName
+    if (typeof window !== 'undefined') {
+      const userEmail = localStorage.getItem('trackr_user_email')
+      const userId = localStorage.getItem('trackr_user_id')
+      if (userEmail) headers['x-user-email'] = userEmail
+      if (userId) headers['x-user-id'] = userId
+    }
     return headers
   }, [userName])
 
@@ -323,7 +331,7 @@ export default function RecurringPanel({ userName, refreshTrigger }: RecurringPa
       if (response.ok) {
         toast({
           title: isEdit ? 'Recurring Updated' : 'Recurring Created',
-          description: `"${form.description}" — $${amount.toLocaleString()}/${form.frequency}`,
+          description: `"${form.description}" — ${currencySymbol}${amount.toLocaleString()}/${form.frequency}`,
         })
         setShowAddDialog(false)
         setShowEditDialog(false)
@@ -401,7 +409,7 @@ export default function RecurringPanel({ userName, refreshTrigger }: RecurringPa
         <div className="flex items-center gap-2">
           <Repeat className="w-5 h-5 text-emerald-500" />
           <h2 className="text-lg font-bold">Recurring Transactions</h2>
-          <Badge variant="outline" className="text-[10px] bg-emerald-50 text-emerald-700 border-emerald-200">
+          <Badge variant="outline" className="text-xs bg-emerald-50 text-emerald-700 border-emerald-200">
             Auto-add
           </Badge>
         </div>
@@ -463,7 +471,7 @@ export default function RecurringPanel({ userName, refreshTrigger }: RecurringPa
                       {/* Top row: Type badge + Description + Amount */}
                       <div className="flex items-center gap-2 flex-wrap">
                         <Badge
-                          className={`text-[10px] px-1.5 py-0 ${
+                          className={`text-xs px-1.5 py-0 ${
                             item.type === 'expense'
                               ? 'bg-red-100 text-red-800 border-red-300'
                               : 'bg-emerald-100 text-emerald-800 border-emerald-300'
@@ -482,7 +490,7 @@ export default function RecurringPanel({ userName, refreshTrigger }: RecurringPa
 
                       {/* Frequency badge + Next execution date */}
                       <div className="flex items-center gap-3 flex-wrap">
-                        <Badge variant="outline" className="text-[10px] gap-1 bg-emerald-50/50 text-emerald-700 border-emerald-200">
+                        <Badge variant="outline" className="text-xs gap-1 bg-emerald-50/50 text-emerald-700 border-emerald-200">
                           <FreqIcon className="w-3 h-3" />
                           {getFrequencyLabel(item.frequency)}
                         </Badge>
@@ -556,7 +564,7 @@ export default function RecurringPanel({ userName, refreshTrigger }: RecurringPa
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2 min-w-0">
                       <Badge
-                        className={`text-[10px] px-1.5 py-0 ${
+                        className={`text-xs px-1.5 py-0 ${
                           item.type === 'expense'
                             ? 'bg-red-50 text-red-400 border-red-200'
                             : 'bg-emerald-50 text-emerald-400 border-emerald-200'
@@ -565,8 +573,8 @@ export default function RecurringPanel({ userName, refreshTrigger }: RecurringPa
                         {item.type === 'expense' ? 'Expense' : 'Income'}
                       </Badge>
                       <span className="text-sm text-muted-foreground line-through truncate">{item.description}</span>
-                      <span className="text-sm text-muted-foreground shrink-0">${item.amount.toLocaleString()}</span>
-                      <Badge variant="outline" className="text-[9px] gap-0.5 bg-muted/50 text-muted-foreground">
+                      <span className="text-sm text-muted-foreground shrink-0">{currencySymbol}{item.amount.toLocaleString()}</span>
+                      <Badge variant="outline" className="text-xs gap-0.5 bg-muted/50 text-muted-foreground">
                         <FreqIcon className="w-2.5 h-2.5" />
                         {getFrequencyLabel(item.frequency)}
                       </Badge>
@@ -906,7 +914,7 @@ export default function RecurringPanel({ userName, refreshTrigger }: RecurringPa
             <AlertDialogDescription>
               {deleteTarget && (
                 <>
-                  This will permanently remove <strong>&quot;{deleteTarget.description}&quot;</strong> (${deleteTarget.amount.toLocaleString()}/{getFrequencyLabel(deleteTarget.frequency)}).
+                  This will permanently remove <strong>&quot;{deleteTarget.description}&quot;</strong> ({currencySymbol}{deleteTarget.amount.toLocaleString()}/{getFrequencyLabel(deleteTarget.frequency)}).
                   No future transactions will be auto-created from this schedule.
                 </>
               )}

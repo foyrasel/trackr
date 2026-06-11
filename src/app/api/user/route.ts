@@ -24,6 +24,7 @@ export async function GET(request: NextRequest) {
       darkMode: dbUser.darkMode,
       currency: dbUser.currency,
       currencySymbol: dbUser.currencySymbol,
+      language: dbUser.language,
     })
   } catch (error) {
     console.error('Error fetching user settings:', error)
@@ -40,12 +41,14 @@ export async function PUT(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { darkMode, currency, currencySymbol } = body
+    const { darkMode, currency, currencySymbol, language, onboardingDone } = body
 
     const updateData: Record<string, unknown> = {}
     if (darkMode !== undefined) updateData.darkMode = darkMode
     if (currency !== undefined) updateData.currency = currency
     if (currencySymbol !== undefined) updateData.currencySymbol = currencySymbol
+    if (language !== undefined) updateData.language = language
+    if (onboardingDone !== undefined) updateData.onboardingDone = onboardingDone
 
     if (Object.keys(updateData).length === 0) {
       return NextResponse.json({ error: 'No fields to update' }, { status: 400 })
@@ -62,6 +65,8 @@ export async function PUT(request: NextRequest) {
       darkMode: updated.darkMode,
       currency: updated.currency,
       currencySymbol: updated.currencySymbol,
+      language: updated.language,
+      onboardingDone: updated.onboardingDone,
     })
   } catch (error) {
     console.error('Error updating user settings:', error)

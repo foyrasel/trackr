@@ -18,11 +18,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { name, email, password } = body
 
-    // Sanitize inputs
-    const sanitizedName = typeof name === 'string' ? name.trim().slice(0, 100) : ''
-    const sanitizedEmail = typeof email === 'string' ? email.trim().toLowerCase().slice(0, 255) : ''
-
-    if (!sanitizedEmail || !password || !sanitizedName) {
+    if (!email || !password || !name) {
       return NextResponse.json(
         { error: 'Name, email, and password are required' },
         { status: 400 }
@@ -31,7 +27,7 @@ export async function POST(request: NextRequest) {
 
     // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-    if (!emailRegex.test(sanitizedEmail)) {
+    if (!emailRegex.test(email)) {
       return NextResponse.json(
         { error: 'Invalid email format' },
         { status: 400 }
@@ -48,10 +44,51 @@ export async function POST(request: NextRequest) {
 
     // Check if email already exists
     const existingUser = await db.user.findUnique({
-      where: { email: sanitizedEmail },
+      where: { email },
     })
 
     if (existingUser) {
+      // If user exists but hasn't verified their email, allow re-registration
+      // by updating their data instead of rejecting
+      if (!existingUser.emailVerified) {
+        const hashedPassword = await hashPassword(password)
+        const verificationCode = generateVerificationCode()
+
+        // Update existing unverified user with new data
+        await db.user.update({
+          where: { id: existingUser.id },
+          data: {
+            name,
+            password: hashedPassword,
+          },
+        })
+
+        // Clean up old expired tokens for this email
+        await db.verificationToken.deleteMany({
+          where: {
+            email,
+            expires: { lt: new Date() },
+          },
+        })
+
+        // Store new verification code
+        await db.verificationToken.create({
+          data: {
+            email,
+            token: verificationCode,
+            expires: new Date(Date.now() + 10 * 60 * 1000),
+          },
+        })
+
+        return NextResponse.json({
+          userId: existingUser.id,
+          email,
+          verificationCode,
+          message: 'Account updated! Please verify your email.',
+        }, { status: 201 })
+      }
+
+      // User exists and is verified — cannot re-register
       return NextResponse.json(
         { error: 'An account with this email already exists' },
         { status: 409 }
@@ -67,8 +104,8 @@ export async function POST(request: NextRequest) {
     // Create user (unverified)
     const user = await db.user.create({
       data: {
-        name: sanitizedName,
-        email: sanitizedEmail,
+        name,
+        email,
         password: hashedPassword,
         provider: 'email',
       },
@@ -87,7 +124,7 @@ export async function POST(request: NextRequest) {
     // Store verification code in database (expires in 10 minutes)
     await db.verificationToken.create({
       data: {
-        email: sanitizedEmail,
+        email,
         token: verificationCode,
         expires: new Date(Date.now() + 10 * 60 * 1000),
       },
@@ -96,17 +133,16 @@ export async function POST(request: NextRequest) {
     // Clean up old expired tokens for this email
     await db.verificationToken.deleteMany({
       where: {
-        email: sanitizedEmail,
+        email,
         expires: { lt: new Date() },
       },
     })
 
-    // In production, you'd send an email here. For demo, store code server-side only.
-    // The client displays the code from the server response for testing purposes only.
+    // In production, you'd send an email here. For this demo, return the code on screen.
     return NextResponse.json({
       userId: user.id,
-      email: sanitizedEmail,
-      verificationCode,
+      email,
+      verificationCode, // In production, this would be sent via email, not returned in the response
       message: 'Account created! Please verify your email.',
     }, { status: 201 })
   } catch (error) {

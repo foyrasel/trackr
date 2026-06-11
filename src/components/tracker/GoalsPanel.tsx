@@ -38,6 +38,7 @@ import {
   PartyPopper,
 } from 'lucide-react'
 import { toast } from '@/hooks/use-toast'
+import { useCurrency } from './CurrencyContext'
 
 interface GoalItem {
   id: string
@@ -84,6 +85,7 @@ function formatDate(date: string): string {
 }
 
 export default function GoalsPanel({ userName, refreshTrigger }: GoalsPanelProps) {
+  const { currencySymbol } = useCurrency()
   const [goals, setGoals] = useState<GoalItem[]>([])
   const [loading, setLoading] = useState(true)
   const [mounted, setMounted] = useState(false)
@@ -115,6 +117,12 @@ export default function GoalsPanel({ userName, refreshTrigger }: GoalsPanelProps
     const headers: Record<string, string> = {}
     if (contentType) headers['Content-Type'] = 'application/json'
     if (userName) headers['x-user-name'] = userName
+    if (typeof window !== 'undefined') {
+      const userEmail = localStorage.getItem('trackr_user_email')
+      const userId = localStorage.getItem('trackr_user_id')
+      if (userEmail) headers['x-user-email'] = userEmail
+      if (userId) headers['x-user-id'] = userId
+    }
     return headers
   }, [userName])
 
@@ -194,7 +202,7 @@ export default function GoalsPanel({ userName, refreshTrigger }: GoalsPanelProps
       if (response.ok) {
         toast({
           title: 'Goal Created',
-          description: `"${formName}" — $${parseFloat(formTarget).toLocaleString()} target`,
+          description: `"${formName}" — ${currencySymbol}${parseFloat(formTarget).toLocaleString()} target`,
         })
         setShowAddDialog(false)
         resetForm()
@@ -268,7 +276,7 @@ export default function GoalsPanel({ userName, refreshTrigger }: GoalsPanelProps
           title: willComplete ? '🎉 Goal Completed!' : 'Funds Added',
           description: willComplete
             ? `Congratulations! "${selectedGoal.name}" is fully funded!`
-            : `$${parseFloat(addFundsAmount).toLocaleString()} added to "${selectedGoal.name}"`,
+            : `${currencySymbol}${parseFloat(addFundsAmount).toLocaleString()} added to "${selectedGoal.name}"`,
         })
         setShowAddFundsDialog(false)
         setSelectedGoal(null)
@@ -342,7 +350,7 @@ export default function GoalsPanel({ userName, refreshTrigger }: GoalsPanelProps
           <Target className="w-5 h-5 text-emerald-500" />
           <h2 className="text-lg font-bold">Financial Goals</h2>
           {goals.length > 0 && (
-            <Badge variant="outline" className="text-[10px] bg-emerald-50 text-emerald-700 border-emerald-200">
+            <Badge variant="outline" className="text-xs bg-emerald-50 text-emerald-700 border-emerald-200">
               {activeGoals.length} active
             </Badge>
           )}
@@ -509,7 +517,7 @@ export default function GoalsPanel({ userName, refreshTrigger }: GoalsPanelProps
                     <div>
                       <div className="flex items-center gap-2">
                         <h3 className="text-sm font-semibold">{goal.name}</h3>
-                        <Badge className="bg-amber-100 text-amber-800 border-amber-200 text-[10px] hover:bg-amber-100">
+                        <Badge className="bg-amber-100 text-amber-800 border-amber-200 text-xs hover:bg-amber-100">
                           <PartyPopper className="w-3 h-3 mr-0.5" />
                           Completed!
                         </Badge>

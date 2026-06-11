@@ -11,7 +11,6 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url)
     const month = searchParams.get('month')
-    const category = searchParams.get('category') || undefined
 
     const now = new Date()
     const currentMonth = month || `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
@@ -31,7 +30,6 @@ export async function GET(request: NextRequest) {
       where: {
         userId: user.id,
         date: { gte: startDate, lt: endDate },
-        ...(category ? { category } : {}),
       },
       orderBy: { date: 'desc' },
     })
@@ -73,6 +71,7 @@ export async function GET(request: NextRequest) {
         spendingTypeStats[key].count += 1
       }
     })
+    // Calculate averages
     for (const key of Object.keys(spendingTypeStats) as (keyof typeof spendingTypeStats)[]) {
       if (spendingTypeStats[key].count > 0) {
         spendingTypeStats[key].avgPerTxn = Math.round(spendingTypeStats[key].total / spendingTypeStats[key].count)
@@ -94,25 +93,26 @@ export async function GET(request: NextRequest) {
         alerts.push(`Your savings rate is only ${savingsRate.toFixed(1)}% this month. Aim for at least 20%.`)
       }
     }
+
     if (totalExpense > 0 && egoTotal / totalExpense > 0.30) {
       alerts.push(`Your ego spending is ${((egoTotal / totalExpense) * 100).toFixed(1)}% this month — focus here to reach 30%.`)
     }
+
     if (totalExpense > 0 && wantTotal / totalExpense > 0.30) {
       alerts.push(`Your want spending is ${((wantTotal / totalExpense) * 100).toFixed(1)}% — consider cutting back to stay under 30%.`)
     }
+
     if (totalIncome > 0 && totalExpense / totalIncome > 0.9) {
       alerts.push(`You're spending ${(totalExpense / totalIncome * 100).toFixed(1)}% of your income. Danger zone!`)
     }
+
     if (debtTotal > 0 && totalIncome > 0 && debtTotal / totalIncome > 0.3) {
       alerts.push(`Debt repayment is ${((debtTotal / totalIncome) * 100).toFixed(1)}% of income. Prioritize debt reduction.`)
     }
 
     // Get ALL transactions for comprehensive analytics (filtered by user)
     const allTransactions = await db.transaction.findMany({
-      where: { 
-        userId: user.id,
-        ...(category ? { category } : {}),
-      },
+      where: { userId: user.id },
       orderBy: { date: 'asc' },
     })
 
@@ -130,12 +130,12 @@ export async function GET(request: NextRequest) {
       else monthlyTrend[monthKey].expense += t.amount
     })
 
-    // ===== AVERAGE MONTHLY EXPENSE (1Y - excluding current month) =====
-    const pastMonths1Y = Object.entries(monthlyTrend)
+    // ===== AVERAGE MONTHLY EXPENSE (excluding current month) =====
+    const pastMonths = Object.entries(monthlyTrend)
       .filter(([monthKey]) => monthKey !== currentMonth)
     
-    const averageMonthlyExpense = pastMonths1Y.length > 0
-      ? pastMonths1Y.reduce((sum, [_, v]) => sum + v.expense, 0) / pastMonths1Y.length
+    const averageMonthlyExpense = pastMonths.length > 0
+      ? pastMonths.reduce((sum, [_, v]) => sum + v.expense, 0) / pastMonths.length
       : 0
 
     // ===== PAST MONTHS CATEGORY BREAKDOWN =====
@@ -150,17 +150,17 @@ export async function GET(request: NextRequest) {
     })
 
     const avgCategoryBreakdown: Record<string, number> = {}
-    if (pastMonths1Y.length > 0) {
+    if (pastMonths.length > 0) {
       Object.entries(pastCategoryBreakdown).forEach(([cat, total]) => {
-        avgCategoryBreakdown[cat] = total / pastMonths1Y.length
+        avgCategoryBreakdown[cat] = total / pastMonths.length
       })
     }
 
-    const pastNeed = pastExpenses.filter(t => t.classification === 'need').reduce((sum, t) => sum + t.amount, 0) / Math.max(pastMonths1Y.length, 1)
-    const pastWant = pastExpenses.filter(t => t.classification === 'want').reduce((sum, t) => sum + t.amount, 0) / Math.max(pastMonths1Y.length, 1)
-    const pastEgo = pastExpenses.filter(t => t.classification === 'ego').reduce((sum, t) => sum + t.amount, 0) / Math.max(pastMonths1Y.length, 1)
-    const pastSavings = pastExpenses.filter(t => t.classification === 'savings').reduce((sum, t) => sum + t.amount, 0) / Math.max(pastMonths1Y.length, 1)
-    const pastDebt = pastExpenses.filter(t => t.classification === 'debt').reduce((sum, t) => sum + t.amount, 0) / Math.max(pastMonths1Y.length, 1)
+    const pastNeed = pastExpenses.filter(t => t.classification === 'need').reduce((sum, t) => sum + t.amount, 0) / Math.max(pastMonths.length, 1)
+    const pastWant = pastExpenses.filter(t => t.classification === 'want').reduce((sum, t) => sum + t.amount, 0) / Math.max(pastMonths.length, 1)
+    const pastEgo = pastExpenses.filter(t => t.classification === 'ego').reduce((sum, t) => sum + t.amount, 0) / Math.max(pastMonths.length, 1)
+    const pastSavings = pastExpenses.filter(t => t.classification === 'savings').reduce((sum, t) => sum + t.amount, 0) / Math.max(pastMonths.length, 1)
+    const pastDebt = pastExpenses.filter(t => t.classification === 'debt').reduce((sum, t) => sum + t.amount, 0) / Math.max(pastMonths.length, 1)
 
     // ===== CUMULATIVE DAILY EXPENSE DATA FOR LINE CHART =====
     const daysInCurrentMonth = new Date(currentYear, currentMonthNum, 0).getDate()
@@ -177,44 +177,6 @@ export async function GET(request: NextRequest) {
       currentCumulative.push({ day: d, cumulative: runningTotal })
     }
 
-    // Helper: compute cumulative average for a set of past months
-    function computeAvgCumulative(pastMonthKeys: string[], pastMonthsDailyData: Record<string, Record<number, number>>, daysInMonth: number) {
-      const result: { day: number; average: number }[] = []
-      const maxDay = Math.max(daysInMonth, 31)
-
-      if (pastMonthKeys.length === 0) return result
-
-      const avgDailyCumulative: number[] = new Array(maxDay + 1).fill(0)
-
-      for (let d = 1; d <= maxDay; d++) {
-        let totalCumulativeAtDay = 0
-        let monthsWithData = 0
-
-        for (const mKey of pastMonthKeys) {
-          const daysInThisMonth = new Date(
-            parseInt(mKey.split('-')[0]),
-            parseInt(mKey.split('-')[1]),
-            0
-          ).getDate()
-          if (d > daysInThisMonth) continue
-
-          let cumForMonth = 0
-          for (let dd = 1; dd <= d; dd++) {
-            cumForMonth += (pastMonthsDailyData[mKey]?.[dd] || 0)
-          }
-          totalCumulativeAtDay += cumForMonth
-          monthsWithData++
-        }
-        avgDailyCumulative[d] = monthsWithData > 0 ? totalCumulativeAtDay / monthsWithData : 0
-      }
-
-      for (let d = 1; d <= daysInMonth; d++) {
-        result.push({ day: d, average: Math.round(avgDailyCumulative[d]) })
-      }
-      return result
-    }
-
-    // Build past months daily data for all past months
     const pastAllExpenses = allTransactions.filter(t => {
       const tMonth = new Date(t.date).toISOString().slice(0, 7)
       return t.type === 'expense' && tMonth !== currentMonth
@@ -228,42 +190,50 @@ export async function GET(request: NextRequest) {
       pastMonthsDaily[monthKey][day] = (pastMonthsDaily[monthKey][day] || 0) + t.amount
     })
 
-    // 1Y Avg: last 12 months
-    const pastMonthKeys1Y = Object.keys(pastMonthsDaily).filter(mk => {
-      const d = new Date(mk + '-01')
-      return d >= twelveMonthsAgo && mk !== currentMonth
-    })
-    const avgCumulative1Y = computeAvgCumulative(pastMonthKeys1Y, pastMonthsDaily, daysInCurrentMonth)
+    const avgCumulative: { day: number; cumulative: number }[] = []
+    const pastMonthKeys = Object.keys(pastMonthsDaily)
+    const maxDay = Math.max(daysInCurrentMonth, 31)
 
-    // 2Y Avg: last 24 months
-    const twentyFourMonthsAgo = new Date(now)
-    twentyFourMonthsAgo.setMonth(twentyFourMonthsAgo.getMonth() - 24)
-    const pastMonthKeys2Y = Object.keys(pastMonthsDaily).filter(mk => {
-      const d = new Date(mk + '-01')
-      return d >= twentyFourMonthsAgo && mk !== currentMonth
-    })
-    const avgCumulative2Y = computeAvgCumulative(pastMonthKeys2Y, pastMonthsDaily, daysInCurrentMonth)
+    if (pastMonthKeys.length > 0) {
+      const avgDailyCumulative: number[] = new Array(maxDay + 1).fill(0)
+      
+      for (let d = 1; d <= maxDay; d++) {
+        let totalCumulativeAtDay = 0
+        let monthsWithData = 0
+        
+        for (const mKey of pastMonthKeys) {
+          const daysInThisMonth = new Date(
+            parseInt(mKey.split('-')[0]),
+            parseInt(mKey.split('-')[1]),
+            0
+          ).getDate()
+          
+          if (d > daysInThisMonth) continue
+          
+          let cumForMonth = 0
+          for (let dd = 1; dd <= d; dd++) {
+            cumForMonth += (pastMonthsDaily[mKey][dd] || 0)
+          }
+          totalCumulativeAtDay += cumForMonth
+          monthsWithData++
+        }
+        
+        avgDailyCumulative[d] = monthsWithData > 0 ? totalCumulativeAtDay / monthsWithData : 0
+      }
 
-    // All Time Avg
-    const pastMonthKeysAll = Object.keys(pastMonthsDaily).filter(mk => mk !== currentMonth)
-    const avgCumulativeAll = computeAvgCumulative(pastMonthKeysAll, pastMonthsDaily, daysInCurrentMonth)
+      for (let d = 1; d <= daysInCurrentMonth; d++) {
+        avgCumulative.push({ day: d, cumulative: Math.round(avgDailyCumulative[d]) })
+      }
+    }
 
     const avgVsCurrentLineData = currentCumulative.map((item) => {
-      const avgItem = avgCumulative1Y.find(a => a.day === item.day)
+      const avgItem = avgCumulative.find(a => a.day === item.day)
       return {
         day: item.day,
         current: item.cumulative,
-        average: avgItem ? avgItem.average : 0,
+        average: avgItem ? avgItem.cumulative : 0,
       }
     })
-
-    const avgVsCurrentLineData2Y = avgCumulative2Y.length > 0 ? avgCumulative2Y : undefined
-    const avgVsCurrentLineDataAll = avgCumulativeAll.length > 0 ? avgCumulativeAll : undefined
-
-    // Available categories for the chart filter
-    const allCategoriesSet = new Set<string>()
-    allTransactions.filter(t => t.type === 'expense').forEach(t => allCategoriesSet.add(t.category))
-    const availableCategories = Array.from(allCategoriesSet).sort()
 
     // ===== YEARLY AVERAGES =====
     const yearlyData: Record<number, { expense: number; income: number; months: Set<string> }> = {}
@@ -285,14 +255,14 @@ export async function GET(request: NextRequest) {
       months: number
     }[] = []
 
-    for (const [year, yData] of Object.entries(yearlyData)) {
-      const numMonths = yData.months.size
+    for (const [year, data] of Object.entries(yearlyData)) {
+      const numMonths = data.months.size
       yearlyComparison.push({
         year: parseInt(year),
         label: parseInt(year) === currentYear ? `${year} (Current)` : year.toString(),
-        totalExpense: Math.round(yData.expense),
-        totalIncome: Math.round(yData.income),
-        avgMonthlyExpense: numMonths > 0 ? Math.round(yData.expense / numMonths) : 0,
+        totalExpense: Math.round(data.expense),
+        totalIncome: Math.round(data.income),
+        avgMonthlyExpense: numMonths > 0 ? Math.round(data.expense / numMonths) : 0,
         months: numMonths,
       })
     }
@@ -341,9 +311,6 @@ export async function GET(request: NextRequest) {
         debt: pastDebt,
       },
       avgVsCurrentLineData,
-      avgVsCurrentLineData2Y,
-      avgVsCurrentLineDataAll,
-      availableCategories,
       yearlyComparison,
       allTimeAvgMonthlyExpense,
       allTimeTotalExpense: Math.round(allTimeExpense),

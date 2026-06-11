@@ -156,7 +156,7 @@ export default function TransactionConfirm({ data, onConfirm, onReject, isSaving
           <CardTitle className="text-lg flex items-center gap-2">
             {editData.type === 'income' ? '💰 Income' : '💸 Expense'} Detected
           </CardTitle>
-          <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+          <span className="text-xs text-muted-foreground flex items-center gap-1">
             Tap any field to edit
           </span>
         </div>
@@ -183,7 +183,7 @@ export default function TransactionConfirm({ data, onConfirm, onReject, isSaving
             <Calendar className="w-3 h-3" />
             Date
             {isDateCustom && (
-              <Badge className="bg-blue-100 text-blue-800 border-blue-300 text-[9px] px-1 py-0 ml-1">
+              <Badge className="bg-blue-100 text-blue-800 border-blue-300 text-xs px-1 py-0 ml-1">
                 Past Date
               </Badge>
             )}
@@ -195,7 +195,7 @@ export default function TransactionConfirm({ data, onConfirm, onReject, isSaving
             className="mt-1 border-2 border-blue-200 focus:border-blue-500 bg-blue-50/50"
             max={new Date().toISOString().split('T')[0]}
           />
-          <p className="text-[10px] text-muted-foreground mt-0.5">
+          <p className="text-xs text-muted-foreground mt-0.5">
             {formatDate(editData.date)}
             {isDateCustom && ' — Previous expenditure'}
           </p>
@@ -315,7 +315,7 @@ export default function TransactionConfirm({ data, onConfirm, onReject, isSaving
           <Label className="text-xs text-muted-foreground flex items-center gap-1">
             <Paperclip className="w-3 h-3" />
             Receipt Photo
-            <span className="text-[10px] text-muted-foreground/60 ml-1">(max 5MB)</span>
+            <span className="text-xs text-muted-foreground/60 ml-1">(max 5MB)</span>
           </Label>
           <div className="mt-1.5">
             {receiptPreview ? (

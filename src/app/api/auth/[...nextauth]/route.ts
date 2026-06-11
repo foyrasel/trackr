@@ -50,34 +50,61 @@ if (process.env.APPLE_ID && process.env.APPLE_SECRET &&
   )
 }
 
-// Email + Password credentials provider
+// Demo/Name-based credentials provider (Quick Start)
 providers.push(
   CredentialsProvider({
     id: 'credentials',
-    name: 'Email & Password',
+    name: 'Demo Login',
     credentials: {
-      email: { label: 'Email', type: 'email', placeholder: 'Email address' },
-      password: { label: 'Password', type: 'password', placeholder: 'Password' },
+      name: { label: 'Name', type: 'text', placeholder: 'Your name' },
+      email: { label: 'Email', type: 'email', placeholder: 'Email (optional)' },
+      password: { label: 'Password', type: 'password', placeholder: 'Password (optional)' },
     },
     async authorize(credentials) {
       if (!credentials) return null
 
-      // Email + Password login (required)
-      if (!credentials.email || !credentials.password) return null
+      // Email + Password login
+      if (credentials.email && credentials.password) {
+        const user = await db.user.findUnique({
+          where: { email: credentials.email },
+        })
 
-      const user = await db.user.findUnique({
-        where: { email: credentials.email },
-      })
+        if (!user || !user.password) return null
 
-      if (!user || !user.password) return null
+        const hashedInput = await hashPassword(credentials.password)
+        if (user.password !== hashedInput) return null
 
-      const hashedInput = await hashPassword(credentials.password)
-      if (user.password !== hashedInput) return null
+        // Check if email is verified - allow login even if not verified (verification is a separate step)
+        // Removing the hard block so seed users and newly registered users can log in
+        // if (!user.emailVerified) return null
 
-      // Check if email is verified
-      if (!user.emailVerified) return null
+        return { id: user.id, name: user.name, email: user.email, image: user.image }
+      }
 
-      return { id: user.id, name: user.name, email: user.email, image: user.image }
+      // Name-based demo login
+      if (credentials.name) {
+        let user = await db.user.findFirst({ where: { name: credentials.name } })
+        if (!user) {
+          user = await db.user.create({
+            data: {
+              name: credentials.name,
+              provider: 'demo',
+            },
+          })
+          // Create default accounts for new user
+          await db.account.createMany({
+            data: [
+              { userId: user.id, name: 'Cash', type: 'cash', balance: 0, color: '#10b981', icon: '💵', isDefault: true },
+              { userId: user.id, name: 'Debit Card', type: 'debit', balance: 0, color: '#3b82f6', icon: '💳', isDefault: false },
+              { userId: user.id, name: 'Credit Card', type: 'credit', balance: 0, color: '#8b5cf6', icon: '💳', isDefault: false },
+              { userId: user.id, name: 'Mobile Wallet', type: 'mobile', balance: 0, color: '#a855f7', icon: '📱', isDefault: false },
+            ],
+          })
+        }
+        return { id: user.id, name: user.name, email: user.email, image: user.image }
+      }
+
+      return null
     },
   })
 )
@@ -99,6 +126,7 @@ export const authOptions: NextAuthOptions = {
               image: user.image,
               provider: account.provider,
               emailVerified: new Date(), // OAuth emails are considered verified
+              onboardingDone: false, // New OAuth user still needs to go through onboarding
             },
           })
           // Create default accounts
@@ -113,6 +141,16 @@ export const authOptions: NextAuthOptions = {
           user.id = newUser.id
         } else {
           user.id = existingUser.id
+          // Ensure onboardingDone is set for existing users who have accounts
+          if (!existingUser.onboardingDone) {
+            const accountCount = await db.account.count({ where: { userId: existingUser.id } })
+            if (accountCount > 0) {
+              await db.user.update({
+                where: { id: existingUser.id },
+                data: { onboardingDone: true },
+              })
+            }
+          }
         }
       }
       return true

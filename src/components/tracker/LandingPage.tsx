@@ -14,14 +14,14 @@ import {
 } from 'lucide-react'
 
 interface LandingPageProps {
-  onLogin: (name: string) => void
+  onLogin: (name: string, email?: string | null, userId?: string | null) => void
 }
 
 const features = [
   {
     icon: Mic,
     title: 'Voice-First Input',
-    description: 'Just speak naturally — "Spent 500 taka on groceries" or "আয় ১০০০০ টাকা স্যালারি". Trackr understands English and Bangla, powered by AI.',
+    description: 'Just speak naturally — "Spent 500 taka on groceries" or "আয় ১০০০০ টাকা স্যালারি" or "खर्च ५०० रुपये बाजार". Trackr understands English, Bangla, and Hindi, powered by AI.',
     gradient: 'from-emerald-500 to-teal-500',
     glow: 'shadow-emerald-500/20',
     iconColor: '#10b981'
@@ -36,8 +36,8 @@ const features = [
   },
   {
     icon: Globe,
-    title: 'Auto-Detect Currency & Language',
-    description: 'Trackr automatically detects your location and sets the right currency and language. Supports BDT, INR, USD, EUR, and more — switch anytime.',
+    title: '22 Currencies Supported',
+    description: 'USD, BDT, INR, EUR, GBP, AED, SGD, and 15 more. Designed for international users — switch currency anytime, everything updates automatically.',
     gradient: 'from-cyan-500 to-blue-500',
     glow: 'shadow-cyan-500/20',
     iconColor: '#06b6d4'
@@ -93,8 +93,8 @@ const features = [
 ]
 
 const stats = [
-  { value: 'Auto', label: 'Currency', icon: Globe },
-  { value: '2', label: 'Languages', icon: Mic },
+  { value: '22', label: 'Currencies', icon: Globe },
+  { value: '3', label: 'Languages', icon: Mic },
   { value: '16+', label: 'Categories', icon: Brain },
   { value: '5', label: 'Classifications', icon: BarChart3 },
 ]
@@ -117,7 +117,7 @@ const testimonials = [
   {
     name: 'Ahmed Hassan',
     location: 'Dubai, UAE',
-    text: 'The auto-detect currency feature is brilliant. It switched to AED automatically when I landed, and back to BDT when I returned home. Seamless!',
+    text: 'Multi-currency support is exactly what I needed. I track expenses in AED at home and INR when visiting India.',
     rating: 5,
     emoji: '🇦🇪'
   }
@@ -267,6 +267,7 @@ function PhoneMockup() {
 }
 
 export default function LandingPage({ onLogin }: LandingPageProps) {
+  const [name, setName] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [googleConfigured, setGoogleConfigured] = useState(false)
   const [facebookConfigured, setFacebookConfigured] = useState(false)
@@ -284,25 +285,60 @@ export default function LandingPage({ onLogin }: LandingPageProps) {
   const heroOpacity = useTransform(scrollYProgress, [0, 0.8], [1, 0])
 
   // Email signup state
-  const [authMode, setAuthMode] = useState<'signin' | 'signup' | 'verify'>('signin')
+  const [authMode, setAuthMode] = useState<'quick' | 'signup' | 'login' | 'verify' | 'forgot'>('quick')
   const [signupName, setSignupName] = useState('')
   const [signupEmail, setSignupEmail] = useState('')
   const [signupPassword, setSignupPassword] = useState('')
-  const [signinEmail, setSigninEmail] = useState('')
-  const [signinPassword, setSigninPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [verifyCode, setVerifyCode] = useState('')
   const [verificationCode, setVerificationCode] = useState('')
   const [signupError, setSignupError] = useState('')
 
+  // Login state
+  const [loginEmail, setLoginEmail] = useState('')
+  const [loginPassword, setLoginPassword] = useState('')
+
+  // Forgot password state
+  const [forgotEmail, setForgotEmail] = useState('')
+  const [forgotCode, setForgotCode] = useState('')
+  const [forgotNewPassword, setForgotNewPassword] = useState('')
+  const [forgotStep, setForgotStep] = useState<'email' | 'reset'>('email')
+  const [forgotResetCode, setForgotResetCode] = useState('')
+
   useEffect(() => {
-    // Always show Google login as primary social option
-    setGoogleConfigured(true)
+    setGoogleConfigured(process.env.NEXT_PUBLIC_GOOGLE_CONFIGURED === 'true')
     setFacebookConfigured(process.env.NEXT_PUBLIC_FACEBOOK_CONFIGURED === 'true')
     setAppleConfigured(process.env.NEXT_PUBLIC_APPLE_CONFIGURED === 'true')
   }, [])
 
+  // Auto-seed test users on every app start (idempotent — safe to call repeatedly)
+  useEffect(() => {
+    fetch('/api/seed', { method: 'POST' })
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (data?.success) {
+          localStorage.setItem('trackr_seeded', 'true')
+        }
+      })
+      .catch(() => {
+        // Silently ignore seed errors
+      })
+  }, [])
 
+  const handleDemoLogin = async () => {
+    const userName = name.trim() || 'User'
+    setIsLoading(true)
+    try {
+      const result = await signIn('credentials', { name: userName, redirect: false })
+      if (result?.ok) {
+        onLogin(userName)
+      } else {
+        onLogin(userName)
+      }
+    } catch {
+      onLogin(userName)
+    }
+  }
 
   const handleGoogleLogin = async () => {
     setIsLoading(true)
@@ -327,32 +363,6 @@ export default function LandingPage({ onLogin }: LandingPageProps) {
     try {
       await signIn('apple', { callbackUrl: '/' })
     } catch {
-      setIsLoading(false)
-    }
-  }
-
-  const handleEmailSignin = async () => {
-    setSignupError('')
-    if (!signinEmail.trim() || !signinPassword.trim()) {
-      setSignupError('Email and password are required')
-      return
-    }
-    setIsLoading(true)
-    try {
-      const result = await signIn('credentials', {
-        email: signinEmail.trim(),
-        password: signinPassword,
-        redirect: false,
-      })
-      if (result?.ok) {
-        onLogin(signinEmail.trim())
-      } else {
-        setSignupError('Invalid email or password')
-      }
-    } catch (error) {
-      console.error('Sign in error:', error)
-      setSignupError('Something went wrong. Please try again.')
-    } finally {
       setIsLoading(false)
     }
   }
@@ -422,12 +432,153 @@ export default function LandingPage({ onLogin }: LandingPageProps) {
           password: signupPassword,
           redirect: false,
         })
-        onLogin(signupName.trim())
+        // Store email for reliable API auth
+        localStorage.setItem('trackr_user_email', signupEmail.trim())
+        if (result?.ok) {
+          try {
+            const sessionRes = await fetch('/api/auth/session')
+            const sessionData = await sessionRes.json()
+            const sessionId = sessionData?.user?.id || null
+            if (sessionId) localStorage.setItem('trackr_user_id', sessionId)
+            onLogin(signupName.trim(), signupEmail.trim(), sessionId)
+          } catch {
+            onLogin(signupName.trim(), signupEmail.trim())
+          }
+        } else {
+          onLogin(signupName.trim(), signupEmail.trim())
+        }
       } else {
         setSignupError(data.error || 'Verification failed')
       }
     } catch (error) {
       console.error('Verification error:', error)
+      setSignupError('Something went wrong. Please try again.')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleEmailLogin = async () => {
+    setSignupError('')
+    if (!loginEmail.trim() || !loginPassword.trim()) {
+      setSignupError('Email and password are required')
+      return
+    }
+
+    setIsLoading(true)
+    try {
+      const result = await signIn('credentials', {
+        email: loginEmail.trim(),
+        password: loginPassword,
+        redirect: false,
+      })
+
+      if (result?.ok) {
+        // Fetch the session to get the user's actual name and id
+        try {
+          const sessionRes = await fetch('/api/auth/session')
+          const sessionData = await sessionRes.json()
+          const displayName = sessionData?.user?.name || loginEmail.trim()
+          const sessionId = sessionData?.user?.id || null
+          // Store email and id for reliable API auth
+          localStorage.setItem('trackr_user_email', loginEmail.trim())
+          if (sessionId) localStorage.setItem('trackr_user_id', sessionId)
+          onLogin(displayName, loginEmail.trim(), sessionId)
+        } catch {
+          localStorage.setItem('trackr_user_email', loginEmail.trim())
+          onLogin(loginEmail.trim(), loginEmail.trim())
+        }
+      } else {
+        setSignupError('Invalid email or password. Please try again.')
+      }
+    } catch (error) {
+      console.error('Login error:', error)
+      setSignupError('Something went wrong. Please try again.')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleForgotPassword = async () => {
+    setSignupError('')
+    if (!forgotEmail.trim()) {
+      setSignupError('Email is required')
+      return
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(forgotEmail.trim())) {
+      setSignupError('Invalid email format')
+      return
+    }
+
+    setIsLoading(true)
+    try {
+      const response = await fetch('/api/auth/forgot-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: forgotEmail.trim() }),
+      })
+
+      const data = await response.json()
+
+      if (response.ok) {
+        if (data.resetCode) {
+          setForgotResetCode(data.resetCode)
+        }
+        setForgotStep('reset')
+      } else {
+        setSignupError(data.error || 'Failed to send reset code')
+      }
+    } catch (error) {
+      console.error('Forgot password error:', error)
+      setSignupError('Something went wrong. Please try again.')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleResetPassword = async () => {
+    setSignupError('')
+    if (!forgotCode || forgotCode.length !== 6) {
+      setSignupError('Please enter the 6-digit reset code')
+      return
+    }
+    if (!forgotNewPassword || forgotNewPassword.length < 6) {
+      setSignupError('New password must be at least 6 characters')
+      return
+    }
+
+    setIsLoading(true)
+    try {
+      const response = await fetch('/api/auth/reset-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: forgotEmail.trim(),
+          code: forgotCode,
+          newPassword: forgotNewPassword,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (response.ok) {
+        setSignupError('')
+        // Switch to login mode with the email pre-filled
+        setLoginEmail(forgotEmail.trim())
+        setLoginPassword('')
+        setForgotStep('email')
+        setForgotEmail('')
+        setForgotCode('')
+        setForgotNewPassword('')
+        setForgotResetCode('')
+        setAuthMode('login')
+      } else {
+        setSignupError(data.error || 'Failed to reset password')
+      }
+    } catch (error) {
+      console.error('Reset password error:', error)
       setSignupError('Something went wrong. Please try again.')
     } finally {
       setIsLoading(false)
@@ -454,13 +605,8 @@ export default function LandingPage({ onLogin }: LandingPageProps) {
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
           <a href="/" className="flex items-center gap-2.5 group">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg shadow-emerald-500/25 group-hover:shadow-emerald-500/40 transition-shadow relative overflow-hidden">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="text-white">
-                <path d="M3 20L8 13L13 16L21 6" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
-                <path d="M17 6H21V10" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
-                <circle cx="8" cy="13" r="1.5" fill="currentColor"/>
-                <circle cx="13" cy="16" r="1.5" fill="currentColor"/>
-              </svg>
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg shadow-emerald-500/25 group-hover:shadow-emerald-500/40 transition-shadow">
+              <span className="text-white text-lg font-bold">T</span>
             </div>
             <span className="text-xl font-bold text-gray-900 dark:text-white tracking-tight">Trackr</span>
           </a>
@@ -528,7 +674,7 @@ export default function LandingPage({ onLogin }: LandingPageProps) {
                 className="inline-flex items-center gap-2 bg-emerald-100/80 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 text-sm font-medium px-4 py-1.5 rounded-full mb-6 backdrop-blur-sm border border-emerald-200/50 dark:border-emerald-800/50"
               >
                 <Sparkles className="w-4 h-4" />
-                AI-Powered &bull; Voice-First &bull; Multi-Language
+                AI-Powered &bull; Voice-First &bull; International
               </motion.div>
 
               <motion.h1
@@ -551,7 +697,7 @@ export default function LandingPage({ onLogin }: LandingPageProps) {
                 transition={{ duration: 0.6, delay: 0.4 }}
                 className="text-lg sm:text-xl text-gray-600 dark:text-gray-300 mb-8 max-w-xl mx-auto lg:mx-0 leading-relaxed"
               >
-                Just say <em className="not-italic text-emerald-700 dark:text-emerald-400 font-medium">&ldquo;Spent 500 on groceries&rdquo;</em> or <em className="not-italic text-emerald-700 dark:text-emerald-400 font-medium">&ldquo;খরচ ৫০০ টাকা বাজার&rdquo;</em> — Trackr&apos;s AI understands, categorizes, and logs it instantly. Currency and language adapt to your location automatically.
+                Just say <em className="not-italic text-emerald-700 dark:text-emerald-400 font-medium">&ldquo;Spent 500 on groceries&rdquo;</em> or <em className="not-italic text-emerald-700 dark:text-emerald-400 font-medium">&ldquo;আয় ১০০০০ টাকা স্যালারি&rdquo;</em> — Trackr&apos;s AI understands, categorizes, and logs it instantly.
               </motion.p>
 
               <motion.div
@@ -565,7 +711,7 @@ export default function LandingPage({ onLogin }: LandingPageProps) {
                   size="lg"
                   className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white text-lg px-8 py-7 shadow-xl shadow-emerald-500/25 hover:shadow-emerald-500/40 transition-all group"
                 >
-                  Get Started Free
+                  Start Free — No Password Needed
                   <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
                 </Button>
                 <Button
@@ -634,12 +780,13 @@ export default function LandingPage({ onLogin }: LandingPageProps) {
                 </span>
               </h2>
               <p className="text-gray-600 dark:text-gray-300 mb-8 leading-relaxed text-lg">
-                No more typing amounts, selecting categories, and picking dates. Just say what you spent and Trackr handles everything. Our AI understands natural language in English and Bangla.
+                No more typing amounts, selecting categories, and picking dates. Just say what you spent and Trackr handles everything. Our AI understands natural language in English, Bangla, and Hindi.
               </p>
               <div className="space-y-4">
                 {[
                   { text: '"Spent 250 on uber"', result: 'Transport \u2022 Cash \u2022 Want', color: 'border-l-4 border-l-emerald-500' },
                   { text: '"খরচ ৫০০ টাকা বাজার"', result: 'Groceries \u2022 Cash \u2022 Need', color: 'border-l-4 border-l-teal-500' },
+                  { text: '"खर्च ५०० रुपये बाजार"', result: 'Groceries \u2022 Cash \u2022 Need', color: 'border-l-4 border-l-violet-500' },
                   { text: '"Income 50000 salary"', result: 'Salary \u2022 Bank \u2022 Income', color: 'border-l-4 border-l-cyan-500' },
                 ].map((example, i) => (
                   <motion.div
@@ -939,9 +1086,9 @@ export default function LandingPage({ onLogin }: LandingPageProps) {
                   <p className="text-sm text-gray-500 dark:text-gray-400 mb-8">No credit card required</p>
                   <ul className="space-y-3 text-left mb-8">
                     {[
-                      'Voice input in English & Bangla',
+                      'Voice input in English, Bangla & Hindi',
                       'AI categorization & classification',
-                      'Auto-detect currency from your location',
+                      '22 currencies with auto-conversion',
                       'Unlimited transactions & goals',
                       'Budget tracking & AI suggestions',
                       'Lend/Borrow & Bill Reminders',
@@ -985,8 +1132,8 @@ export default function LandingPage({ onLogin }: LandingPageProps) {
 
         <div className="relative max-w-sm mx-auto px-4">
           <AnimatedSection className="text-center mb-8">
-            <h2 className="text-3xl font-extrabold text-gray-900 dark:text-white mb-2 tracking-tight">Create Your Account</h2>
-            <p className="text-sm text-gray-500 dark:text-gray-400">Sign up with social login or email to get started</p>
+            <h2 className="text-3xl font-extrabold text-gray-900 dark:text-white mb-2 tracking-tight">Get Started in Seconds</h2>
+            <p className="text-sm text-gray-500 dark:text-gray-400">Create an account or use Quick Start</p>
           </AnimatedSection>
 
           <motion.div
@@ -1000,24 +1147,34 @@ export default function LandingPage({ onLogin }: LandingPageProps) {
                 {/* Auth Mode Tabs */}
                 <div className="flex gap-1 bg-gray-100 dark:bg-gray-800 rounded-xl p-1">
                   <button
-                    onClick={() => { setAuthMode('signin'); setSignupError('') }}
-                    className={`flex-1 py-2.5 px-3 rounded-lg text-sm font-semibold transition-all ${
-                      authMode === 'signin'
+                    onClick={() => { setAuthMode('quick'); setSignupError('') }}
+                    className={`flex-1 py-2 px-2 rounded-lg text-xs font-semibold transition-all ${
+                      authMode === 'quick'
                         ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
                         : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
                     }`}
                   >
-                    Sign In
+                    Quick
                   </button>
                   <button
                     onClick={() => { setAuthMode('signup'); setSignupError('') }}
-                    className={`flex-1 py-2.5 px-3 rounded-lg text-sm font-semibold transition-all ${
+                    className={`flex-1 py-2 px-2 rounded-lg text-xs font-semibold transition-all ${
                       authMode === 'signup'
                         ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
                         : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
                     }`}
                   >
                     Sign Up
+                  </button>
+                  <button
+                    onClick={() => { setAuthMode('login'); setSignupError('') }}
+                    className={`flex-1 py-2 px-2 rounded-lg text-xs font-semibold transition-all ${
+                      authMode === 'login'
+                        ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+                        : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+                    }`}
+                  >
+                    Log In
                   </button>
                 </div>
 
@@ -1035,8 +1192,8 @@ export default function LandingPage({ onLogin }: LandingPageProps) {
                   )}
                 </AnimatePresence>
 
-                {/* Sign In Mode */}
-                {authMode === 'signin' && (
+                {/* Quick Start Mode */}
+                {authMode === 'quick' && (
                   <motion.div
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
@@ -1105,60 +1262,29 @@ export default function LandingPage({ onLogin }: LandingPageProps) {
                           <span className="w-full border-t dark:border-gray-700" />
                         </div>
                         <div className="relative flex justify-center text-xs uppercase">
-                          <span className="bg-white dark:bg-gray-950 px-2 text-muted-foreground">or sign in with email</span>
+                          <span className="bg-white dark:bg-gray-950 px-2 text-muted-foreground">or continue with name</span>
                         </div>
                       </div>
                     )}
 
-                    <div className="relative">
-                      <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                      <Input
-                        type="email"
-                        placeholder="Email address"
-                        value={signinEmail}
-                        onChange={(e) => setSigninEmail(e.target.value)}
-                        className="h-11 pl-10 border-gray-200 dark:border-gray-700 focus:border-emerald-500 dark:focus:border-emerald-500"
-                        disabled={isLoading}
-                      />
-                    </div>
-                    <div className="relative">
-                      <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                      <Input
-                        type={showPassword ? 'text' : 'password'}
-                        placeholder="Password"
-                        value={signinPassword}
-                        onChange={(e) => setSigninPassword(e.target.value)}
-                        className="h-11 pl-10 pr-10 border-gray-200 dark:border-gray-700 focus:border-emerald-500 dark:focus:border-emerald-500"
-                        onKeyDown={(e) => e.key === 'Enter' && handleEmailSignin()}
-                        disabled={isLoading}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-gray-700"
-                      >
-                        {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                      </button>
-                    </div>
+                    <Input
+                      placeholder="Enter your name..."
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && handleDemoLogin()}
+                      className="h-12 text-center text-lg border-gray-200 dark:border-gray-700 focus:border-emerald-500 dark:focus:border-emerald-500"
+                      disabled={isLoading}
+                    />
                     <Button
-                      onClick={handleEmailSignin}
+                      onClick={handleDemoLogin}
                       disabled={isLoading}
                       className="w-full h-12 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-semibold text-lg shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/40 transition-all"
                     >
                       {isLoading ? (
                         <Loader2 className="w-5 h-5 animate-spin mr-2" />
                       ) : null}
-                      Sign In
+                      Start Tracking Now
                     </Button>
-                    <p className="text-xs text-center text-muted-foreground">
-                      Don&apos;t have an account?{' '}
-                      <button
-                        onClick={() => { setAuthMode('signup'); setSignupError('') }}
-                        className="text-emerald-600 dark:text-emerald-400 font-medium hover:underline"
-                      >
-                        Sign Up
-                      </button>
-                    </p>
                   </motion.div>
                 )}
 
@@ -1224,15 +1350,214 @@ export default function LandingPage({ onLogin }: LandingPageProps) {
                       )}
                       Create Account
                     </Button>
-                    <p className="text-xs text-center text-muted-foreground">
-                      Already have an account?{' '}
+
+                    <div className="flex items-center justify-between">
                       <button
-                        onClick={() => { setAuthMode('signin'); setSignupError('') }}
-                        className="text-emerald-600 dark:text-emerald-400 font-medium hover:underline"
+                        onClick={() => { setForgotStep('email'); setForgotEmail(signupEmail || ''); setSignupError(''); setAuthMode('forgot') }}
+                        className="text-xs text-gray-500 dark:text-gray-400 hover:text-emerald-600 dark:hover:text-emerald-400 font-medium transition-colors"
                       >
-                        Sign In
+                        Forgot Password?
                       </button>
-                    </p>
+                      <button
+                        onClick={() => { setAuthMode('login'); setSignupError('') }}
+                        className="text-xs text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 font-medium transition-colors"
+                      >
+                        Already have an account? Log In
+                      </button>
+                    </div>
+                  </motion.div>
+                )}
+
+                {/* Login Mode */}
+                {authMode === 'login' && (
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ duration: 0.3 }}
+                    className="space-y-3"
+                  >
+                    <div className="space-y-3">
+                      <div className="relative">
+                        <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                        <Input
+                          type="email"
+                          placeholder="Email address"
+                          value={loginEmail}
+                          onChange={(e) => setLoginEmail(e.target.value)}
+                          className="h-11 pl-10 border-gray-200 dark:border-gray-700 focus:border-emerald-500 dark:focus:border-emerald-500"
+                          disabled={isLoading}
+                        />
+                      </div>
+                      <div className="relative">
+                        <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                        <Input
+                          type={showPassword ? 'text' : 'password'}
+                          placeholder="Password"
+                          value={loginPassword}
+                          onChange={(e) => setLoginPassword(e.target.value)}
+                          className="h-11 pl-10 pr-10 border-gray-200 dark:border-gray-700 focus:border-emerald-500 dark:focus:border-emerald-500"
+                          onKeyDown={(e) => e.key === 'Enter' && handleEmailLogin()}
+                          disabled={isLoading}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-gray-700"
+                        >
+                          {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </button>
+                      </div>
+                    </div>
+
+                    <Button
+                      onClick={handleEmailLogin}
+                      disabled={isLoading}
+                      className="w-full h-12 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-semibold text-base shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/40 transition-all"
+                    >
+                      {isLoading ? (
+                        <Loader2 className="w-5 h-5 animate-spin mr-2" />
+                      ) : (
+                        <Lock className="w-4 h-4 mr-2" />
+                      )}
+                      Log In
+                    </Button>
+
+                    <div className="flex items-center justify-between">
+                      <button
+                        onClick={() => { setForgotStep('email'); setForgotEmail(loginEmail || ''); setSignupError(''); setAuthMode('forgot') }}
+                        className="text-xs text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 font-medium transition-colors"
+                      >
+                        Forgot Password?
+                      </button>
+                      <button
+                        onClick={() => { setAuthMode('signup'); setSignupError('') }}
+                        className="text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 font-medium transition-colors"
+                      >
+                        Create Account
+                      </button>
+                    </div>
+                  </motion.div>
+                )}
+
+                {/* Forgot Password Mode */}
+                {authMode === 'forgot' && (
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ duration: 0.3 }}
+                    className="space-y-3"
+                  >
+                    {forgotStep === 'email' ? (
+                      <>
+                        <div className="bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 rounded-xl p-4 text-center">
+                          <Lock className="w-8 h-8 mx-auto text-emerald-600 mb-2" />
+                          <p className="text-sm font-semibold text-gray-900 dark:text-white">Reset Your Password</p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Enter your email and we&apos;ll send you a reset code
+                          </p>
+                        </div>
+
+                        <div className="relative">
+                          <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                          <Input
+                            type="email"
+                            placeholder="Email address"
+                            value={forgotEmail}
+                            onChange={(e) => setForgotEmail(e.target.value)}
+                            className="h-11 pl-10 border-gray-200 dark:border-gray-700 focus:border-emerald-500 dark:focus:border-emerald-500"
+                            onKeyDown={(e) => e.key === 'Enter' && handleForgotPassword()}
+                            disabled={isLoading}
+                          />
+                        </div>
+
+                        <Button
+                          onClick={handleForgotPassword}
+                          disabled={isLoading}
+                          className="w-full h-12 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-semibold text-base shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/40 transition-all"
+                        >
+                          {isLoading ? (
+                            <Loader2 className="w-5 h-5 animate-spin mr-2" />
+                          ) : (
+                            <Mail className="w-4 h-4 mr-2" />
+                          )}
+                          Send Reset Code
+                        </Button>
+                      </>
+                    ) : (
+                      <>
+                        <div className="bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 rounded-xl p-4 text-center">
+                          <Mail className="w-8 h-8 mx-auto text-emerald-600 mb-2" />
+                          <p className="text-sm font-semibold text-gray-900 dark:text-white">Enter Reset Code</p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            We sent a code to <strong>{forgotEmail}</strong>
+                          </p>
+                        </div>
+
+                        {/* Show code on screen for demo */}
+                        {forgotResetCode && (
+                          <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-xl p-3 text-center">
+                            <p className="text-xs text-amber-600 dark:text-amber-400 font-medium mb-1">DEMO MODE — Reset Code</p>
+                            <p className="text-2xl font-bold text-amber-700 dark:text-amber-300 tracking-[0.3em]">{forgotResetCode}</p>
+                          </div>
+                        )}
+
+                        <Input
+                          placeholder="Enter 6-digit code"
+                          value={forgotCode}
+                          onChange={(e) => setForgotCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                          className="h-12 text-center text-lg tracking-[0.5em] font-bold border-gray-200 dark:border-gray-700 focus:border-emerald-500 dark:focus:border-emerald-500"
+                          maxLength={6}
+                          disabled={isLoading}
+                        />
+
+                        <div className="relative">
+                          <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                          <Input
+                            type={showPassword ? 'text' : 'password'}
+                            placeholder="New password (6+ characters)"
+                            value={forgotNewPassword}
+                            onChange={(e) => setForgotNewPassword(e.target.value)}
+                            className="h-11 pl-10 pr-10 border-gray-200 dark:border-gray-700 focus:border-emerald-500 dark:focus:border-emerald-500"
+                            onKeyDown={(e) => e.key === 'Enter' && handleResetPassword()}
+                            disabled={isLoading}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowPassword(!showPassword)}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-gray-700"
+                          >
+                            {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                          </button>
+                        </div>
+
+                        <Button
+                          onClick={handleResetPassword}
+                          disabled={isLoading || forgotCode.length !== 6 || forgotNewPassword.length < 6}
+                          className="w-full h-12 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-semibold text-base shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/40 transition-all"
+                        >
+                          {isLoading ? (
+                            <Loader2 className="w-5 h-5 animate-spin mr-2" />
+                          ) : (
+                            <Check className="w-4 h-4 mr-2" />
+                          )}
+                          Reset Password
+                        </Button>
+
+                        <button
+                          onClick={() => { setForgotStep('email'); setSignupError('') }}
+                          className="w-full text-xs text-muted-foreground hover:text-gray-600 transition-colors"
+                        >
+                          &larr; Back to enter email
+                        </button>
+                      </>
+                    )}
+
+                    <button
+                      onClick={() => { setAuthMode('login'); setSignupError(''); setForgotStep('email') }}
+                      className="w-full text-xs text-muted-foreground hover:text-gray-600 transition-colors"
+                    >
+                      &larr; Back to Log In
+                    </button>
                   </motion.div>
                 )}
 
@@ -1254,7 +1579,7 @@ export default function LandingPage({ onLogin }: LandingPageProps) {
 
                     {/* Show code on screen for demo */}
                     <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-xl p-3 text-center">
-                      <p className="text-[10px] text-amber-600 dark:text-amber-400 font-medium mb-1">DEMO MODE — Verification Code</p>
+                      <p className="text-xs text-amber-600 dark:text-amber-400 font-medium mb-1">DEMO MODE — Verification Code</p>
                       <p className="text-2xl font-bold text-amber-700 dark:text-amber-300 tracking-[0.3em]">{verificationCode}</p>
                     </div>
 
@@ -1300,7 +1625,7 @@ export default function LandingPage({ onLogin }: LandingPageProps) {
                   </div>
                   <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
                     <Globe className="w-3.5 h-3.5" />
-                    Auto Currency
+                    22 Currencies
                   </div>
                 </div>
               </CardContent>
@@ -1317,15 +1642,12 @@ export default function LandingPage({ onLogin }: LandingPageProps) {
             <div className="col-span-2 md:col-span-1">
               <div className="flex items-center gap-2.5 mb-4">
                 <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg shadow-emerald-500/25">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="text-white">
-                    <path d="M3 20L8 13L13 16L21 6" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
-                    <path d="M17 6H21V10" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
+                  <span className="text-white text-sm font-bold">T</span>
                 </div>
                 <span className="text-lg font-bold text-gray-900 dark:text-white tracking-tight">Trackr</span>
               </div>
               <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed">
-                AI-powered voice-first expense tracker. Free, private, and auto-detects your currency and language.
+                AI-powered voice-first expense tracker. Free, private, and works in 22 currencies.
               </p>
             </div>
 

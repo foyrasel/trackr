@@ -34,7 +34,7 @@ const ENGLISH_EXAMPLES = [
 export default function AddTransaction({ onTransactionAdded, userName }: AddTransactionProps) {
   const { currencySymbol } = useCurrency()
   const [inputMode, setInputMode] = useState<'voice' | 'text'>('voice')
-  const [language, setLanguage] = useState<'en' | 'bn'>('en') // Default to English for international app
+  const [language, setLanguage] = useState<'en' | 'bn' | 'hi'>('en') // Default to English for international app
   const [textInput, setTextInput] = useState('')
   const [isProcessing, setIsProcessing] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
@@ -54,6 +54,12 @@ export default function AddTransaction({ onTransactionAdded, userName }: AddTran
     try {
       const headers: Record<string, string> = { 'Content-Type': 'application/json' }
       if (userName) headers['x-user-name'] = userName
+      if (typeof window !== 'undefined') {
+        const userEmail = localStorage.getItem('trackr_user_email')
+        const userId = localStorage.getItem('trackr_user_id')
+        if (userEmail) headers['x-user-email'] = userEmail
+        if (userId) headers['x-user-id'] = userId
+      }
       const response = await fetch('/api/ai/categorize', {
         method: 'POST',
         headers,
@@ -93,6 +99,12 @@ export default function AddTransaction({ onTransactionAdded, userName }: AddTran
     try {
       const headers: Record<string, string> = { 'Content-Type': 'application/json' }
       if (userName) headers['x-user-name'] = userName
+      if (typeof window !== 'undefined') {
+        const userEmail = localStorage.getItem('trackr_user_email')
+        const userId = localStorage.getItem('trackr_user_id')
+        if (userEmail) headers['x-user-email'] = userEmail
+        if (userId) headers['x-user-id'] = userId
+      }
       const response = await fetch('/api/transactions', {
         method: 'POST',
         headers,
@@ -186,7 +198,7 @@ export default function AddTransaction({ onTransactionAdded, userName }: AddTran
                 <p className="text-xs text-muted-foreground mt-1">
                   অথবা: &quot;গতকাল রিকশায় ১০০ টাকা&quot;
                 </p>
-                <p className="text-[10px] text-blue-500 mt-1">
+                <p className="text-xs text-blue-500 mt-1">
                   তারিখ বললে সেটা অটোমেটিক সেট হবে
                 </p>
               </>
@@ -198,7 +210,7 @@ export default function AddTransaction({ onTransactionAdded, userName }: AddTran
                 <p className="text-xs text-muted-foreground mt-1">
                   or: &quot;Paid 200 yesterday for transport&quot;
                 </p>
-                <p className="text-[10px] text-blue-500 mt-1">
+                <p className="text-xs text-blue-500 mt-1">
                   Mention date &quot;yesterday&quot;, &quot;last Friday&quot; — it will be auto-set
                 </p>
               </>
@@ -213,12 +225,22 @@ export default function AddTransaction({ onTransactionAdded, userName }: AddTran
           <CardHeader>
             <CardTitle className="text-base flex items-center gap-2">
               <Receipt className="w-5 h-5 text-emerald-500" />
-              {language === 'bn' ? 'লেনদেন বর্ণনা করুন' : 'Describe Your Transaction'}
+              {language === 'bn' ? 'লেনদেন বর্ণনা করুন' : language === 'hi' ? 'अपना लेनदेन बताएं' : 'Describe Your Transaction'}
             </CardTitle>
           </CardHeader>
           <CardContent>
             {/* Language toggle for text mode */}
             <div className="flex items-center gap-2 mb-3">
+              <button
+                onClick={() => setLanguage('en')}
+                className={`px-3 py-1 rounded-full text-xs font-medium transition-all ${
+                  language === 'en'
+                    ? 'bg-emerald-500 text-white'
+                    : 'bg-muted text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                English
+              </button>
               <button
                 onClick={() => setLanguage('bn')}
                 className={`px-3 py-1 rounded-full text-xs font-medium transition-all ${
@@ -230,14 +252,14 @@ export default function AddTransaction({ onTransactionAdded, userName }: AddTran
                 বাংলা
               </button>
               <button
-                onClick={() => setLanguage('en')}
+                onClick={() => setLanguage('hi')}
                 className={`px-3 py-1 rounded-full text-xs font-medium transition-all ${
-                  language === 'en'
+                  language === 'hi'
                     ? 'bg-emerald-500 text-white'
                     : 'bg-muted text-muted-foreground hover:text-foreground'
                 }`}
               >
-                English
+                हिन्दी
               </button>
             </div>
 
@@ -245,6 +267,8 @@ export default function AddTransaction({ onTransactionAdded, userName }: AddTran
               <Input
                 placeholder={language === 'bn' 
                   ? 'যেমন: গতকাল বাজারে ৫০০ টাকা খরচ' 
+                  : language === 'hi'
+                  ? 'उदा: कल बाजार में 500 रुपये खर्च'
                   : 'e.g., Spent 500 on groceries yesterday'
                 }
                 value={textInput}

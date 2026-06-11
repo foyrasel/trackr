@@ -70,6 +70,12 @@ export default function TransferDialog({ accounts, userName, onTransferComplete 
     try {
       const headers: Record<string, string> = { 'Content-Type': 'application/json' }
       if (userName) headers['x-user-name'] = userName
+      if (typeof window !== 'undefined') {
+        const userEmail = localStorage.getItem('trackr_user_email')
+        const userId = localStorage.getItem('trackr_user_id')
+        if (userEmail) headers['x-user-email'] = userEmail
+        if (userId) headers['x-user-id'] = userId
+      }
 
       const response = await fetch('/api/accounts/transfer', {
         method: 'POST',
@@ -209,7 +215,7 @@ export default function TransferDialog({ accounts, userName, onTransferComplete 
             Transfer {currencySymbol}{amount ? parseFloat(amount).toLocaleString() : '0'}
           </Button>
 
-          <p className="text-[10px] text-center text-muted-foreground">
+          <p className="text-xs text-center text-muted-foreground">
             This adjusts account balances. It&apos;s not recorded as an expense or income.
           </p>
         </div>

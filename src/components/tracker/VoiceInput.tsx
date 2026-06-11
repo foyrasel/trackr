@@ -8,8 +8,8 @@ import { Button } from '@/components/ui/button'
 interface VoiceInputProps {
   onTranscript: (text: string) => void
   isProcessing: boolean
-  language: 'en' | 'bn'
-  onLanguageChange: (lang: 'en' | 'bn') => void
+  language: 'en' | 'bn' | 'hi'
+  onLanguageChange: (lang: 'en' | 'bn' | 'hi') => void
 }
 
 // Language configurations with multiple fallback codes
@@ -27,6 +27,13 @@ const LANG_CONFIG = {
     label: 'বাংলা',
     hint: 'বাংলায় শুনছি... ধীরে ও স্পষ্টভাবে বলুন',
     tips: ['ধীরে ও স্পষ্টভাবে বলুন', 'বলুন: "বাজারে ৫০০ টাকা খরচ"', 'শব্দগুলো আলাদা করে বলুন', 'চুলচেরা উচ্চারণ এড়িয়ে চলুন'],
+  },
+  hi: {
+    code: 'hi-IN',
+    fallbackCodes: ['en-IN'],
+    label: 'हिन्दी',
+    hint: 'हिन्दी में सुन रहे हैं... धीरे और स्पष्ट बोलें',
+    tips: ['धीरे और स्पष्ट बोलें', 'बोलें: "बाजार में 500 रुपये खर्च"', 'शब्दों को अलग-अलग बोलें'],
   },
 }
 
@@ -172,7 +179,7 @@ export default function VoiceInput({ onTranscript, isProcessing, language, onLan
     recognition.continuous = true
     recognition.interimResults = true
     recognition.lang = LANG_CONFIG[languageRef.current].code
-    recognition.maxAlternatives = languageRef.current === 'bn' ? 8 : 3 // More alternatives for Bangla
+    recognition.maxAlternatives = (languageRef.current === 'bn' || languageRef.current === 'hi') ? 8 : 3 // More alternatives for non-English
     
     let restartAttempts = 0
     const MAX_RESTARTS = 5 // Increased from 3
@@ -386,12 +393,12 @@ export default function VoiceInput({ onTranscript, isProcessing, language, onLan
       try {
         // Try the primary language code first
         recognitionRef.current.lang = LANG_CONFIG[language].code
-        recognitionRef.current.maxAlternatives = language === 'bn' ? 8 : 3
+        recognitionRef.current.maxAlternatives = (language === 'bn' || language === 'hi') ? 8 : 3
         recognitionRef.current.start()
         setIsListening(true)
         setUsedLangCode(LANG_CONFIG[language].code)
         // Set initial auto-stop countdown
-        setAutoStopCountdown(language === 'bn' ? 20 : 10) // Longer for Bangla
+        setAutoStopCountdown((language === 'bn' || language === 'hi') ? 20 : 10) // Longer for non-English
       } catch (err) {
         console.error('Failed to start recognition:', err)
 
@@ -523,16 +530,16 @@ export default function VoiceInput({ onTranscript, isProcessing, language, onLan
             <p className="text-sm text-red-600 font-medium animate-pulse">{currentLang.hint}</p>
             {language === 'bn' && (
               <div className="space-y-0.5">
-                <p className="text-[10px] text-muted-foreground">
+                <p className="text-xs text-muted-foreground">
                   ধীরে ও স্পষ্টভাবে কথা বলুন • বলা শেষে আবার ট্যাপ করুন
                 </p>
                 {usedLangCode && (
-                  <p className="text-[9px] text-blue-400">
+                  <p className="text-xs text-blue-400">
                     Language: {usedLangCode}
                   </p>
                 )}
                 {autoStopCountdown !== null && autoStopCountdown <= 5 && (
-                  <p className="text-[10px] text-amber-500 font-medium">
+                  <p className="text-xs text-amber-500 font-medium">
                     আর {autoStopCountdown} সেকেন্ডে স্বয়ংক্রিয়ভাবে বন্ধ হবে...
                   </p>
                 )}
@@ -550,7 +557,8 @@ export default function VoiceInput({ onTranscript, isProcessing, language, onLan
                     style={{ width: `${confidence}%` }}
                   />
                 </div>
-                <span className="text-[9px] text-muted-foreground">{confidence}%</span>
+                <p className="text-xs text-muted-foreground">
+                    {confidence}%</p>
               </div>
             )}
           </div>
@@ -561,10 +569,10 @@ export default function VoiceInput({ onTranscript, isProcessing, language, onLan
             </p>
             {language === 'bn' && (
               <div className="space-y-0.5">
-                <p className="text-[10px] text-muted-foreground">
+                <p className="text-xs text-muted-foreground">
                   সবচেয়ে ভালো ফলাফলের জন্য Chrome বা Edge ব্যবহার করুন
                 </p>
-                <p className="text-[10px] text-blue-400">
+                <p className="text-xs text-blue-400">
                   Tip: ধীরে বলুন, "বাজারে ৫০০ টাকা খরচ"
                 </p>
               </div>
@@ -587,12 +595,12 @@ export default function VoiceInput({ onTranscript, isProcessing, language, onLan
               )}
             </p>
             {isListening && !hasFinalResult && (
-              <p className="text-[10px] text-muted-foreground mt-1">
+              <p className="text-xs text-muted-foreground mt-1">
                 {language === 'bn' ? 'কথা বলতে থাকুন... শেষে ট্যাপ করুন' : 'Keep speaking... tap again when done'}
               </p>
             )}
             {hasFinalResult && isListening && (
-              <p className="text-[10px] text-emerald-600 mt-1">
+              <p className="text-xs text-emerald-600 mt-1">
                 {language === 'bn' ? '✓ শোনা হয়েছে! আরও কিছু বলতে পারেন বা ট্যাপ করে শেষ করুন' : '✓ Heard! Speak more or tap to finish'}
               </p>
             )}
@@ -606,8 +614,8 @@ export default function VoiceInput({ onTranscript, isProcessing, language, onLan
           <p className="text-sm text-destructive">{error}</p>
           {language === 'bn' && (error.includes('শোনা যায়নি') || error.includes('কথা')) && (
             <div className="mt-2 p-3 bg-amber-50 rounded-lg border border-amber-200">
-              <p className="text-[10px] text-amber-800 font-medium mb-1">বাংলা ভয়েস টিপস:</p>
-              <ul className="text-[10px] text-amber-700 space-y-0.5 text-left">
+              <p className="text-xs text-amber-800 font-medium mb-1">বাংলা ভয়েস টিপস:</p>
+              <ul className="text-xs text-amber-700 space-y-0.5 text-left">
                 <li>• ধীরে ও স্পষ্টভাবে কথা বলুন</li>
                 <li>• মাইকের ৩-৫ ইঞ্চি কাছে থাকুন</li>
                 <li>• আধা বাংলা আধা ইংরেজি এড়িয়ে চলুন</li>

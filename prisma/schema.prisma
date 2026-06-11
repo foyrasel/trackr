@@ -19,6 +19,8 @@ model User {
   darkMode       Boolean   @default(false)
   currency       String    @default("USD") // ISO 4217 currency code
   currencySymbol String    @default("$") // Display symbol
+  language       String    @default("en") // "en", "bn", "hi"
+  onboardingDone Boolean   @default(false)
   accounts       Account[]
   transfers      Transfer[]
   budgets        Budget[]
@@ -43,7 +45,6 @@ model Account {
   isDefault Boolean  @default(false)
   fromTransfers Transfer[] @relation("FromAccount")
   toTransfers   Transfer[] @relation("ToAccount")
-  lendBorrows   LendBorrow[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -80,8 +81,6 @@ model Budget {
   category     String   // "Groceries", "Transport", etc. or "total" for overall
   amount       Float    // budget amount
   isIgnored    Boolean  @default(false) // user can ignore/skip budget
-  goalId       String?  // Optional link to a savings goal
-  goal         Goal?    @relation(fields: [goalId], references: [id], onDelete: SetNull)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -138,7 +137,6 @@ model Goal {
   icon         String   @default("🎯")
   color        String   @default("#10b981")
   isCompleted  Boolean  @default(false)
-  budgets      Budget[]
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 }
@@ -172,8 +170,6 @@ model LendBorrow {
   dueDate     DateTime? // When the money should be returned
   isSettled   Boolean  @default(false) // Whether the amount has been paid back
   settledDate DateTime? // When it was actually settled
-  accountId   String?  // Optional link to which account money came from/goes to
-  account     Account? @relation(fields: [accountId], references: [id], onDelete: SetNull)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }

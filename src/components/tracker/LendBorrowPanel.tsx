@@ -10,13 +10,6 @@ import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
-import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -46,32 +39,19 @@ import {
   Clock,
   AlertTriangle,
   CheckCircle2,
-  Wallet,
 } from 'lucide-react'
 import { toast } from '@/hooks/use-toast'
 import { useCurrency } from './CurrencyContext'
 
-interface AccountOption {
-  id: string
-  name: string
-  icon: string
-  type: string
-}
-
 interface LendBorrowRecord {
   id: string
-  type: 'lent' | 'borrowed'
+  type: 'lend' | 'borrow'
   person: string
   amount: number
   description: string
   date: string
   dueDate?: string
   isSettled: boolean
-  accountId?: string
-  accountName?: string
-  daysUntilDue?: number | null
-  isOverdue?: boolean
-  account?: { id: string; name: string; type: string } | null
 }
 
 interface LendBorrowSummary {
@@ -85,7 +65,7 @@ interface LendBorrowPanelProps {
   refreshTrigger?: number
 }
 
-type TypeFilter = 'all' | 'lent' | 'borrowed'
+type TypeFilter = 'all' | 'lend' | 'borrow'
 type StatusFilter = 'active' | 'settled' | 'all'
 
 export default function LendBorrowPanel({ userName, refreshTrigger = 0 }: LendBorrowPanelProps) {
@@ -94,7 +74,6 @@ export default function LendBorrowPanel({ userName, refreshTrigger = 0 }: LendBo
   const [summary, setSummary] = useState<LendBorrowSummary>({ totalLent: 0, totalBorrowed: 0, overdueCount: 0 })
   const [loading, setLoading] = useState(true)
   const [mounted, setMounted] = useState(false)
-  const [accounts, setAccounts] = useState<AccountOption[]>([])
 
   // Filters
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('all')
@@ -103,34 +82,31 @@ export default function LendBorrowPanel({ userName, refreshTrigger = 0 }: LendBo
   // Add dialog
   const [showAddDialog, setShowAddDialog] = useState(false)
   const [addData, setAddData] = useState<{
-    type: 'lent' | 'borrowed'
+    type: 'lend' | 'borrow'
     person: string
     amount: number
     description: string
     date: string
     dueDate: string
-    accountId: string
   }>({
-    type: 'lent',
+    type: 'lend',
     person: '',
     amount: 0,
     description: '',
     date: new Date().toISOString().split('T')[0],
     dueDate: '',
-    accountId: 'none',
   })
   const [isSaving, setIsSaving] = useState(false)
 
   // Edit dialog
   const [editRecord, setEditRecord] = useState<LendBorrowRecord | null>(null)
   const [editData, setEditData] = useState<{
-    type: 'lent' | 'borrowed'
+    type: 'lend' | 'borrow'
     person: string
     amount: number
     description: string
     date: string
     dueDate: string
-    accountId: string
   } | null>(null)
 
   // Delete confirmation
@@ -145,32 +121,14 @@ export default function LendBorrowPanel({ userName, refreshTrigger = 0 }: LendBo
     const headers: Record<string, string> = {}
     if (contentType) headers['Content-Type'] = 'application/json'
     if (userName) headers['x-user-name'] = userName
+    if (typeof window !== 'undefined') {
+      const userEmail = localStorage.getItem('trackr_user_email')
+      const userId = localStorage.getItem('trackr_user_id')
+      if (userEmail) headers['x-user-email'] = userEmail
+      if (userId) headers['x-user-id'] = userId
+    }
     return headers
   }, [userName])
-
-  // Fetch accounts on mount
-  useEffect(() => {
-    if (!mounted) return
-    const fetchAccounts = async () => {
-      try {
-        const response = await fetch('/api/accounts', {
-          headers: getAuthHeaders(false),
-        })
-        if (response.ok) {
-          const data = await response.json()
-          setAccounts((data.accounts || []).map((a: { id: string; name: string; icon: string; type: string }) => ({
-            id: a.id,
-            name: a.name,
-            icon: a.icon,
-            type: a.type,
-          })))
-        }
-      } catch (error) {
-        console.error('Error fetching accounts:', error)
-      }
-    }
-    fetchAccounts()
-  }, [mounted, getAuthHeaders])
 
   const fetchRecords = useCallback(async () => {
     try {
@@ -179,27 +137,12 @@ export default function LendBorrowPanel({ userName, refreshTrigger = 0 }: LendBo
       })
       if (response.ok) {
         const data = await response.json()
-        // Map records to include accountName from the account relation
-        const mappedRecords = (data.records || []).map((r: Record<string, unknown>) => ({
-          ...r,
-          accountName: (r.account as { name?: string } | null)?.name || undefined,
-          accountId: (r.accountId as string) || (r.account as { id?: string } | null)?.id || undefined,
-        }))
-        setRecords(mappedRecords)
-        // Fix: API returns summary nested
-        if (data.summary) {
-          setSummary({
-            totalLent: data.summary.totalLent || 0,
-            totalBorrowed: data.summary.totalBorrowed || 0,
-            overdueCount: data.summary.overdueCount || 0,
-          })
-        } else {
-          setSummary({
-            totalLent: data.totalLent || 0,
-            totalBorrowed: data.totalBorrowed || 0,
-            overdueCount: data.overdueCount || 0,
-          })
-        }
+        setRecords(data.records || [])
+        setSummary({
+          totalLent: data.totalLent || 0,
+          totalBorrowed: data.totalBorrowed || 0,
+          overdueCount: data.overdueCount || 0,
+        })
       }
     } catch (error) {
       console.error('Error fetching lend/borrow records:', error)
@@ -221,24 +164,20 @@ export default function LendBorrowPanel({ userName, refreshTrigger = 0 }: LendBo
     }
     setIsSaving(true)
     try {
-      const body: Record<string, unknown> = {
-        type: addData.type === 'lent' ? 'lend' : 'borrow',
-        person: addData.person.trim(),
-        amount: addData.amount,
-        description: addData.description.trim(),
-        date: addData.date,
-        dueDate: addData.dueDate || null,
-      }
-      if (addData.accountId && addData.accountId !== 'none') {
-        body.accountId = addData.accountId
-      }
       const response = await fetch('/api/lend-borrow', {
         method: 'POST',
         headers: getAuthHeaders(),
-        body: JSON.stringify(body),
+        body: JSON.stringify({
+          type: addData.type,
+          person: addData.person.trim(),
+          amount: addData.amount,
+          description: addData.description.trim(),
+          date: addData.date,
+          dueDate: addData.dueDate || null,
+        }),
       })
       if (response.ok) {
-        toast({ title: `${addData.type === 'lent' ? 'Lent' : 'Borrowed'} record added` })
+        toast({ title: `${addData.type === 'lend' ? 'Lent' : 'Borrowed'} record added` })
         setShowAddDialog(false)
         resetAddForm()
         fetchRecords()
@@ -262,7 +201,6 @@ export default function LendBorrowPanel({ userName, refreshTrigger = 0 }: LendBo
       description: record.description,
       date: record.date ? new Date(record.date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
       dueDate: record.dueDate ? new Date(record.dueDate).toISOString().split('T')[0] : '',
-      accountId: record.accountId || 'none',
     })
   }
 
@@ -274,24 +212,17 @@ export default function LendBorrowPanel({ userName, refreshTrigger = 0 }: LendBo
     }
     setIsSaving(true)
     try {
-      const body: Record<string, unknown> = {
-        id: editRecord.id,
-        type: editData.type === 'lent' ? 'lend' : 'borrow',
-        person: editData.person.trim(),
-        amount: editData.amount,
-        description: editData.description.trim(),
-        date: editData.date,
-        dueDate: editData.dueDate || null,
-      }
-      if (editData.accountId && editData.accountId !== 'none') {
-        body.accountId = editData.accountId
-      } else {
-        body.accountId = null
-      }
-      const response = await fetch('/api/lend-borrow', {
+      const response = await fetch(`/api/lend-borrow/${editRecord.id}`, {
         method: 'PUT',
         headers: getAuthHeaders(),
-        body: JSON.stringify(body),
+        body: JSON.stringify({
+          type: editData.type,
+          person: editData.person.trim(),
+          amount: editData.amount,
+          description: editData.description.trim(),
+          date: editData.date,
+          dueDate: editData.dueDate || null,
+        }),
       })
       if (response.ok) {
         toast({ title: 'Record updated' })
@@ -311,13 +242,13 @@ export default function LendBorrowPanel({ userName, refreshTrigger = 0 }: LendBo
 
   const handleSettle = async (record: LendBorrowRecord) => {
     try {
-      const response = await fetch('/api/lend-borrow', {
+      const response = await fetch(`/api/lend-borrow/${record.id}`, {
         method: 'PUT',
         headers: getAuthHeaders(),
-        body: JSON.stringify({ id: record.id, isSettled: true }),
+        body: JSON.stringify({ isSettled: true }),
       })
       if (response.ok) {
-        toast({ title: `${record.type === 'lent' ? 'Lent' : 'Borrowed'} record settled` })
+        toast({ title: `${record.type === 'lend' ? 'Lent' : 'Borrowed'} record settled` })
         fetchRecords()
       } else {
         toast({ title: 'Failed to settle record', variant: 'destructive' })
@@ -331,9 +262,9 @@ export default function LendBorrowPanel({ userName, refreshTrigger = 0 }: LendBo
   const handleDelete = async () => {
     if (!deleteId) return
     try {
-      const response = await fetch(`/api/lend-borrow?id=${deleteId}`, {
+      const response = await fetch(`/api/lend-borrow/${deleteId}`, {
         method: 'DELETE',
-        headers: getAuthHeaders(false),
+        headers: getAuthHeaders(),
       })
       if (response.ok) {
         toast({ title: 'Record deleted' })
@@ -350,13 +281,12 @@ export default function LendBorrowPanel({ userName, refreshTrigger = 0 }: LendBo
 
   const resetAddForm = () => {
     setAddData({
-      type: 'lent',
+      type: 'lend',
       person: '',
       amount: 0,
       description: '',
       date: new Date().toISOString().split('T')[0],
       dueDate: '',
-      accountId: 'none',
     })
   }
 
@@ -425,7 +355,7 @@ export default function LendBorrowPanel({ userName, refreshTrigger = 0 }: LendBo
   // --- Record form (shared for Add & Edit) ---
 
   const renderRecordForm = (
-    data: { type: 'lent' | 'borrowed'; person: string; amount: number; description: string; date: string; dueDate: string; accountId: string },
+    data: { type: 'lend' | 'borrow'; person: string; amount: number; description: string; date: string; dueDate: string },
     setData: (d: typeof data) => void,
     onSave: () => void,
     onCancel: () => void,
@@ -438,9 +368,9 @@ export default function LendBorrowPanel({ userName, refreshTrigger = 0 }: LendBo
         <div className="flex gap-2 mt-1">
           <button
             type="button"
-            onClick={() => setData({ ...data, type: 'lent' })}
+            onClick={() => setData({ ...data, type: 'lend' })}
             className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-all border-2 flex items-center justify-center gap-1.5 ${
-              data.type === 'lent'
+              data.type === 'lend'
                 ? 'bg-emerald-50 border-emerald-300 text-emerald-800'
                 : 'bg-white border-gray-200 text-muted-foreground hover:bg-gray-50'
             }`}
@@ -450,9 +380,9 @@ export default function LendBorrowPanel({ userName, refreshTrigger = 0 }: LendBo
           </button>
           <button
             type="button"
-            onClick={() => setData({ ...data, type: 'borrowed' })}
+            onClick={() => setData({ ...data, type: 'borrow' })}
             className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-all border-2 flex items-center justify-center gap-1.5 ${
-              data.type === 'borrowed'
+              data.type === 'borrow'
                 ? 'bg-red-50 border-red-300 text-red-800'
                 : 'bg-white border-gray-200 text-muted-foreground hover:bg-gray-50'
             }`}
@@ -501,22 +431,6 @@ export default function LendBorrowPanel({ userName, refreshTrigger = 0 }: LendBo
         />
       </div>
 
-      {/* Account Dropdown */}
-      <div>
-        <Label className="text-xs text-muted-foreground">Account (optional)</Label>
-        <Select value={data.accountId} onValueChange={(v) => setData({ ...data, accountId: v })}>
-          <SelectTrigger className="h-11 mt-1">
-            <SelectValue placeholder="Select account (optional)" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="none">No account link</SelectItem>
-            {accounts.map(acc => (
-              <SelectItem key={acc.id} value={acc.id}>{acc.icon} {acc.name}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
       {/* Date */}
       <div>
         <Label className="text-xs text-muted-foreground">Date</Label>
@@ -539,7 +453,7 @@ export default function LendBorrowPanel({ userName, refreshTrigger = 0 }: LendBo
           min={data.date}
         />
         {data.dueDate && (
-          <p className="text-[10px] text-muted-foreground mt-1">
+          <p className="text-xs text-muted-foreground mt-1">
             Payback reminder: {formatDate(data.dueDate)}
           </p>
         )}
@@ -605,7 +519,7 @@ export default function LendBorrowPanel({ userName, refreshTrigger = 0 }: LendBo
           <CardContent className="p-3 sm:p-4">
             <div className="flex items-center gap-1.5 mb-1">
               <ArrowUpRight className="w-3.5 h-3.5 text-emerald-500" />
-              <p className="text-[10px] sm:text-xs text-muted-foreground font-medium">Total Lent</p>
+              <p className="text-xs sm:text-xs text-muted-foreground font-medium">Total Lent</p>
             </div>
             <p className="text-base sm:text-xl font-bold text-emerald-600">
               {currencySymbol}{summary.totalLent.toLocaleString()}
@@ -618,7 +532,7 @@ export default function LendBorrowPanel({ userName, refreshTrigger = 0 }: LendBo
           <CardContent className="p-3 sm:p-4">
             <div className="flex items-center gap-1.5 mb-1">
               <ArrowDownRight className="w-3.5 h-3.5 text-red-500" />
-              <p className="text-[10px] sm:text-xs text-muted-foreground font-medium">Total Borrowed</p>
+              <p className="text-xs sm:text-xs text-muted-foreground font-medium">Total Borrowed</p>
             </div>
             <p className="text-base sm:text-xl font-bold text-red-600">
               {currencySymbol}{summary.totalBorrowed.toLocaleString()}
@@ -631,7 +545,7 @@ export default function LendBorrowPanel({ userName, refreshTrigger = 0 }: LendBo
           <CardContent className="p-3 sm:p-4">
             <div className="flex items-center gap-1.5 mb-1">
               <AlertTriangle className="w-3.5 h-3.5 text-orange-500" />
-              <p className="text-[10px] sm:text-xs text-muted-foreground font-medium">Overdue</p>
+              <p className="text-xs sm:text-xs text-muted-foreground font-medium">Overdue</p>
             </div>
             <p className="text-base sm:text-xl font-bold text-orange-600">
               {summary.overdueCount}
@@ -646,8 +560,8 @@ export default function LendBorrowPanel({ userName, refreshTrigger = 0 }: LendBo
         <div className="flex gap-1">
           {([
             { key: 'all', label: 'All' },
-            { key: 'lent', label: 'Lent' },
-            { key: 'borrowed', label: 'Borrowed' },
+            { key: 'lend', label: 'Lent' },
+            { key: 'borrow', label: 'Borrowed' },
           ] as const).map(({ key, label }) => (
             <Button
               key={key}
@@ -707,7 +621,7 @@ export default function LendBorrowPanel({ userName, refreshTrigger = 0 }: LendBo
       ) : (
         <div className="max-h-[60vh] overflow-y-auto pr-1 space-y-2">
           {filteredRecords.map((record) => {
-            const isLent = record.type === 'lent'
+            const isLent = record.type === 'lend'
             const isOverdue = !record.isSettled && record.dueDate && getDaysUntilDue(record.dueDate) < 0
             const daysUntilDue = record.dueDate ? getDaysUntilDue(record.dueDate) : null
             const isApproachingDue = !record.isSettled && daysUntilDue !== null && daysUntilDue >= 0 && daysUntilDue <= 7
@@ -740,7 +654,7 @@ export default function LendBorrowPanel({ userName, refreshTrigger = 0 }: LendBo
                           <p className="font-semibold text-sm truncate">{record.person}</p>
                           <Badge
                             variant="outline"
-                            className={`text-[10px] px-1.5 py-0 shrink-0 ${
+                            className={`text-xs px-1.5 py-0 shrink-0 ${
                               isLent
                                 ? 'bg-emerald-100 text-emerald-800 border-emerald-200'
                                 : 'bg-red-100 text-red-800 border-red-200'
@@ -749,19 +663,11 @@ export default function LendBorrowPanel({ userName, refreshTrigger = 0 }: LendBo
                             {isLent ? 'Lent' : 'Borrowed'}
                           </Badge>
                         </div>
-                        <div className="flex items-center gap-1.5 shrink-0">
-                          <p className={`font-bold text-sm whitespace-nowrap ${
-                            isLent ? 'text-emerald-600' : 'text-red-600'
-                          }`}>
-                            {currencySymbol}{record.amount.toLocaleString()}
-                          </p>
-                          {record.accountName && (
-                            <Badge variant="outline" className="text-[9px] px-1.5 py-0 bg-slate-50 text-slate-600 border-slate-200 whitespace-nowrap">
-                              <Wallet className="w-2.5 h-2.5 mr-0.5" />
-                              via {record.accountName}
-                            </Badge>
-                          )}
-                        </div>
+                        <p className={`font-bold text-sm whitespace-nowrap ${
+                          isLent ? 'text-emerald-600' : 'text-red-600'
+                        }`}>
+                          {currencySymbol}{record.amount.toLocaleString()}
+                        </p>
                       </div>
 
                       {/* Description */}
@@ -783,26 +689,26 @@ export default function LendBorrowPanel({ userName, refreshTrigger = 0 }: LendBo
                           </span>
                         )}
                         {record.isSettled && (
-                          <Badge variant="outline" className="text-[10px] px-1.5 py-0 bg-emerald-50 text-emerald-700 border-emerald-200">
+                          <Badge variant="outline" className="text-xs px-1.5 py-0 bg-emerald-50 text-emerald-700 border-emerald-200">
                             <CheckCircle2 className="w-3 h-3 mr-0.5" />
                             Settled
                           </Badge>
                         )}
                         {/* Overdue badge */}
                         {isOverdue && (
-                          <Badge variant="outline" className="text-[10px] px-1.5 py-0 bg-red-50 text-red-700 border-red-200">
+                          <Badge variant="outline" className="text-xs px-1.5 py-0 bg-red-50 text-red-700 border-red-200">
                             <AlertTriangle className="w-3 h-3 mr-0.5" />
                             {Math.abs(daysUntilDue!)} day{Math.abs(daysUntilDue!) !== 1 ? 's' : ''} overdue
                           </Badge>
                         )}
                         {/* Approaching due date badge */}
                         {isApproachingDue && daysUntilDue === 0 && (
-                          <Badge variant="outline" className="text-[10px] px-1.5 py-0 bg-amber-50 text-amber-700 border-amber-200">
+                          <Badge variant="outline" className="text-xs px-1.5 py-0 bg-amber-50 text-amber-700 border-amber-200">
                             Due today
                           </Badge>
                         )}
                         {isApproachingDue && daysUntilDue !== null && daysUntilDue > 0 && (
-                          <Badge variant="outline" className="text-[10px] px-1.5 py-0 bg-amber-50 text-amber-700 border-amber-200">
+                          <Badge variant="outline" className="text-xs px-1.5 py-0 bg-amber-50 text-amber-700 border-amber-200">
                             Due in {daysUntilDue} day{daysUntilDue !== 1 ? 's' : ''}
                           </Badge>
                         )}

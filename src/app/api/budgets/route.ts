@@ -15,20 +15,10 @@ export async function GET(request: NextRequest) {
 
     const currentMonth = month || `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`
 
-    let budgets: any[]
-    try {
-      budgets = await db.budget.findMany({
-        where: { userId: user.id, month: currentMonth },
-        orderBy: { category: 'asc' },
-        include: { goal: { select: { id: true, name: true, icon: true } } },
-      })
-    } catch {
-      // Fallback if goalId column doesn't exist yet
-      budgets = await db.budget.findMany({
-        where: { userId: user.id, month: currentMonth },
-        orderBy: { category: 'asc' },
-      })
-    }
+    const budgets = await db.budget.findMany({
+      where: { userId: user.id, month: currentMonth },
+      orderBy: { category: 'asc' },
+    })
 
     // Get current month spending per category
     const startDate = new Date(`${currentMonth}-01`)
@@ -82,7 +72,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { month, category, amount, isIgnored, goalId } = body
+    const { month, category, amount, isIgnored } = body
 
     // Upsert budget
     const existing = await db.budget.findFirst({
@@ -93,12 +83,7 @@ export async function POST(request: NextRequest) {
     if (existing) {
       budget = await db.budget.update({
         where: { id: existing.id },
-        data: {
-          amount,
-          isIgnored: isIgnored ?? existing.isIgnored,
-          ...(goalId !== undefined && { goalId: goalId || null }),
-        },
-        include: { goal: { select: { id: true, name: true, icon: true } } },
+        data: { amount, isIgnored: isIgnored ?? existing.isIgnored },
       })
     } else {
       budget = await db.budget.create({
@@ -108,9 +93,7 @@ export async function POST(request: NextRequest) {
           category,
           amount,
           isIgnored: isIgnored || false,
-          ...(goalId && goalId !== 'none' && { goalId }),
         },
-        include: { goal: { select: { id: true, name: true, icon: true } } },
       })
     }
 
@@ -130,7 +113,7 @@ export async function PUT(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { budgetId, isIgnored, amount, goalId } = body
+    const { budgetId, isIgnored, amount } = body
 
     // Verify budget belongs to user
     const existing = await db.budget.findUnique({ where: { id: budgetId } })
@@ -143,9 +126,7 @@ export async function PUT(request: NextRequest) {
       data: {
         ...(isIgnored !== undefined && { isIgnored }),
         ...(amount !== undefined && { amount }),
-        ...(goalId !== undefined && { goalId: goalId || null }),
       },
-      include: { goal: { select: { id: true, name: true, icon: true } } },
     })
 
     return NextResponse.json({ budget })

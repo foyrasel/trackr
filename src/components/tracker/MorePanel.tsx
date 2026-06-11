@@ -43,6 +43,8 @@ import {
 } from 'lucide-react'
 import { toast } from '@/hooks/use-toast'
 import { useCurrency } from './CurrencyContext'
+import { useSession } from 'next-auth/react'
+import PasswordVerifyDialog from './PasswordVerifyDialog'
 
 import GoalsPanel from './GoalsPanel'
 import LendBorrowPanel from './LendBorrowPanel'
@@ -112,6 +114,12 @@ function ExportPanel({ userName, onBack }: { userName?: string; onBack: () => vo
   const getAuthHeaders = useCallback((): Record<string, string> => {
     const headers: Record<string, string> = {}
     if (userName) headers['x-user-name'] = userName
+    if (typeof window !== 'undefined') {
+      const userEmail = localStorage.getItem('trackr_user_email')
+      const userId = localStorage.getItem('trackr_user_id')
+      if (userEmail) headers['x-user-email'] = userEmail
+      if (userId) headers['x-user-id'] = userId
+    }
     return headers
   }, [userName])
 
@@ -228,6 +236,8 @@ function ExportPanel({ userName, onBack }: { userName?: string; onBack: () => vo
 // ─── Accounts Sub-Panel ──────────────────────────────────────────────────────
 
 function AccountsPanel({ userName, onBack }: { userName?: string; onBack: () => void }) {
+  const { currencySymbol } = useCurrency()
+  const { data: session } = useSession()
   const [accounts, setAccounts] = useState<AccountItem[]>([])
   const [loading, setLoading] = useState(true)
   const [showAddDialog, setShowAddDialog] = useState(false)
@@ -248,10 +258,47 @@ function AccountsPanel({ userName, onBack }: { userName?: string; onBack: () => 
   const [editIcon, setEditIcon] = useState('')
   const [editColor, setEditColor] = useState('')
 
+  // Password verification state
+  const [showPasswordDialog, setShowPasswordDialog] = useState(false)
+  const [pendingEditAccount, setPendingEditAccount] = useState<AccountItem | null>(null)
+  const [needsPassword, setNeedsPassword] = useState(false)
+
+  // Check if current user needs password verification
+  useEffect(() => {
+    if (session?.user) {
+      const h: Record<string, string> = {}
+      if (userName) h['x-user-name'] = userName
+      if (typeof window !== 'undefined') {
+        const userEmail = localStorage.getItem('trackr_user_email')
+        const userId = localStorage.getItem('trackr_user_id')
+        if (userEmail) h['x-user-email'] = userEmail
+        if (userId) h['x-user-id'] = userId
+      }
+      fetch('/api/user', { headers: h })
+        .then(res => res.ok ? res.json() : null)
+        .then(data => {
+          if (data?.provider === 'email') {
+            setNeedsPassword(true)
+          } else {
+            setNeedsPassword(false)
+          }
+        })
+        .catch(() => {})
+    } else {
+      setNeedsPassword(false)
+    }
+  }, [session, userName])
+
   const getAuthHeaders = useCallback((contentType = true): Record<string, string> => {
     const headers: Record<string, string> = {}
     if (contentType) headers['Content-Type'] = 'application/json'
     if (userName) headers['x-user-name'] = userName
+    if (typeof window !== 'undefined') {
+      const userEmail = localStorage.getItem('trackr_user_email')
+      const userId = localStorage.getItem('trackr_user_id')
+      if (userEmail) headers['x-user-email'] = userEmail
+      if (userId) headers['x-user-id'] = userId
+    }
     return headers
   }, [userName])
 
@@ -366,11 +413,29 @@ function AccountsPanel({ userName, onBack }: { userName?: string; onBack: () => 
   }
 
   const openEditDialog = (account: AccountItem) => {
+    if (needsPassword) {
+      // Show password dialog first
+      setPendingEditAccount(account)
+      setShowPasswordDialog(true)
+    } else {
+      // No password needed, open edit dialog directly
+      doOpenEditDialog(account)
+    }
+  }
+
+  const doOpenEditDialog = (account: AccountItem) => {
     setSelectedAccount(account)
     setEditName(account.name)
     setEditIcon(account.icon)
     setEditColor(account.color)
     setShowEditDialog(true)
+  }
+
+  const handlePasswordVerified = () => {
+    if (pendingEditAccount) {
+      doOpenEditDialog(pendingEditAccount)
+      setPendingEditAccount(null)
+    }
   }
 
   const getTypeIcon = (type: string) => {
@@ -460,7 +525,7 @@ function AccountsPanel({ userName, onBack }: { userName?: string; onBack: () => 
                   </div>
                   <div className="text-right">
                     <p className={`font-bold text-sm ${account.balance >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                      {account.balance >= 0 ? '' : '-'}${Math.abs(account.balance).toLocaleString()}
+                      {account.balance >= 0 ? '' : '-'}{currencySymbol}{Math.abs(account.balance).toLocaleString()}
                     </p>
                   </div>
                   <div className="flex items-center gap-0.5 shrink-0">
@@ -677,6 +742,14 @@ function AccountsPanel({ userName, onBack }: { userName?: string; onBack: () => 
         </DialogContent>
       </Dialog>
 
+      {/* Password Verification Dialog */}
+      <PasswordVerifyDialog
+        open={showPasswordDialog}
+        onOpenChange={setShowPasswordDialog}
+        onVerified={handlePasswordVerified}
+        userName={userName}
+      />
+
       {/* Delete Confirmation */}
       <Dialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
         <DialogContent className="max-w-sm">
@@ -705,6 +778,12 @@ function AccountsPanel({ userName, onBack }: { userName?: string; onBack: () => 
 
 // ─── Settings Sub-Panel ──────────────────────────────────────────────────────
 
+const LANGUAGES = [
+  { code: 'en', label: 'English', flag: '🇺🇸' },
+  { code: 'bn', label: 'বাংলা (Bangla)', flag: '🇧🇩' },
+  { code: 'hi', label: 'हिन्दी (Hindi)', flag: '🇮🇳' },
+]
+
 function SettingsPanel({
   userName,
   onBack,
@@ -712,7 +791,7 @@ function SettingsPanel({
   userName?: string
   onBack: () => void
 }) {
-  const { currency, currencySymbol, setCurrency } = useCurrency()
+  const { currency, currencySymbol, language, setCurrency, setLanguage } = useCurrency()
   const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null)
   const [notifPermission, setNotifPermission] = useState<NotificationPermission | 'unsupported'>('unsupported')
   const { requestPermission } = useNotificationPermission()
@@ -748,12 +827,19 @@ function SettingsPanel({
 
     // Also persist to backend
     try {
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      }
+      if (userName) headers['x-user-name'] = userName
+      if (typeof window !== 'undefined') {
+        const userEmail = localStorage.getItem('trackr_user_email')
+        const userId = localStorage.getItem('trackr_user_id')
+        if (userEmail) headers['x-user-email'] = userEmail
+        if (userId) headers['x-user-id'] = userId
+      }
       await fetch('/api/user', {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(userName ? { 'x-user-name': userName } : {}),
-        },
+        headers,
         body: JSON.stringify({ currency: curr.code, currencySymbol: curr.symbol }),
       })
       toast({ title: `Currency changed to ${curr.code} (${curr.symbol})` })
@@ -781,6 +867,25 @@ function SettingsPanel({
         <Settings className="w-5 h-5 text-emerald-500" />
         <h2 className="text-lg font-bold">Settings</h2>
       </div>
+
+      {/* Language */}
+      <Card>
+        <CardContent className="p-4 space-y-3">
+          <Label className="text-xs text-muted-foreground">Language</Label>
+          <Select value={language} onValueChange={setLanguage}>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {LANGUAGES.map((l) => (
+                <SelectItem key={l.code} value={l.code}>
+                  {l.flag} {l.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </CardContent>
+      </Card>
 
       {/* Currency */}
       <Card>
@@ -888,6 +993,7 @@ export default function MorePanel({
   onToggleDarkMode,
   isDarkMode,
 }: MorePanelProps) {
+  const { currencySymbol } = useCurrency()
   const [activePanel, setActivePanel] = useState<PanelView>('menu')
 
   // Notification permission state
@@ -922,9 +1028,15 @@ export default function MorePanel({
 
   useEffect(() => {
     if (userName) {
-      fetch('/api/notifications?period=weekly', {
-        headers: userName ? { 'x-user-name': userName } : {},
-      })
+      const headers: Record<string, string> = {}
+      if (userName) headers['x-user-name'] = userName
+      if (typeof window !== 'undefined') {
+        const userEmail = localStorage.getItem('trackr_user_email')
+        const userId = localStorage.getItem('trackr_user_id')
+        if (userEmail) headers['x-user-email'] = userEmail
+        if (userId) headers['x-user-id'] = userId
+      }
+      fetch('/api/notifications?period=weekly', { headers })
         .then(res => res.ok ? res.json() : null)
         .then(data => {
           if (data?.summary) {
@@ -1085,7 +1197,7 @@ export default function MorePanel({
     <div className="space-y-4">
       <div className="flex items-center gap-2">
         <h2 className="text-lg font-bold">More</h2>
-        <Badge variant="outline" className="text-[10px] bg-emerald-50 text-emerald-700 border-emerald-200">
+        <Badge variant="outline" className="text-xs bg-emerald-50 text-emerald-700 border-emerald-200">
           {menuItems.length} features
         </Badge>
       </div>
@@ -1097,15 +1209,15 @@ export default function MorePanel({
             <p className="text-xs font-semibold text-emerald-700 mb-2">This Week&apos;s Summary</p>
             <div className="grid grid-cols-3 gap-2 text-center">
               <div>
-                <p className="text-[10px] text-muted-foreground">Income</p>
-                <p className="text-sm font-bold text-emerald-600">${summary.totalIncome.toLocaleString()}</p>
+                <p className="text-xs text-muted-foreground">Income</p>
+                <p className="text-sm font-bold text-emerald-600">{currencySymbol}{summary.totalIncome.toLocaleString()}</p>
               </div>
               <div>
-                <p className="text-[10px] text-muted-foreground">Expense</p>
-                <p className="text-sm font-bold text-red-600">${summary.totalExpense.toLocaleString()}</p>
+                <p className="text-xs text-muted-foreground">Expense</p>
+                <p className="text-sm font-bold text-red-600">{currencySymbol}{summary.totalExpense.toLocaleString()}</p>
               </div>
               <div>
-                <p className="text-[10px] text-muted-foreground">Savings</p>
+                <p className="text-xs text-muted-foreground">Savings</p>
                 <p className={`text-sm font-bold ${summary.savingsRate >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>{summary.savingsRate}%</p>
               </div>
             </div>

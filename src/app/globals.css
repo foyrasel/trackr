@@ -116,7 +116,24 @@
   * {
     @apply border-border outline-ring/50;
   }
+  html {
+    font-size: 14px;
+  }
   body {
     @apply bg-background text-foreground;
+    min-height: 100vh;
+    min-height: 100dvh;
+  }
+}
+
+/* Ensure minimum readable font size across the app */
+@layer utilities {
+  .text-xs {
+    font-size: 12px;
+    line-height: 1.5;
+  }
+  .text-sm {
+    font-size: 14px;
+    line-height: 1.5;
   }
 }

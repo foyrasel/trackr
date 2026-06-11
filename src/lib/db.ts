@@ -33,13 +33,13 @@ function createPrismaClient(): PrismaClient {
 
     return new PrismaClient({
       adapter,
-      log: process.env.NODE_ENV === 'development' ? ['query'] : ['error'],
+      log: ['error', 'warn'],
     })
   }
 
   // Local SQLite (development)
   return new PrismaClient({
-    log: process.env.NODE_ENV === 'development' ? ['query'] : ['error'],
+    log: ['error', 'warn'],
   })
 }
 
@@ -50,21 +50,16 @@ async function runMigrations(url: string, authToken?: string) {
   const migrations = [
     { name: 'add_password_column', sql: 'ALTER TABLE User ADD COLUMN password TEXT' },
     { name: 'add_emailVerified_column', sql: 'ALTER TABLE User ADD COLUMN emailVerified DATETIME' },
-    { name: 'add_lendBorrow_accountId', sql: 'ALTER TABLE LendBorrow ADD COLUMN accountId TEXT' },
-    { name: 'add_budget_goalId', sql: 'ALTER TABLE Budget ADD COLUMN goalId TEXT' },
+    { name: 'add_language_column', sql: 'ALTER TABLE User ADD COLUMN language TEXT DEFAULT \'en\'' },
+    { name: 'add_onboardingDone_column', sql: 'ALTER TABLE User ADD COLUMN onboardingDone BOOLEAN DEFAULT 0' },
   ]
 
   for (const migration of migrations) {
     try {
       await libsql.execute(migration.sql)
-      console.log('[DB] Migration', migration.name, 'applied successfully')
     } catch (err: any) {
-      // Column already exists is fine, anything else is a real error
-      const msg = err?.message || String(err)
-      if (msg.includes('duplicate column') || msg.includes('already exists')) {
-        console.log('[DB] Migration', migration.name, 'already applied')
-      } else {
-        console.error('[DB] Migration', migration.name, 'FAILED:', msg)
+      if (!err.message?.includes('duplicate column') && !err.message?.includes('already exists')) {
+        console.error('[DB] Migration', migration.name, 'warning:', err.message)
       }
     }
   }

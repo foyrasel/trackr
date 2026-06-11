@@ -32,9 +32,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { Trash2, Edit3, ArrowUpRight, ArrowDownRight, RefreshCw, Loader2, Check, X, Search, Download, Paperclip, ImagePlus } from 'lucide-react'
+import { Trash2, Edit3, ArrowUpRight, ArrowDownRight, RefreshCw, Loader2, Check, X, Search, Download, Paperclip, ImagePlus, CheckSquare, Square } from 'lucide-react'
 import { toast } from '@/hooks/use-toast'
 import { useCurrency } from './CurrencyContext'
+import { useSession } from 'next-auth/react'
+import PasswordVerifyDialog from './PasswordVerifyDialog'
 
 interface Transaction {
   id: string
@@ -85,6 +87,7 @@ const CLASSIFICATION_LABELS: Record<string, string> = {
 
 export default function TransactionList({ refreshTrigger, userName }: TransactionListProps) {
   const { currencySymbol } = useCurrency()
+  const { data: session } = useSession()
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [loading, setLoading] = useState(true)
   const [mounted, setMounted] = useState(false)
@@ -123,7 +126,44 @@ export default function TransactionList({ refreshTrigger, userName }: Transactio
   const [editReceiptUploading, setEditReceiptUploading] = useState(false)
   const editFileInputRef = React.useRef<HTMLInputElement>(null)
 
+  // Multi-select state
+  const [selectMode, setSelectMode] = useState(false)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [showBatchDeleteConfirm, setShowBatchDeleteConfirm] = useState(false)
+  const [batchDeleting, setBatchDeleting] = useState(false)
+
+  // Password verification for batch delete
+  const [showPasswordDialog, setShowPasswordDialog] = useState(false)
+  const [needsPassword, setNeedsPassword] = useState(false)
+  const [passwordVerifiedForBatch, setPasswordVerifiedForBatch] = useState(false)
+
   const PAGE_SIZE = 30
+
+  // Check if current user needs password verification
+  useEffect(() => {
+    if (session?.user) {
+      const h: Record<string, string> = {}
+      if (userName) h['x-user-name'] = userName
+      if (typeof window !== 'undefined') {
+        const userEmail = localStorage.getItem('trackr_user_email')
+        const userId = localStorage.getItem('trackr_user_id')
+        if (userEmail) h['x-user-email'] = userEmail
+        if (userId) h['x-user-id'] = userId
+      }
+      fetch('/api/user', { headers: h })
+        .then(res => res.ok ? res.json() : null)
+        .then(data => {
+          if (data?.provider === 'email') {
+            setNeedsPassword(true)
+          } else {
+            setNeedsPassword(false)
+          }
+        })
+        .catch(() => {})
+    } else {
+      setNeedsPassword(false)
+    }
+  }, [session, userName])
 
   // Debounce search input
   useEffect(() => {
@@ -142,6 +182,13 @@ export default function TransactionList({ refreshTrigger, userName }: Transactio
     const headers: Record<string, string> = {}
     if (contentType) headers['Content-Type'] = 'application/json'
     if (userName) headers['x-user-name'] = userName
+    // Also include email and id from localStorage for reliable user lookup
+    if (typeof window !== 'undefined') {
+      const userEmail = localStorage.getItem('trackr_user_email')
+      const userId = localStorage.getItem('trackr_user_id')
+      if (userEmail) headers['x-user-email'] = userEmail
+      if (userId) headers['x-user-id'] = userId
+    }
     return headers
   }, [userName])
 
@@ -321,6 +368,79 @@ export default function TransactionList({ refreshTrigger, userName }: Transactio
     }
   }
 
+  // Multi-select handlers
+  const toggleSelectMode = () => {
+    setSelectMode(prev => !prev)
+    setSelectedIds(new Set())
+    setPasswordVerifiedForBatch(false)
+  }
+
+  const toggleSelectTransaction = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) {
+        next.delete(id)
+      } else {
+        next.add(id)
+      }
+      return next
+    })
+  }
+
+  const selectAll = () => {
+    setSelectedIds(new Set(transactions.map(tx => tx.id)))
+  }
+
+  const deselectAll = () => {
+    setSelectedIds(new Set())
+  }
+
+  const handleBatchDeleteClick = () => {
+    if (selectedIds.size === 0) return
+
+    if (needsPassword && !passwordVerifiedForBatch) {
+      // Show password dialog first
+      setShowPasswordDialog(true)
+    } else {
+      // Already verified or no password needed, show confirmation
+      setShowBatchDeleteConfirm(true)
+    }
+  }
+
+  const handlePasswordVerifiedForBatch = () => {
+    setPasswordVerifiedForBatch(true)
+    // Now show the batch delete confirmation
+    setShowBatchDeleteConfirm(true)
+  }
+
+  const handleBatchDelete = async () => {
+    setBatchDeleting(true)
+    try {
+      const response = await fetch('/api/transactions/batch-delete', {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ ids: Array.from(selectedIds) }),
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        toast({ title: `${data.deleted} transaction${data.deleted !== 1 ? 's' : ''} deleted` })
+        setSelectedIds(new Set())
+        setSelectMode(false)
+        setPasswordVerifiedForBatch(false)
+        fetchTransactions()
+      } else {
+        toast({ title: 'Failed to delete transactions', variant: 'destructive' })
+      }
+    } catch (error) {
+      console.error('Error batch deleting transactions:', error)
+      toast({ title: 'Failed to delete transactions', variant: 'destructive' })
+    } finally {
+      setBatchDeleting(false)
+      setShowBatchDeleteConfirm(false)
+    }
+  }
+
   const ALL_CATEGORIES = [...EXPENSE_CATEGORIES, ...INCOME_CATEGORIES]
 
   const hasActiveFilters = debouncedSearch || categoryFilter !== 'all' || fromDate || toDate
@@ -359,6 +479,8 @@ export default function TransactionList({ refreshTrigger, userName }: Transactio
   }
 
   const categories = editData?.type === 'income' ? INCOME_CATEGORIES : EXPENSE_CATEGORIES
+
+  const allSelected = transactions.length > 0 && selectedIds.size === transactions.length
 
   return (
     <div className="space-y-4">
@@ -450,6 +572,15 @@ export default function TransactionList({ refreshTrigger, userName }: Transactio
             )}
             Export
           </Button>
+          <Button
+            variant={selectMode ? 'default' : 'outline'}
+            size="sm"
+            className={`text-xs h-8 ${selectMode ? 'bg-emerald-600 hover:bg-emerald-700' : 'border-emerald-200 text-emerald-700 hover:bg-emerald-50'}`}
+            onClick={toggleSelectMode}
+          >
+            <CheckSquare className="w-3.5 h-3.5 mr-1" />
+            {selectMode ? 'Done' : 'Select'}
+          </Button>
           <div className="flex items-center gap-2">
             {total > 0 && (
               <span className="text-xs text-muted-foreground whitespace-nowrap">{total} txns</span>
@@ -460,6 +591,51 @@ export default function TransactionList({ refreshTrigger, userName }: Transactio
           </div>
         </div>
       </div>
+
+      {/* Select Mode Actions Bar */}
+      {selectMode && (
+        <div className="flex items-center justify-between gap-2 p-2 bg-muted/50 rounded-lg border">
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-xs h-7"
+              onClick={allSelected ? deselectAll : selectAll}
+            >
+              {allSelected ? (
+                <>
+                  <X className="w-3.5 h-3.5 mr-1" />
+                  Deselect All
+                </>
+              ) : (
+                <>
+                  <CheckSquare className="w-3.5 h-3.5 mr-1" />
+                  Select All
+                </>
+              )}
+            </Button>
+            {selectedIds.size > 0 && (
+              <span className="text-xs text-muted-foreground">
+                {selectedIds.size} selected
+              </span>
+            )}
+          </div>
+          <Button
+            variant="destructive"
+            size="sm"
+            className="text-xs h-7"
+            onClick={handleBatchDeleteClick}
+            disabled={selectedIds.size === 0 || batchDeleting}
+          >
+            {batchDeleting ? (
+              <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />
+            ) : (
+              <Trash2 className="w-3.5 h-3.5 mr-1" />
+            )}
+            Delete Selected{selectedIds.size > 0 ? ` (${selectedIds.size})` : ''}
+          </Button>
+        </div>
+      )}
 
       {/* Transaction List */}
       {transactions.length === 0 ? (
@@ -473,21 +649,36 @@ export default function TransactionList({ refreshTrigger, userName }: Transactio
           <div className="max-h-[60vh] overflow-y-auto pr-1 space-y-2">
             {transactions.map((tx) => {
               const badge = CLASSIFICATION_BADGE[tx.classification] || CLASSIFICATION_BADGE.need
+              const isSelected = selectedIds.has(tx.id)
               return (
-                <Card key={tx.id} className="hover:shadow-sm transition-shadow group">
+                <Card key={tx.id} className={`hover:shadow-sm transition-shadow group ${isSelected ? 'ring-2 ring-emerald-400 border-emerald-300' : ''}`}>
                   <CardContent className="p-3 sm:p-4">
                     <div className="flex items-start gap-3">
-                      {/* Icon */}
-                      <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${
-                        tx.type === 'income' 
-                          ? 'bg-emerald-100 text-emerald-600' 
-                          : 'bg-red-100 text-red-600'
-                      }`}>
-                        {tx.type === 'income' 
-                          ? <ArrowUpRight className="w-5 h-5" /> 
-                          : <ArrowDownRight className="w-5 h-5" />
-                        }
-                      </div>
+                      {/* Checkbox (select mode) or Icon */}
+                      {selectMode ? (
+                        <button
+                          type="button"
+                          className="shrink-0 mt-0.5"
+                          onClick={() => toggleSelectTransaction(tx.id)}
+                        >
+                          {isSelected ? (
+                            <CheckSquare className="w-5 h-5 text-emerald-600" />
+                          ) : (
+                            <Square className="w-5 h-5 text-muted-foreground hover:text-emerald-600 transition-colors" />
+                          )}
+                        </button>
+                      ) : (
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${
+                          tx.type === 'income' 
+                            ? 'bg-emerald-100 text-emerald-600' 
+                            : 'bg-red-100 text-red-600'
+                        }`}>
+                          {tx.type === 'income' 
+                            ? <ArrowUpRight className="w-5 h-5" /> 
+                            : <ArrowDownRight className="w-5 h-5" />
+                          }
+                        </div>
+                      )}
 
                       {/* Details */}
                       <div className="flex-1 min-w-0">
@@ -501,7 +692,7 @@ export default function TransactionList({ refreshTrigger, userName }: Transactio
                         </div>
                         <div className="flex items-center gap-2 mt-1 flex-wrap">
                           <span className="text-xs text-muted-foreground">{tx.category}</span>
-                          <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${badge.color}`}>
+                          <Badge variant="outline" className={`text-xs px-1.5 py-0 ${badge.color}`}>
                             {badge.label}
                           </Badge>
                           <span className="text-xs text-muted-foreground capitalize">
@@ -526,25 +717,27 @@ export default function TransactionList({ refreshTrigger, userName }: Transactio
                         </div>
                       </div>
 
-                      {/* Edit & Delete */}
-                      <div className="flex items-center gap-0.5 shrink-0">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="text-muted-foreground hover:text-blue-600 h-8 w-8 p-0"
-                          onClick={() => handleEditOpen(tx)}
-                        >
-                          <Edit3 className="w-3.5 h-3.5" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="text-muted-foreground hover:text-destructive h-8 w-8 p-0"
-                          onClick={() => setDeleteId(tx.id)}
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </Button>
-                      </div>
+                      {/* Edit & Delete (hidden in select mode) */}
+                      {!selectMode && (
+                        <div className="flex items-center gap-0.5 shrink-0">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-muted-foreground hover:text-blue-600 h-8 w-8 p-0"
+                            onClick={() => handleEditOpen(tx)}
+                          >
+                            <Edit3 className="w-3.5 h-3.5" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-muted-foreground hover:text-destructive h-8 w-8 p-0"
+                            onClick={() => setDeleteId(tx.id)}
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </Button>
+                        </div>
+                      )}
                     </div>
                   </CardContent>
                 </Card>
@@ -721,7 +914,7 @@ export default function TransactionList({ refreshTrigger, userName }: Transactio
                 <Label className="text-xs text-muted-foreground flex items-center gap-1">
                   <Paperclip className="w-3 h-3" />
                   Receipt Photo
-                  <span className="text-[10px] text-muted-foreground/60 ml-1">(max 5MB)</span>
+                  <span className="text-xs text-muted-foreground/60 ml-1">(max 5MB)</span>
                 </Label>
                 <div className="mt-1.5">
                   {editReceiptUrl ? (
@@ -842,7 +1035,34 @@ export default function TransactionList({ refreshTrigger, userName }: Transactio
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation Dialog */}
+      {/* Password Verification Dialog (for batch delete) */}
+      <PasswordVerifyDialog
+        open={showPasswordDialog}
+        onOpenChange={setShowPasswordDialog}
+        onVerified={handlePasswordVerifiedForBatch}
+        userName={userName}
+      />
+
+      {/* Batch Delete Confirmation Dialog */}
+      <AlertDialog open={showBatchDeleteConfirm} onOpenChange={setShowBatchDeleteConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete {selectedIds.size} Transaction{selectedIds.size !== 1 ? 's' : ''}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete {selectedIds.size} transaction{selectedIds.size !== 1 ? 's' : ''}? This action cannot be undone and will reverse the balance effect for each transaction.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleBatchDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90" disabled={batchDeleting}>
+              {batchDeleting ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : null}
+              Delete {selectedIds.size} Transaction{selectedIds.size !== 1 ? 's' : ''}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Single Delete Confirmation Dialog */}
       <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>

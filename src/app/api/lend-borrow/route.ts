@@ -23,7 +23,6 @@ export async function GET(request: NextRequest) {
     const records = await db.lendBorrow.findMany({
       where,
       orderBy: { date: 'desc' },
-      include: { account: { select: { id: true, name: true, type: true } } },
     })
 
     const today = new Date()
@@ -77,7 +76,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { type, amount, person, description, date, dueDate, accountId } = body
+    const { type, amount, person, description, date, dueDate } = body
 
     if (!type || !amount || !person) {
       return NextResponse.json(
@@ -103,30 +102,8 @@ export async function POST(request: NextRequest) {
         date: date ? new Date(date) : new Date(),
         dueDate: dueDate ? new Date(dueDate) : null,
         isSettled: false,
-        accountId: accountId || null,
       },
-      include: { account: { select: { id: true, name: true, type: true } } },
     })
-
-    // Update account balance if accountId provided
-    if (accountId) {
-      const account = await db.account.findUnique({ where: { id: accountId } })
-      if (account && account.userId === user.id) {
-        if (type === 'lend') {
-          // Lending: deduct from account
-          await db.account.update({
-            where: { id: accountId },
-            data: { balance: account.balance - parseFloat(String(amount)) },
-          })
-        } else {
-          // Borrowing: add to account
-          await db.account.update({
-            where: { id: accountId },
-            data: { balance: account.balance + parseFloat(String(amount)) },
-          })
-        }
-      }
-    }
 
     return NextResponse.json({ record }, { status: 201 })
   } catch (error) {
@@ -144,39 +121,16 @@ export async function PUT(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { id, type, amount, person, description, date, dueDate, isSettled, settledDate, accountId } = body
+    const { id, type, amount, person, description, date, dueDate, isSettled, settledDate } = body
 
     if (!id) {
       return NextResponse.json({ error: 'Record ID is required' }, { status: 400 })
     }
 
     // Verify ownership
-    const existing = await db.lendBorrow.findUnique({ 
-      where: { id },
-      include: { account: { select: { id: true, name: true } } },
-    })
+    const existing = await db.lendBorrow.findUnique({ where: { id } })
     if (!existing || existing.userId !== user.id) {
       return NextResponse.json({ error: 'Record not found' }, { status: 404 })
-    }
-
-    // When settling: reverse the account balance change
-    if (isSettled === true && !existing.isSettled && existing.accountId) {
-      const account = await db.account.findUnique({ where: { id: existing.accountId } })
-      if (account) {
-        if (existing.type === 'lend') {
-          // Settling a lend: money comes back to account
-          await db.account.update({
-            where: { id: existing.accountId },
-            data: { balance: account.balance + existing.amount },
-          })
-        } else {
-          // Settling a borrow: money goes out from account
-          await db.account.update({
-            where: { id: existing.accountId },
-            data: { balance: account.balance - existing.amount },
-          })
-        }
-      }
     }
 
     const record = await db.lendBorrow.update({
@@ -190,10 +144,9 @@ export async function PUT(request: NextRequest) {
         ...(dueDate !== undefined && { dueDate: dueDate ? new Date(dueDate) : null }),
         ...(isSettled !== undefined && { isSettled }),
         ...(settledDate !== undefined && { settledDate: settledDate ? new Date(settledDate) : null }),
+        // Auto-set settled date if marking as settled
         ...(isSettled === true && !existing.isSettled && { settledDate: new Date() }),
-        ...(accountId !== undefined && { accountId: accountId || null }),
       },
-      include: { account: { select: { id: true, name: true, type: true } } },
     })
 
     return NextResponse.json({ record })
@@ -222,26 +175,6 @@ export async function DELETE(request: NextRequest) {
     const existing = await db.lendBorrow.findUnique({ where: { id } })
     if (!existing || existing.userId !== user.id) {
       return NextResponse.json({ error: 'Record not found' }, { status: 404 })
-    }
-
-    // If not settled and has account, reverse the balance change
-    if (!existing.isSettled && existing.accountId) {
-      const account = await db.account.findUnique({ where: { id: existing.accountId } })
-      if (account) {
-        if (existing.type === 'lend') {
-          // Was lent from account, add back
-          await db.account.update({
-            where: { id: existing.accountId },
-            data: { balance: account.balance + existing.amount },
-          })
-        } else {
-          // Was borrowed to account, remove
-          await db.account.update({
-            where: { id: existing.accountId },
-            data: { balance: account.balance - existing.amount },
-          })
-        }
-      }
     }
 
     await db.lendBorrow.delete({ where: { id } })

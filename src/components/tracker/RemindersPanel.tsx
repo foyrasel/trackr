@@ -58,6 +58,7 @@ import {
 } from 'lucide-react'
 import { toast } from '@/hooks/use-toast'
 import { cn } from '@/lib/utils'
+import { useCurrency } from './CurrencyContext'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -122,6 +123,7 @@ function formatDueDate(dateStr: string): string {
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export default function RemindersPanel({ userName, refreshTrigger }: RemindersPanelProps) {
+  const { currencySymbol } = useCurrency()
   const [reminders, setReminders] = useState<Reminder[]>([])
   const [loading, setLoading] = useState(true)
   const [mounted, setMounted] = useState(false)
@@ -158,6 +160,12 @@ export default function RemindersPanel({ userName, refreshTrigger }: RemindersPa
       const headers: Record<string, string> = {}
       if (contentType) headers['Content-Type'] = 'application/json'
       if (userName) headers['x-user-name'] = userName
+      if (typeof window !== 'undefined') {
+        const userEmail = localStorage.getItem('trackr_user_email')
+        const userId = localStorage.getItem('trackr_user_id')
+        if (userEmail) headers['x-user-email'] = userEmail
+        if (userId) headers['x-user-id'] = userId
+      }
       return headers
     },
     [userName]
@@ -411,7 +419,7 @@ export default function RemindersPanel({ userName, refreshTrigger }: RemindersPa
                 </span>
                 {reminder.amount != null && (
                   <span className={cn('text-sm font-bold', variant === 'paid' ? 'text-muted-foreground' : 'text-emerald-600')}>
-                    ${reminder.amount.toLocaleString()}
+                    {currencySymbol}{reminder.amount.toLocaleString()}
                   </span>
                 )}
               </div>
@@ -419,7 +427,7 @@ export default function RemindersPanel({ userName, refreshTrigger }: RemindersPa
                 {/* Category badge */}
                 <Badge
                   variant="outline"
-                  className="text-[10px] border"
+                  className="text-xs border"
                   style={{
                     borderColor: CATEGORY_COLORS[reminder.category] || '#94a3b8',
                     color: CATEGORY_COLORS[reminder.category] || '#94a3b8',
@@ -437,7 +445,7 @@ export default function RemindersPanel({ userName, refreshTrigger }: RemindersPa
 
                 {/* Days badge */}
                 {!reminder.isPaid && (
-                  <Badge variant="outline" className={cn('text-[10px]', daysBadgeStyles[variant])}>
+                  <Badge variant="outline" className={cn('text-xs', daysBadgeStyles[variant])}>
                     {isOverdue
                       ? `Overdue by ${Math.abs(reminder.daysUntilDue)} day${Math.abs(reminder.daysUntilDue) !== 1 ? 's' : ''}`
                       : reminder.daysUntilDue === 0
@@ -448,7 +456,7 @@ export default function RemindersPanel({ userName, refreshTrigger }: RemindersPa
 
                 {/* Recurring badge */}
                 {reminder.isRecurring && reminder.frequency && (
-                  <Badge variant="outline" className="text-[10px] bg-emerald-50 text-emerald-700 border-emerald-200 flex items-center gap-1">
+                  <Badge variant="outline" className="text-xs bg-emerald-50 text-emerald-700 border-emerald-200 flex items-center gap-1">
                     <Repeat className="w-2.5 h-2.5" />
                     {FREQUENCY_LABELS[reminder.frequency] || reminder.frequency}
                   </Badge>
@@ -520,7 +528,7 @@ export default function RemindersPanel({ userName, refreshTrigger }: RemindersPa
         <h3 className={cn('text-sm font-semibold flex items-center gap-1.5', labelClassName)}>
           {icon}
           {label}
-          <Badge variant="outline" className="text-[10px] ml-1">
+          <Badge variant="outline" className="text-xs ml-1">
             {items.length}
           </Badge>
         </h3>
@@ -700,7 +708,7 @@ export default function RemindersPanel({ userName, refreshTrigger }: RemindersPa
           <BellRing className="w-5 h-5 text-emerald-500" />
           <h2 className="text-lg font-bold">Bill Reminders</h2>
           {hasReminders && (
-            <Badge variant="outline" className="text-[10px] bg-emerald-50 text-emerald-700 border-emerald-200">
+            <Badge variant="outline" className="text-xs bg-emerald-50 text-emerald-700 border-emerald-200">
               {reminders.filter((r) => !r.isPaid).length} active
             </Badge>
           )}

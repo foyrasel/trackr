@@ -5,7 +5,8 @@ import { db } from '@/lib/db'
 /**
  * Get the current user from the session.
  * Works with both next-auth OAuth sessions and demo/credentials sessions.
- * Falls back to finding/creating user by localStorage name if no session exists.
+ * Priority: x-user-id > x-user-email > x-user-name > session
+ * No longer falls back to creating/finding a random user to prevent data mixing.
  */
 export async function getCurrentUser(request?: Request): Promise<{
   id: string
@@ -13,11 +14,60 @@ export async function getCurrentUser(request?: Request): Promise<{
   email: string | null
   provider: string
 } | null> {
-  // Try to get the next-auth session first
+  // 1. Try custom headers FIRST (fast, no session overhead)
+  if (request) {
+    // x-user-id is the most reliable header-based lookup
+    const userId = request.headers.get('x-user-id')
+    if (userId) {
+      const user = await db.user.findUnique({ where: { id: userId } })
+      if (user) {
+        return {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          provider: user.provider,
+        }
+      }
+    }
+
+    // x-user-email is unique and reliable for email/OAuth users
+    const userEmail = request.headers.get('x-user-email')
+    if (userEmail) {
+      const user = await db.user.findUnique({ where: { email: userEmail } })
+      if (user) {
+        return {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          provider: user.provider,
+        }
+      }
+    }
+
+    // x-user-name is the least reliable (names can be duplicated) but needed for demo mode
+    const userName = request.headers.get('x-user-name')
+    if (userName) {
+      // For demo mode, find or create user by name
+      let user = await db.user.findFirst({ where: { name: userName, provider: 'demo' } })
+      if (!user) {
+        // Also try any user with this name (for non-demo providers)
+        user = await db.user.findFirst({ where: { name: userName } })
+      }
+      if (user) {
+        return {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          provider: user.provider,
+        }
+      }
+    }
+  }
+
+  // 2. Fall back to next-auth session (slower, needed for OAuth redirects without headers)
   try {
     const session = await getServerSession(authOptions)
     if (session?.user?.id) {
-      // Verify user exists in DB
       const dbUser = await db.user.findUnique({ where: { id: session.user.id } })
       if (dbUser) {
         return {
@@ -32,48 +82,14 @@ export async function getCurrentUser(request?: Request): Promise<{
     // Session might not be available (e.g., during build or if auth not configured)
   }
 
-  // Fallback: try to get user from custom header (set by client for demo mode)
-  if (request) {
-    const userName = request.headers.get('x-user-name')
-    if (userName) {
-      const user = await db.user.findFirst({ where: { name: userName } })
-      if (user) {
-        return {
-          id: user.id,
-          name: user.name,
-          email: user.email,
-          provider: user.provider,
-        }
-      }
-    }
-  }
-
-  // Ultimate fallback: find or create default user
-  let user = await db.user.findFirst({ orderBy: { createdAt: 'asc' } })
-  if (!user) {
-    user = await db.user.create({
-      data: { name: 'User', provider: 'demo' },
-    })
-    await db.account.createMany({
-      data: [
-        { userId: user.id, name: 'Cash', type: 'cash', balance: 0, color: '#10b981', icon: '💵', isDefault: true },
-        { userId: user.id, name: 'Debit Card', type: 'debit', balance: 0, color: '#3b82f6', icon: '💳', isDefault: false },
-        { userId: user.id, name: 'Credit Card', type: 'credit', balance: 0, color: '#8b5cf6', icon: '💳', isDefault: false },
-        { userId: user.id, name: 'Mobile Wallet', type: 'mobile', balance: 0, color: '#a855f7', icon: '📱', isDefault: false },
-      ],
-    })
-  }
-
-  return {
-    id: user.id,
-    name: user.name,
-    email: user.email,
-    provider: user.provider,
-  }
+  // No longer auto-create or fall back to oldest user — return null instead
+  // This prevents data mixing between users
+  return null
 }
 
 /**
- * Add user-name header to fetch requests for demo mode auth
+ * Add auth headers to fetch requests for demo mode / client-side auth
+ * Includes x-user-id, x-user-email, and x-user-name for reliable user lookup
  */
 export function getAuthHeaders(userName?: string | null): HeadersInit {
   const headers: Record<string, string> = {
@@ -81,6 +97,13 @@ export function getAuthHeaders(userName?: string | null): HeadersInit {
   }
   if (userName) {
     headers['x-user-name'] = userName
+  }
+  // Also include user email and id from localStorage if available
+  if (typeof window !== 'undefined') {
+    const userEmail = localStorage.getItem('trackr_user_email')
+    const userId = localStorage.getItem('trackr_user_id')
+    if (userEmail) headers['x-user-email'] = userEmail
+    if (userId) headers['x-user-id'] = userId
   }
   return headers
 }

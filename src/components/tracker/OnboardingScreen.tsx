@@ -3,11 +3,18 @@
 import React, { useState, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Button } from '@/components/ui/button'
-import { Mic, Banknote, CreditCard, Smartphone, ArrowRight, X, Zap, Clock, TrendingUp } from 'lucide-react'
+import { Mic, Banknote, CreditCard, Smartphone, ArrowRight, X, Zap, Clock, TrendingUp, Globe, Check } from 'lucide-react'
+import { useCurrency } from './CurrencyContext'
 
 interface OnboardingScreenProps {
   onComplete: () => void
 }
+
+const LANGUAGES = [
+  { code: 'en', label: 'English', nativeLabel: 'English', flag: '\U0001f1fa\U0001f1f8', currency: 'USD ($)' },
+  { code: 'bn', label: 'Bangla', nativeLabel: '\u09ac\u09be\u0982\u09b2\u09be', flag: '\U0001f1e7\U0001f1e9', currency: 'BDT (\u09f3)' },
+  { code: 'hi', label: 'Hindi', nativeLabel: '\u0939\u093f\u0928\u094d\u0926\u0940', flag: '\U0001f1ee\U0001f1f3', currency: 'INR (\u20b9)' },
+]
 
 const screens = [
   {
@@ -33,6 +40,13 @@ const screens = [
   },
   {
     id: 3,
+    title: 'Choose your language',
+    subtitle: "We'll set the right currency for you.",
+    description: 'Trackr speaks your language. Pick one and we\'ll automatically configure the right currency.',
+    visual: 'language',
+  },
+  {
+    id: 4,
     title: 'Ready to give tracking another shot?',
     subtitle: 'This time, it sticks.',
     description: 'No credit card. No bank link. No subscription trap. Just start tracking.',
@@ -146,7 +160,7 @@ function VoiceVisual() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.8 }}
       >
-        <p className="text-[10px] font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">
+        <p className="text-xs font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">
           &quot;Spent 200 on groceries&quot;
         </p>
       </motion.div>
@@ -159,12 +173,12 @@ function VoiceVisual() {
       >
         <div className="flex items-center gap-1 bg-red-50 dark:bg-red-900/30 rounded-lg px-2 py-1">
           <Clock className="w-3 h-3 text-red-500" />
-          <span className="text-[10px] font-medium text-red-600 dark:text-red-400">45 sec manual</span>
+          <span className="text-xs font-medium text-red-600 dark:text-red-400">45 sec manual</span>
         </div>
         <ArrowRight className="w-4 h-4 text-emerald-500" />
         <div className="flex items-center gap-1 bg-emerald-50 dark:bg-emerald-900/30 rounded-lg px-2 py-1">
           <Zap className="w-3 h-3 text-emerald-500" />
-          <span className="text-[10px] font-medium text-emerald-600 dark:text-emerald-400">5 sec voice</span>
+          <span className="text-xs font-medium text-emerald-600 dark:text-emerald-400">5 sec voice</span>
         </div>
       </motion.div>
     </div>
@@ -206,7 +220,7 @@ function PaymentVisual() {
         transition={{ delay: 1.0 }}
       >
         <div className="flex items-center justify-between mb-1.5">
-          <span className="text-[10px] font-medium text-gray-500 dark:text-gray-400">50/30/20 Budget</span>
+          <span className="text-xs font-medium text-gray-500 dark:text-gray-400">50/30/20 Budget</span>
           <TrendingUp className="w-3 h-3 text-emerald-500" />
         </div>
         <div className="h-3 rounded-full overflow-hidden flex bg-gray-100 dark:bg-gray-700">
@@ -242,9 +256,66 @@ function PaymentVisual() {
         animate={{ opacity: 1 }}
         transition={{ delay: 2.0 }}
       >
-        <span className="text-[10px]">🌍</span>
-        <span className="text-[10px] font-medium text-emerald-700 dark:text-emerald-300">Works with any currency</span>
+        <span className="text-xs">🌍</span>
+        <span className="text-xs font-medium text-emerald-700 dark:text-emerald-300">Works with any currency</span>
       </motion.div>
+    </div>
+  )
+}
+
+// Language selection visual
+function LanguageVisual() {
+  const { language, setLanguage } = useCurrency()
+  const [selectedLang, setSelectedLang] = useState(language)
+
+  const handleSelect = (code: string) => {
+    setSelectedLang(code)
+    setLanguage(code)
+  }
+
+  return (
+    <div className="w-full max-w-xs mx-auto flex flex-col items-center gap-4">
+      <motion.div
+        className="w-20 h-20 rounded-2xl bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center shadow-xl shadow-emerald-500/30 mb-2"
+        initial={{ scale: 0, rotate: -10 }}
+        animate={{ scale: 1, rotate: 0 }}
+        transition={{ delay: 0.2, type: 'spring', stiffness: 200 }}
+      >
+        <Globe className="w-10 h-10 text-white" />
+      </motion.div>
+
+      <div className="w-full space-y-2">
+        {LANGUAGES.map((lang, i) => (
+          <motion.button
+            key={lang.code}
+            type="button"
+            onClick={() => handleSelect(lang.code)}
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.4 + i * 0.1, duration: 0.3 }}
+            className={`w-full flex items-center gap-3 p-3 rounded-xl border-2 transition-all text-left ${
+              selectedLang === lang.code
+                ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/30 shadow-md'
+                : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-emerald-300 dark:hover:border-emerald-700'
+            }`}
+          >
+            <span className="text-2xl">{lang.flag}</span>
+            <div className="flex-1 min-w-0">
+              <p className="font-semibold text-sm text-gray-900 dark:text-white">{lang.nativeLabel}</p>
+              <p className="text-xs text-muted-foreground">{lang.label} &middot; {lang.currency}</p>
+            </div>
+            {selectedLang === lang.code && (
+              <motion.div
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                transition={{ type: 'spring', stiffness: 500 }}
+              >
+                <Check className="w-5 h-5 text-emerald-600" />
+              </motion.div>
+            )}
+          </motion.button>
+        ))}
+      </div>
     </div>
   )
 }
@@ -282,7 +353,7 @@ function CtaVisual() {
             transition={{ delay: 1.0 + i * 0.15 }}
           >
             <span className="text-xs">{badge.icon}</span>
-            <span className="text-[9px] font-medium text-gray-600 dark:text-gray-400">{badge.text}</span>
+            <span className="text-xs font-medium text-gray-600 dark:text-gray-400">{badge.text}</span>
           </motion.div>
         ))}
       </motion.div>
@@ -318,6 +389,7 @@ function getVisual(visualType: string) {
     case 'frustration': return <FrustrationVisual />
     case 'voice': return <VoiceVisual />
     case 'payment': return <PaymentVisual />
+    case 'language': return <LanguageVisual />
     case 'cta': return <CtaVisual />
     default: return null
   }
@@ -382,7 +454,7 @@ export default function OnboardingScreen({ onComplete }: OnboardingScreenProps) 
       </div>
 
       {/* Content area */}
-      <div className="flex-1 flex flex-col items-center justify-center px-6 overflow-hidden">
+      <div className="flex-1 flex flex-col items-center justify-center px-6 overflow-y-auto">
         <AnimatePresence mode="wait" custom={direction}>
           <motion.div
             key={currentScreen}
@@ -398,7 +470,7 @@ export default function OnboardingScreen({ onComplete }: OnboardingScreenProps) 
             className="w-full max-w-sm flex flex-col items-center text-center"
           >
             {/* Visual */}
-            <div className="mb-6 min-h-[220px] flex items-center justify-center">
+            <div className="mb-6 min-h-[220px] flex items-center justify-center overflow-visible">
               {getVisual(screen.visual)}
             </div>
 
