@@ -19,16 +19,11 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     if (!emailRegex.test(email)) {
-      return NextResponse.json(
-        { error: 'Invalid email format' },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: 'Invalid email format' }, { status: 400 })
     }
 
-    // Validate password length
     if (password.length < 6) {
       return NextResponse.json(
         { error: 'Password must be at least 6 characters' },
@@ -36,87 +31,67 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Check if email already exists
-    const existingUser = await db.user.findUnique({
-      where: { email },
-    })
+    const existingUser = await db.user.findUnique({ where: { email } })
 
     if (existingUser) {
-      // If user exists but hasn't verified their email, allow re-registration
-      // by updating their data instead of rejecting
       if (!existingUser.emailVerified) {
+        // Allow re-registration of unverified accounts
         const hashedPassword = await hashPassword(password)
-        const verificationCode = generateVerificationCode()
 
-        // Update existing unverified user with new data
+        if (!isEmailEnabled()) {
+          // No email provider — verify immediately
+          await db.user.update({
+            where: { id: existingUser.id },
+            data: { name, password: hashedPassword, emailVerified: new Date() },
+          })
+          return NextResponse.json({ userId: existingUser.id, email, autoVerified: true })
+        }
+
+        const verificationCode = generateVerificationCode()
         await db.user.update({
           where: { id: existingUser.id },
-          data: {
-            name,
-            password: hashedPassword,
-          },
+          data: { name, password: hashedPassword },
         })
-
-        // Clean up old expired tokens for this email
-        await db.verificationToken.deleteMany({
-          where: {
-            email,
-            expires: { lt: new Date() },
-          },
-        })
-
-        // Store new verification code
+        await db.verificationToken.deleteMany({ where: { email, expires: { lt: new Date() } } })
         await db.verificationToken.create({
-          data: {
-            email,
-            token: verificationCode,
-            expires: new Date(Date.now() + 10 * 60 * 1000),
-          },
+          data: { email, token: verificationCode, expires: new Date(Date.now() + 10 * 60 * 1000) },
         })
-
-        // Attempt to send verification email; fall back to returning the code
-        // on screen when no email provider is configured (demo / development).
-        try {
-          await sendVerificationEmail(email, name, verificationCode)
-        } catch (emailErr) {
-          console.error('[register] Email send failed:', emailErr)
-        }
-
-        const reregResponse: Record<string, unknown> = {
-          userId: existingUser.id,
-          email,
-          message: 'Account updated! Please verify your email.',
-        }
-        if (!isEmailEnabled()) {
-          reregResponse.verificationCode = verificationCode
-        }
-        return NextResponse.json(reregResponse, { status: 201 })
+        try { await sendVerificationEmail(email, name, verificationCode) } catch {}
+        return NextResponse.json({ userId: existingUser.id, email, message: 'Verification email sent.' }, { status: 201 })
       }
 
-      // User exists and is verified — cannot re-register
-      return NextResponse.json(
-        { error: 'An account with this email already exists' },
-        { status: 409 }
-      )
+      return NextResponse.json({ error: 'An account with this email already exists' }, { status: 409 })
     }
 
-    // Hash password
     const hashedPassword = await hashPassword(password)
 
-    // Generate verification code
+    if (!isEmailEnabled()) {
+      // No email provider — create user and verify immediately, no code dance
+      const user = await db.user.create({
+        data: {
+          name,
+          email,
+          password: hashedPassword,
+          provider: 'email',
+          emailVerified: new Date(),
+        },
+      })
+      await db.account.createMany({
+        data: [
+          { userId: user.id, name: 'Cash', type: 'cash', balance: 0, color: '#10b981', icon: '💵', isDefault: true },
+          { userId: user.id, name: 'Debit Card', type: 'debit', balance: 0, color: '#3b82f6', icon: '💳', isDefault: false },
+          { userId: user.id, name: 'Credit Card', type: 'credit', balance: 0, color: '#8b5cf6', icon: '💳', isDefault: false },
+          { userId: user.id, name: 'Mobile Wallet', type: 'mobile', balance: 0, color: '#a855f7', icon: '📱', isDefault: false },
+        ],
+      })
+      return NextResponse.json({ userId: user.id, email, autoVerified: true }, { status: 201 })
+    }
+
+    // Email provider configured — send verification code
     const verificationCode = generateVerificationCode()
-
-    // Create user (unverified)
     const user = await db.user.create({
-      data: {
-        name,
-        email,
-        password: hashedPassword,
-        provider: 'email',
-      },
+      data: { name, email, password: hashedPassword, provider: 'email' },
     })
-
-    // Create default accounts for new user
     await db.account.createMany({
       data: [
         { userId: user.id, name: 'Cash', type: 'cash', balance: 0, color: '#10b981', icon: '💵', isDefault: true },
@@ -125,44 +100,17 @@ export async function POST(request: NextRequest) {
         { userId: user.id, name: 'Mobile Wallet', type: 'mobile', balance: 0, color: '#a855f7', icon: '📱', isDefault: false },
       ],
     })
-
-    // Store verification code in database (expires in 10 minutes)
+    await db.verificationToken.deleteMany({ where: { email, expires: { lt: new Date() } } })
     await db.verificationToken.create({
-      data: {
-        email,
-        token: verificationCode,
-        expires: new Date(Date.now() + 10 * 60 * 1000),
-      },
+      data: { email, token: verificationCode, expires: new Date(Date.now() + 10 * 60 * 1000) },
     })
-
-    // Clean up old expired tokens for this email
-    await db.verificationToken.deleteMany({
-      where: {
-        email,
-        expires: { lt: new Date() },
-      },
-    })
-
-    try {
-      await sendVerificationEmail(email, name, verificationCode)
-    } catch (emailErr) {
+    try { await sendVerificationEmail(email, name, verificationCode) } catch (emailErr) {
       console.error('[register] Email send failed:', emailErr)
     }
-
-    const regResponse: Record<string, unknown> = {
-      userId: user.id,
-      email,
-      message: 'Account created! Please verify your email.',
-    }
-    if (!isEmailEnabled()) {
-      regResponse.verificationCode = verificationCode
-    }
-    return NextResponse.json(regResponse, { status: 201 })
+    return NextResponse.json({ userId: user.id, email, message: 'Verification email sent.' }, { status: 201 })
   } catch (error) {
     console.error('Error registering user:', error)
-    return NextResponse.json(
-      { error: 'Failed to create account' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Failed to create account' }, { status: 500 })
   }
 }
+

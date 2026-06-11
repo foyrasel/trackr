@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAI } from '@/lib/ai'
+import { getCurrentUser } from '@/lib/auth'
+import { db } from '@/lib/db'
 
 const CATEGORIES = {
   expense: [
@@ -197,6 +199,34 @@ async function categorizeWithClaude(preprocessed: string): Promise<string | null
   }
 }
 
+// Call Google Gemini API for AI categorization (free tier: 1,500 req/day)
+async function categorizeWithGemini(preprocessed: string, apiKey: string): Promise<string | null> {
+  try {
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          system_instruction: { parts: [{ text: CATEGORIZE_SYSTEM_PROMPT }] },
+          contents: [{ parts: [{ text: preprocessed }] }],
+          generationConfig: {
+            temperature: 0.1,
+            maxOutputTokens: 300,
+            responseMimeType: 'application/json',
+          },
+        }),
+        signal: AbortSignal.timeout(8000),
+      }
+    )
+    if (!response.ok) return null
+    const data = await response.json()
+    return data.candidates?.[0]?.content?.parts?.[0]?.text || null
+  } catch {
+    return null
+  }
+}
+
 function parseAIResponse(content: string): Record<string, unknown> {
   let cleaned = content.trim()
   if (cleaned.startsWith('```json')) cleaned = cleaned.slice(7)
@@ -217,6 +247,18 @@ export async function POST(request: NextRequest) {
 
     const preprocessed = preprocessBanglaText(text)
     const extractedDate = extractDateFromText(text)
+
+    // Look up user's Gemini API key from DB
+    let geminiApiKey: string | null = null
+    try {
+      const user = await getCurrentUser(request)
+      if (user) {
+        const dbUser = await db.user.findUnique({ where: { id: user.id }, select: { geminiApiKey: true } })
+        geminiApiKey = dbUser?.geminiApiKey || null
+      }
+    } catch {}
+    // Fall back to app-level key if user hasn't set their own
+    if (!geminiApiKey) geminiApiKey = process.env.GEMINI_API_KEY || null
 
     // Try ZAI SDK first (only works inside Z.ai sandbox)
     const zai = await getAI()
@@ -240,7 +282,19 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Try Anthropic Claude if ZAI not available and ANTHROPIC_API_KEY is set
+    // Try Gemini (user key or app GEMINI_API_KEY) — free 1,500 req/day
+    if (!parsed && geminiApiKey) {
+      const geminiResponse = await categorizeWithGemini(preprocessed, geminiApiKey)
+      if (geminiResponse) {
+        try {
+          parsed = parseAIResponse(geminiResponse)
+        } catch {
+          parsed = null
+        }
+      }
+    }
+
+    // Try Anthropic Claude if ANTHROPIC_API_KEY is set (paid fallback)
     if (!parsed) {
       const claudeResponse = await categorizeWithClaude(preprocessed)
       if (claudeResponse) {

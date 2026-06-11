@@ -149,8 +149,35 @@ export default function AuthModal({ isOpen, onClose, defaultMode = 'login', onLo
       })
       const data = await response.json()
       if (response.ok) {
-        setVerificationCode(data.verificationCode)
-        setMode('verify')
+        if (data.autoVerified) {
+          // No email provider configured — user is verified immediately, log them in
+          const result = await signIn('credentials', {
+            email: email.trim(),
+            password,
+            redirect: false,
+          })
+          if (result?.ok) {
+            try {
+              const sessionRes = await fetch('/api/auth/session')
+              const sessionData = await sessionRes.json()
+              const sessionId = sessionData?.user?.id || null
+              localStorage.setItem('trackr_user_email', email.trim())
+              if (sessionId) localStorage.setItem('trackr_user_id', sessionId)
+              onLogin(name.trim(), email.trim(), sessionId)
+            } catch {
+              localStorage.setItem('trackr_user_email', email.trim())
+              onLogin(name.trim(), email.trim())
+            }
+            handleClose()
+          } else {
+            setError('Account created but login failed. Please log in manually.')
+            setMode('login')
+          }
+        } else {
+          // Email verification required
+          setVerificationCode(data.verificationCode || '')
+          setMode('verify')
+        }
       } else {
         setError(data.error || 'Registration failed')
       }

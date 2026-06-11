@@ -184,6 +184,9 @@ async function pushSchema() {
     // Add new columns to User table (for existing databases)
     `ALTER TABLE User ADD COLUMN emailVerified DATETIME;`,
     `ALTER TABLE User ADD COLUMN password TEXT;`,
+    `ALTER TABLE User ADD COLUMN language TEXT NOT NULL DEFAULT 'en';`,
+    `ALTER TABLE User ADD COLUMN onboardingDone BOOLEAN NOT NULL DEFAULT 0;`,
+    `ALTER TABLE User ADD COLUMN geminiApiKey TEXT;`,
 
     // Indexes for performance
     `CREATE INDEX IF NOT EXISTS idx_account_userId ON Account(userId);`,

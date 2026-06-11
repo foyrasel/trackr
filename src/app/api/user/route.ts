@@ -25,6 +25,7 @@ export async function GET(request: NextRequest) {
       currency: dbUser.currency,
       currencySymbol: dbUser.currencySymbol,
       language: dbUser.language,
+      hasGeminiKey: !!dbUser.geminiApiKey,
     })
   } catch (error) {
     console.error('Error fetching user settings:', error)
@@ -41,7 +42,7 @@ export async function PUT(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { darkMode, currency, currencySymbol, language, onboardingDone } = body
+    const { darkMode, currency, currencySymbol, language, onboardingDone, geminiApiKey } = body
 
     const updateData: Record<string, unknown> = {}
     if (darkMode !== undefined) updateData.darkMode = darkMode
@@ -49,6 +50,7 @@ export async function PUT(request: NextRequest) {
     if (currencySymbol !== undefined) updateData.currencySymbol = currencySymbol
     if (language !== undefined) updateData.language = language
     if (onboardingDone !== undefined) updateData.onboardingDone = onboardingDone
+    if (geminiApiKey !== undefined) updateData.geminiApiKey = geminiApiKey || null
 
     if (Object.keys(updateData).length === 0) {
       return NextResponse.json({ error: 'No fields to update' }, { status: 400 })

@@ -424,42 +424,37 @@ export default function Home() {
     <CurrencyProvider>
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-gray-50 via-white to-emerald-50/30 dark:from-gray-950 dark:via-gray-900 dark:to-emerald-950/10">
       {/* Header */}
-      <header className="sticky top-0 z-50 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md border-b dark:border-gray-800">
-        <div className="w-full mx-auto px-3 sm:px-4 py-3 flex items-center justify-between">
+      <header className="sticky top-0 z-50 bg-white/95 dark:bg-gray-950/95 backdrop-blur-xl border-b border-gray-100/80 dark:border-gray-800/60">
+        <div className="w-full max-w-2xl mx-auto px-4 py-2.5 flex items-center justify-between">
           <button
             onClick={() => setActiveTab('dashboard')}
             className="flex items-center gap-2.5 hover:opacity-80 transition-opacity"
           >
-            <div className="w-9 h-9 rounded-xl bg-emerald-500 flex items-center justify-center">
-              <span className="text-white text-lg font-bold">T</span>
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-sm shadow-emerald-500/20">
+              <span className="text-white text-base font-extrabold tracking-tight">T</span>
             </div>
-            <div className="hidden sm:block">
-              <h1 className="text-lg font-bold leading-tight">Trackr</h1>
-              <p className="text-sm text-muted-foreground leading-tight">
-                {userName ? `Hi, ${userName}` : 'AI Voice Expense Tracker'}
+            <div>
+              <h1 className="text-[15px] font-bold leading-tight tracking-tight">Trackr</h1>
+              <p className="text-[11px] text-muted-foreground leading-tight">
+                {userName ? `Hi, ${userName.split(' ')[0]}` : 'AI Expense Tracker'}
               </p>
             </div>
           </button>
-          <div className="flex items-center gap-1.5">
-            <Badge variant="outline" className="text-xs bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800">
-              <CurrencyDisplay />
-            </Badge>
+          <div className="flex items-center gap-1">
             <Button
               variant="ghost"
               size="sm"
               onClick={handleToggleDarkMode}
-              className="text-muted-foreground hover:text-emerald-600 h-8 w-8 p-0"
+              className="text-muted-foreground hover:text-emerald-600 h-9 w-9 p-0 rounded-xl"
             >
-              {isDarkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+              {isDarkMode ? <Sun className="w-[18px] h-[18px]" /> : <Moon className="w-[18px] h-[18px]" />}
             </Button>
-            {userImage && (
-              <Avatar className="h-7 w-7">
-                <AvatarImage src={userImage} alt={userName} />
-                <AvatarFallback className="text-xs bg-emerald-100 dark:bg-emerald-900 text-emerald-700 dark:text-emerald-300">{userInitials}</AvatarFallback>
-              </Avatar>
-            )}
-            <Button variant="ghost" size="sm" onClick={handleLogout} className="text-muted-foreground hover:text-destructive h-8 w-8 p-0">
-              <LogOut className="w-4 h-4" />
+            <Avatar className="h-8 w-8 cursor-pointer" onClick={() => setActiveTab('more')}>
+              {userImage && <AvatarImage src={userImage} alt={userName} />}
+              <AvatarFallback className="text-[11px] font-semibold bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300">{userInitials || '?'}</AvatarFallback>
+            </Avatar>
+            <Button variant="ghost" size="sm" onClick={handleLogout} className="text-muted-foreground hover:text-red-500 h-9 w-9 p-0 rounded-xl">
+              <LogOut className="w-[18px] h-[18px]" />
             </Button>
           </div>
         </div>
@@ -468,7 +463,7 @@ export default function Home() {
       {/* Single Tabs component wrapping both content and navigation */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         {/* Main Content */}
-        <main className="w-full mx-auto px-2 sm:px-4 pb-24 pt-2 sm:pt-4 flex-1">
+        <main className="w-full max-w-2xl mx-auto px-3 sm:px-4 pb-28 pt-4 flex-1">
           <TabsContent value="dashboard" className="mt-0">
             <ErrorBoundary label="Dashboard">
               <Dashboard refreshTrigger={refreshTrigger} userName={userName} />
@@ -512,51 +507,57 @@ export default function Home() {
         </main>
 
         {/* Bottom Navigation */}
-        <nav className="fixed bottom-0 left-0 right-0 bg-white/95 dark:bg-gray-900/95 backdrop-blur-md border-t dark:border-gray-800 z-50">
-          <div className="w-full mx-auto">
-            <TabsList className="w-full h-16 bg-transparent justify-around p-0 shadow-none">
-              <TabsTrigger
-                value="dashboard"
-                className="flex-col gap-0.5 data-[state=active]:text-emerald-600 data-[state=active]:shadow-none px-1 py-2 flex-1"
-              >
-                <LayoutDashboard className="w-5 h-5" />
-                <span className="text-sm">Dashboard</span>
-              </TabsTrigger>
+        <nav className="fixed bottom-0 left-0 right-0 z-50">
+          <div className="bg-white/97 dark:bg-gray-950/97 backdrop-blur-xl border-t border-gray-100/80 dark:border-gray-800/60 shadow-[0_-4px_24px_rgba(0,0,0,0.06)]">
+            <div className="w-full max-w-2xl mx-auto">
+              <TabsList className="w-full h-[62px] bg-transparent justify-around p-0 shadow-none rounded-none">
+                <TabsTrigger
+                  value="dashboard"
+                  className="group flex-col gap-0.5 data-[state=active]:text-emerald-600 dark:data-[state=active]:text-emerald-400 data-[state=active]:shadow-none data-[state=active]:bg-transparent text-gray-400 dark:text-gray-500 px-1 pb-2 pt-2.5 flex-1 h-full rounded-none relative"
+                >
+                  <LayoutDashboard className="w-[22px] h-[22px]" />
+                  <span className="text-[10px] font-medium leading-none">Home</span>
+                  <span className="absolute bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-emerald-500 opacity-0 group-data-[state=active]:opacity-100 transition-opacity" />
+                </TabsTrigger>
 
-              <TabsTrigger
-                value="budget"
-                className="flex-col gap-0.5 data-[state=active]:text-emerald-600 data-[state=active]:shadow-none px-1 py-2 flex-1"
-              >
-                <Target className="w-5 h-5" />
-                <span className="text-sm">Budget</span>
-              </TabsTrigger>
+                <TabsTrigger
+                  value="budget"
+                  className="group flex-col gap-0.5 data-[state=active]:text-emerald-600 dark:data-[state=active]:text-emerald-400 data-[state=active]:shadow-none data-[state=active]:bg-transparent text-gray-400 dark:text-gray-500 px-1 pb-2 pt-2.5 flex-1 h-full rounded-none relative"
+                >
+                  <Target className="w-[22px] h-[22px]" />
+                  <span className="text-[10px] font-medium leading-none">Budget</span>
+                  <span className="absolute bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-emerald-500 opacity-0 group-data-[state=active]:opacity-100 transition-opacity" />
+                </TabsTrigger>
 
-              <TabsTrigger
-                value="add"
-                className="flex-col gap-0.5 data-[state=active]:text-emerald-600 data-[state=active]:shadow-none px-1 py-2 flex-1 relative"
-              >
-                <div className="w-10 h-10 rounded-full bg-emerald-500 flex items-center justify-center -mt-5 shadow-lg shadow-emerald-500/30">
-                  <Plus className="w-6 h-6 text-white" />
-                </div>
-                <span className="text-sm">Add</span>
-              </TabsTrigger>
+                <TabsTrigger
+                  value="add"
+                  className="flex-col items-center justify-end data-[state=active]:shadow-none data-[state=active]:bg-transparent px-1 pb-2 pt-0 flex-1 h-full rounded-none relative gap-0.5"
+                >
+                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-500 flex items-center justify-center -mt-5 shadow-lg shadow-emerald-500/35 active:scale-95 transition-transform">
+                    <Plus className="w-[26px] h-[26px] text-white stroke-[2.5]" />
+                  </div>
+                  <span className="text-[10px] font-medium leading-none text-gray-400 data-[state=active]:text-emerald-600 dark:data-[state=active]:text-emerald-400">Add</span>
+                </TabsTrigger>
 
-              <TabsTrigger
-                value="history"
-                className="flex-col gap-0.5 data-[state=active]:text-emerald-600 data-[state=active]:shadow-none px-1 py-2 flex-1"
-              >
-                <History className="w-5 h-5" />
-                <span className="text-sm">History</span>
-              </TabsTrigger>
+                <TabsTrigger
+                  value="history"
+                  className="group flex-col gap-0.5 data-[state=active]:text-emerald-600 dark:data-[state=active]:text-emerald-400 data-[state=active]:shadow-none data-[state=active]:bg-transparent text-gray-400 dark:text-gray-500 px-1 pb-2 pt-2.5 flex-1 h-full rounded-none relative"
+                >
+                  <History className="w-[22px] h-[22px]" />
+                  <span className="text-[10px] font-medium leading-none">History</span>
+                  <span className="absolute bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-emerald-500 opacity-0 group-data-[state=active]:opacity-100 transition-opacity" />
+                </TabsTrigger>
 
-              <TabsTrigger
-                value="more"
-                className="flex-col gap-0.5 data-[state=active]:text-emerald-600 data-[state=active]:shadow-none px-1 py-2 flex-1"
-              >
-                <MoreHorizontal className="w-5 h-5" />
-                <span className="text-sm">More</span>
-              </TabsTrigger>
-            </TabsList>
+                <TabsTrigger
+                  value="more"
+                  className="group flex-col gap-0.5 data-[state=active]:text-emerald-600 dark:data-[state=active]:text-emerald-400 data-[state=active]:shadow-none data-[state=active]:bg-transparent text-gray-400 dark:text-gray-500 px-1 pb-2 pt-2.5 flex-1 h-full rounded-none relative"
+                >
+                  <MoreHorizontal className="w-[22px] h-[22px]" />
+                  <span className="text-[10px] font-medium leading-none">More</span>
+                  <span className="absolute bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-emerald-500 opacity-0 group-data-[state=active]:opacity-100 transition-opacity" />
+                </TabsTrigger>
+              </TabsList>
+            </div>
           </div>
         </nav>
       </Tabs>
