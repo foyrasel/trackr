@@ -82,12 +82,14 @@ export async function POST(request: NextRequest) {
         )
       }
 
-      // In production, you'd send an email here. For this demo, return the code on screen.
-      return NextResponse.json({
+      const resetResponse: Record<string, unknown> = {
         success: true,
-        resetCode, // In production, this would be sent via email, not returned in the response
         message: 'Reset code sent to your email.',
-      })
+      }
+      if (process.env.NODE_ENV !== 'production') {
+        resetResponse.resetCode = resetCode
+      }
+      return NextResponse.json(resetResponse)
     }
 
     // For security, don't reveal if email exists or not
