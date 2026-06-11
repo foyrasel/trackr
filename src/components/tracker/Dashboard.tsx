@@ -183,16 +183,13 @@ export default function Dashboard({ refreshTrigger, userName }: DashboardProps) 
   if (loading || !mounted) {
     return (
       <div className="space-y-3">
-        {[1, 2, 3].map((i) => (
-          <Card key={i}>
-            <CardContent className="p-4">
-              <div className="animate-pulse space-y-3">
-                <div className="h-4 bg-muted rounded w-1/3" />
-                <div className="h-8 bg-muted rounded w-1/2" />
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+        <div className="h-40 rounded-2xl bg-gradient-to-br from-gray-900/10 via-emerald-950/10 to-slate-900/10 animate-pulse" />
+        <div className="grid grid-cols-2 gap-3">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="h-24 rounded-2xl bg-muted animate-pulse" />
+          ))}
+        </div>
+        <div className="h-48 rounded-2xl bg-muted animate-pulse" />
       </div>
     )
   }
@@ -301,109 +298,107 @@ export default function Dashboard({ refreshTrigger, userName }: DashboardProps) 
   return (
     <div className="space-y-4">
       {/* Row 1: Month Navigation Header */}
-      <Card className="bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-500 text-white border-0 shadow-lg">
-        <CardContent className="p-4">
+      <div className="rounded-2xl bg-gradient-to-br from-gray-900 via-emerald-950 to-slate-900 text-white shadow-xl shadow-emerald-900/20 overflow-hidden">
+        <div className="px-5 pt-5 pb-4">
           <div className="flex items-center justify-between">
-            <Button
-              variant="ghost"
-              size="sm"
+            <button
               onClick={() => navigateMonth(-1)}
-              className="text-white/80 hover:text-white hover:bg-white/10 h-8 w-8 p-0"
+              className="w-9 h-9 rounded-xl bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors active:scale-95"
             >
               <ChevronLeft className="w-5 h-5" />
-            </Button>
+            </button>
             <div className="text-center">
-              <div className="flex items-center gap-2 justify-center">
-                <Calendar className="w-4 h-4 opacity-80" />
-                <h2 className="text-lg font-bold">{data.monthName}</h2>
-              </div>
+              <p className="text-[10px] text-white/40 font-semibold tracking-widest uppercase mb-0.5">
+                {data.monthName.includes(' ') ? data.monthName.split(' ')[1] : new Date().getFullYear()}
+              </p>
+              <h2 className="text-4xl font-bold tracking-tight leading-none">
+                {data.monthShortName || data.monthName.split(' ')[0]}
+              </h2>
               {!isCurrentMonth && (
-                <Button
-                  variant="ghost"
-                  size="sm"
+                <button
                   onClick={goToCurrentMonth}
-                  className="text-sm text-white/70 hover:text-white hover:bg-white/10 mt-0.5 h-6 px-2"
+                  className="text-[11px] text-emerald-400 hover:text-emerald-300 mt-1.5 transition-colors"
                 >
-                  Back to Current Month
-                </Button>
+                  ← Back to current
+                </button>
               )}
             </div>
-            <Button
-              variant="ghost"
-              size="sm"
+            <button
               onClick={() => navigateMonth(1)}
-              className="text-white/80 hover:text-white hover:bg-white/10 h-8 w-8 p-0"
+              className="w-9 h-9 rounded-xl bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors active:scale-95"
             >
               <ChevronRight className="w-5 h-5" />
-            </Button>
+            </button>
           </div>
-        </CardContent>
-      </Card>
+          {isCurrentMonth && data.daysInMonth > 0 && (
+            <div className="mt-4">
+              <div className="flex justify-between text-[10px] text-white/35 mb-1.5">
+                <span>Day {data.daysElapsed} of {data.daysInMonth}</span>
+                <span>{Math.round((data.daysElapsed / data.daysInMonth) * 100)}% through</span>
+              </div>
+              <div className="h-[3px] bg-white/10 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-gradient-to-r from-emerald-400 to-teal-400 rounded-full"
+                  style={{ width: `${Math.min((data.daysElapsed / data.daysInMonth) * 100, 100)}%` }}
+                />
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
 
       {/* Row 2: Balance Cards - Cash, Debit, Credit */}
       <BalanceCards refreshTrigger={refreshTrigger} userName={userName} />
 
-      {/* Row 3: Summary Cards with inline avg badge on Expense */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Card className="bg-gradient-to-br from-emerald-50 to-emerald-100/50 border-emerald-200">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2 mb-0.5">
-              <TrendingUp className="w-4 h-4 text-emerald-600" />
-              <span className="text-sm text-emerald-700 font-medium">Income</span>
+      {/* Row 3: Summary Cards */}
+      <div className="grid grid-cols-2 gap-3">
+        <div className="bg-white dark:bg-gray-900 rounded-2xl p-4 shadow-sm border border-gray-100 dark:border-gray-800">
+          <div className="flex items-center gap-2 mb-2.5">
+            <div className="w-7 h-7 rounded-lg bg-emerald-100 dark:bg-emerald-900/40 flex items-center justify-center">
+              <TrendingUp className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
             </div>
-            <p className="text-xl font-bold text-emerald-900">{currencySymbol}{data.totalIncome.toLocaleString()}</p>
-          </CardContent>
-        </Card>
+            <span className="text-xs text-muted-foreground font-medium">Income</span>
+          </div>
+          <p className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white leading-none">{currencySymbol}{data.totalIncome.toLocaleString()}</p>
+        </div>
 
-        <Card className="bg-gradient-to-br from-red-50 to-red-100/50 border-red-200">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2 mb-0.5">
-              <TrendingDown className="w-4 h-4 text-red-600" />
-              <span className="text-sm text-red-700 font-medium">Expense</span>
+        <div className="bg-white dark:bg-gray-900 rounded-2xl p-4 shadow-sm border border-gray-100 dark:border-gray-800">
+          <div className="flex items-center gap-2 mb-2.5">
+            <div className="w-7 h-7 rounded-lg bg-red-100 dark:bg-red-900/40 flex items-center justify-center">
+              <TrendingDown className="w-3.5 h-3.5 text-red-500 dark:text-red-400" />
             </div>
-            <div className="flex items-center gap-2">
-              <p className="text-xl font-bold text-red-900">{currencySymbol}{data.totalExpense.toLocaleString()}</p>
-              {data.averageMonthlyExpense > 0 && (
-                <Badge className={`text-[10px] px-1.5 py-0 h-5 ${
-                  diffFromAvg > 10
-                    ? 'bg-red-100 text-red-700 border-red-300'
-                    : diffFromAvg < -10
-                      ? 'bg-emerald-100 text-emerald-700 border-emerald-300'
-                      : 'bg-amber-100 text-amber-700 border-amber-300'
-                }`}>
-                  {diffFromAvg > 0 ? '+' : ''}{diffFromAvg.toFixed(1)}% vs avg
-                </Badge>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className={`bg-gradient-to-br ${data.balance >= 0 ? 'from-emerald-50 to-emerald-100/50 border-emerald-200' : 'from-red-50 to-red-100/50 border-red-200'}`}>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2 mb-0.5">
-              <Wallet className="w-4 h-4" />
-              <span className="text-sm font-medium">Net Balance</span>
-            </div>
-            <p className={`text-xl font-bold ${data.balance >= 0 ? 'text-emerald-900' : 'text-red-900'}`}>
-              {currencySymbol}{data.balance.toLocaleString()}
+            <span className="text-xs text-muted-foreground font-medium">Expenses</span>
+          </div>
+          <p className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white leading-none">{currencySymbol}{data.totalExpense.toLocaleString()}</p>
+          {data.averageMonthlyExpense > 0 && (
+            <p className={`text-[11px] mt-1 font-medium ${diffFromAvg > 10 ? 'text-red-500' : diffFromAvg < -10 ? 'text-emerald-500' : 'text-amber-500'}`}>
+              {diffFromAvg > 0 ? '↑' : '↓'} {Math.abs(diffFromAvg).toFixed(0)}% vs avg
             </p>
-          </CardContent>
-        </Card>
+          )}
+        </div>
 
-        <Card className="bg-gradient-to-br from-amber-50 to-amber-100/50 border-amber-200">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2 mb-0.5">
-              <PiggyBank className="w-4 h-4 text-amber-600" />
-              <span className="text-sm text-amber-700 font-medium">Savings Rate</span>
+        <div className={`rounded-2xl p-4 shadow-sm ${data.balance >= 0 ? 'bg-gradient-to-br from-emerald-500 to-teal-500' : 'bg-gradient-to-br from-red-500 to-rose-500'}`}>
+          <div className="flex items-center gap-2 mb-2.5">
+            <Wallet className="w-4 h-4 text-white/70" />
+            <span className="text-xs text-white/70 font-medium">Net Balance</span>
+          </div>
+          <p className="text-2xl font-bold tracking-tight text-white leading-none">{currencySymbol}{Math.abs(data.balance).toLocaleString()}</p>
+          <p className="text-[11px] text-white/60 mt-1">{data.balance < 0 ? 'Overspent' : 'Surplus this month'}</p>
+        </div>
+
+        <div className="bg-white dark:bg-gray-900 rounded-2xl p-4 shadow-sm border border-gray-100 dark:border-gray-800">
+          <div className="flex items-center gap-2 mb-2.5">
+            <div className="w-7 h-7 rounded-lg bg-amber-100 dark:bg-amber-900/40 flex items-center justify-center">
+              <PiggyBank className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
             </div>
-            <p className="text-xl font-bold text-amber-900">
-              {data.totalIncome > 0
-                ? `${Math.round(((data.totalIncome - data.totalExpense) / data.totalIncome) * 100)}%`
-                : '0%'
-              }
-            </p>
-          </CardContent>
-        </Card>
+            <span className="text-xs text-muted-foreground font-medium">Savings Rate</span>
+          </div>
+          <p className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white leading-none">
+            {data.totalIncome > 0
+              ? `${Math.round(((data.totalIncome - data.totalExpense) / data.totalIncome) * 100)}%`
+              : '—'}
+          </p>
+        </div>
       </div>
 
       {/* Row 3b: Smart Insights — plain-English highlights */}
@@ -433,55 +428,55 @@ export default function Dashboard({ refreshTrigger, userName }: DashboardProps) 
       {/* Row 3c: Spending Pace key metrics */}
       {data.totalExpense > 0 && (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          <Card className="bg-gradient-to-br from-blue-50 to-blue-100/40 border-blue-200 dark:from-blue-950/20 dark:border-blue-900/50">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-2 mb-0.5">
-                <Gauge className="w-4 h-4 text-blue-600" />
-                <span className="text-sm text-blue-700 dark:text-blue-300 font-medium">Daily Average</span>
+          <div className="bg-white dark:bg-gray-900 rounded-2xl p-4 shadow-sm border border-gray-100 dark:border-gray-800">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="w-6 h-6 rounded-lg bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center">
+                <Gauge className="w-3 h-3 text-blue-600" />
               </div>
-              <p className="text-xl font-bold text-blue-900 dark:text-blue-100">{currencySymbol}{data.avgDailySpend.toLocaleString()}</p>
-              <p className="text-xs text-blue-600/70 dark:text-blue-400/70">over {data.daysElapsed} day{data.daysElapsed !== 1 ? 's' : ''}</p>
-            </CardContent>
-          </Card>
+              <span className="text-[11px] text-muted-foreground font-medium">Daily Avg</span>
+            </div>
+            <p className="text-xl font-bold text-gray-900 dark:text-white leading-none">{currencySymbol}{data.avgDailySpend.toLocaleString()}</p>
+            <p className="text-[10px] text-muted-foreground mt-1">{data.daysElapsed} day{data.daysElapsed !== 1 ? 's' : ''}</p>
+          </div>
 
           {data.isViewingCurrentMonth && (
-            <Card className="bg-gradient-to-br from-violet-50 to-violet-100/40 border-violet-200 dark:from-violet-950/20 dark:border-violet-900/50">
-              <CardContent className="p-4">
-                <div className="flex items-center gap-2 mb-0.5">
-                  <Activity className="w-4 h-4 text-violet-600" />
-                  <span className="text-sm text-violet-700 dark:text-violet-300 font-medium">Projected</span>
+            <div className="bg-white dark:bg-gray-900 rounded-2xl p-4 shadow-sm border border-gray-100 dark:border-gray-800">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-6 h-6 rounded-lg bg-violet-100 dark:bg-violet-900/40 flex items-center justify-center">
+                  <Activity className="w-3 h-3 text-violet-600" />
                 </div>
-                <p className="text-xl font-bold text-violet-900 dark:text-violet-100">{currencySymbol}{data.projectedMonthEnd.toLocaleString()}</p>
-                <p className="text-xs text-violet-600/70 dark:text-violet-400/70">by month end</p>
-              </CardContent>
-            </Card>
+                <span className="text-[11px] text-muted-foreground font-medium">Projected</span>
+              </div>
+              <p className="text-xl font-bold text-gray-900 dark:text-white leading-none">{currencySymbol}{data.projectedMonthEnd.toLocaleString()}</p>
+              <p className="text-[10px] text-muted-foreground mt-1">by month end</p>
+            </div>
           )}
 
           {data.biggestDay && (
-            <Card className="bg-gradient-to-br from-orange-50 to-orange-100/40 border-orange-200 dark:from-orange-950/20 dark:border-orange-900/50">
-              <CardContent className="p-4">
-                <div className="flex items-center gap-2 mb-0.5">
-                  <Flame className="w-4 h-4 text-orange-600" />
-                  <span className="text-sm text-orange-700 dark:text-orange-300 font-medium">Biggest Day</span>
+            <div className="bg-white dark:bg-gray-900 rounded-2xl p-4 shadow-sm border border-gray-100 dark:border-gray-800">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-6 h-6 rounded-lg bg-orange-100 dark:bg-orange-900/40 flex items-center justify-center">
+                  <Flame className="w-3 h-3 text-orange-600" />
                 </div>
-                <p className="text-xl font-bold text-orange-900 dark:text-orange-100">{currencySymbol}{data.biggestDay.amount.toLocaleString()}</p>
-                <p className="text-xs text-orange-600/70 dark:text-orange-400/70">
-                  {new Date(data.biggestDay.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                </p>
-              </CardContent>
-            </Card>
+                <span className="text-[11px] text-muted-foreground font-medium">Biggest Day</span>
+              </div>
+              <p className="text-xl font-bold text-gray-900 dark:text-white leading-none">{currencySymbol}{data.biggestDay.amount.toLocaleString()}</p>
+              <p className="text-[10px] text-muted-foreground mt-1">
+                {new Date(data.biggestDay.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+              </p>
+            </div>
           )}
 
-          <Card className="bg-gradient-to-br from-teal-50 to-teal-100/40 border-teal-200 dark:from-teal-950/20 dark:border-teal-900/50">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-2 mb-0.5">
-                <Receipt className="w-4 h-4 text-teal-600" />
-                <span className="text-sm text-teal-700 dark:text-teal-300 font-medium">Transactions</span>
+          <div className="bg-white dark:bg-gray-900 rounded-2xl p-4 shadow-sm border border-gray-100 dark:border-gray-800">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="w-6 h-6 rounded-lg bg-teal-100 dark:bg-teal-900/40 flex items-center justify-center">
+                <Receipt className="w-3 h-3 text-teal-600" />
               </div>
-              <p className="text-xl font-bold text-teal-900 dark:text-teal-100">{data.transactionCount}</p>
-              <p className="text-xs text-teal-600/70 dark:text-teal-400/70">this month</p>
-            </CardContent>
-          </Card>
+              <span className="text-[11px] text-muted-foreground font-medium">Transactions</span>
+            </div>
+            <p className="text-xl font-bold text-gray-900 dark:text-white leading-none">{data.transactionCount}</p>
+            <p className="text-[10px] text-muted-foreground mt-1">this month</p>
+          </div>
         </div>
       )}
 
@@ -567,7 +562,7 @@ export default function Dashboard({ refreshTrigger, userName }: DashboardProps) 
               <CardTitle className="text-base">Spending Distribution</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="h-52">
+              <div className="h-56">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie
@@ -607,7 +602,7 @@ export default function Dashboard({ refreshTrigger, userName }: DashboardProps) 
               <CardTitle className="text-base">Where Money Goes</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="h-52">
+              <div className="h-56">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={categoryData} layout="vertical" margin={{ left: 10 }}>
                     <CartesianGrid strokeDasharray="3 3" horizontal={false} />
@@ -635,7 +630,7 @@ export default function Dashboard({ refreshTrigger, userName }: DashboardProps) 
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="h-52">
+                <div className="h-56">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={data.dayOfWeekSpending} margin={{ top: 5, right: 10, left: 5, bottom: 5 }}>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} />
@@ -767,7 +762,7 @@ export default function Dashboard({ refreshTrigger, userName }: DashboardProps) 
               <CardTitle className="text-base">Income vs Expense Trend</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="h-52">
+              <div className="h-56">
                 <ResponsiveContainer width="100%" height="100%">
                   <AreaChart data={trendData}>
                     <CartesianGrid strokeDasharray="3 3" />
@@ -793,7 +788,7 @@ export default function Dashboard({ refreshTrigger, userName }: DashboardProps) 
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="h-52">
+              <div className="h-56">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={classificationComparison} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
                     <CartesianGrid strokeDasharray="3 3" />
@@ -990,7 +985,7 @@ export default function Dashboard({ refreshTrigger, userName }: DashboardProps) 
             <CardTitle className="text-base">Category: Current vs Average</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="h-52">
+            <div className="h-56">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={categoryComparison} layout="vertical" margin={{ left: 10 }}>
                   <CartesianGrid strokeDasharray="3 3" horizontal={false} />
