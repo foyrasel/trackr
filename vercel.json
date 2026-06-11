@@ -1,3 +1,4 @@
 {
-  "framework": "nextjs"
+  "framework": "nextjs",
+  "buildCommand": "npx tsx scripts/push-turso-schema.ts && next build"
 }
