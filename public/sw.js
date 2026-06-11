@@ -1,10 +1,11 @@
 /// <reference lib="webworker" />
 
-const CACHE_NAME = 'trackr-v1';
+const CACHE_NAME = 'trackr-v3';
 
 // Static assets to pre-cache on install
 const STATIC_ASSETS = [
   '/',
+  '/offline',
   '/manifest.json',
   '/icons/icon-192.png',
   '/icons/icon-512.png',
@@ -119,7 +120,7 @@ async function cacheFirst(request) {
   } catch (error) {
     // Offline fallback for navigation requests
     if (request.mode === 'navigate') {
-      const cached = await caches.match('/');
+      const cached = await caches.match('/offline') || await caches.match('/');
       if (cached) return cached;
     }
 
