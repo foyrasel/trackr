@@ -46,6 +46,7 @@ interface TransactionConfirmProps {
   onReject: () => void
   isSaving: boolean
   userName?: string
+  preloadedAccounts?: Account[]
 }
 
 const PAYMENT_TYPE_ICON: Record<string, string> = {
@@ -75,13 +76,13 @@ const CLASSIFICATION_LABELS: Record<string, { label: string; color: string }> = 
   income: { label: 'Income', color: 'bg-emerald-100 text-emerald-800 border-emerald-300' },
 }
 
-export default function TransactionConfirm({ data, onConfirm, onReject, isSaving, userName }: TransactionConfirmProps) {
+export default function TransactionConfirm({ data, onConfirm, onReject, isSaving, userName, preloadedAccounts }: TransactionConfirmProps) {
   const { currencySymbol } = useCurrency()
   const [editData, setEditData] = useState<CategorizedTransaction>({ ...data })
   const [receiptUrl, setReceiptUrl] = useState<string | undefined>(undefined)
   const [receiptPreview, setReceiptPreview] = useState<string | null>(null)
   const [uploading, setUploading] = useState(false)
-  const [accounts, setAccounts] = useState<Account[]>([])
+  const [accounts, setAccounts] = useState<Account[]>(preloadedAccounts || [])
   const fileInputRef = React.useRef<HTMLInputElement>(null)
 
   // Keep editData in sync if data prop changes
@@ -89,8 +90,21 @@ export default function TransactionConfirm({ data, onConfirm, onReject, isSaving
     setEditData({ ...data })
   }, [data])
 
-  // Load the user's real accounts so they can pick the exact one (bKash, Nagad…)
+  // Apply preselection whenever accounts or data changes
+  const applyAccountPreselection = (list: Account[], prev: CategorizedTransaction) => {
+    if (prev.accountId) return prev
+    const match = list.find(a => a.type === prev.spendingType) || list[0]
+    if (!match) return prev
+    return { ...prev, accountId: match.id, spendingType: match.type }
+  }
+
+  // If parent passed pre-loaded accounts, use them immediately; otherwise fetch
   useEffect(() => {
+    if (preloadedAccounts && preloadedAccounts.length > 0) {
+      setAccounts(preloadedAccounts)
+      setEditData(prev => applyAccountPreselection(preloadedAccounts, prev))
+      return
+    }
     const headers: Record<string, string> = {}
     if (userName) headers['x-user-name'] = userName
     if (typeof window !== 'undefined') {
@@ -104,17 +118,11 @@ export default function TransactionConfirm({ data, onConfirm, onReject, isSaving
       .then(result => {
         const list: Account[] = result?.accounts || []
         setAccounts(list)
-        // Preselect: if no accountId yet, pick the first account whose type
-        // matches the AI-detected spendingType, else the default/first account.
-        setEditData(prev => {
-          if (prev.accountId) return prev
-          const match = list.find(a => a.type === prev.spendingType) || list[0]
-          if (!match) return prev
-          return { ...prev, accountId: match.id, spendingType: match.type }
-        })
+        setEditData(prev => applyAccountPreselection(list, prev))
       })
       .catch(() => {})
-  }, [userName, data])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userName, data, preloadedAccounts])
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]

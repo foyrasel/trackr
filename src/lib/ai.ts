@@ -5,16 +5,13 @@
  * the Z.ai sandbox, not from Vercel's public servers.
  *
  * This module tries to use the Z.ai SDK directly. If it fails (e.g., on Vercel),
- * it returns null and the caller falls back to regex-based categorization.
+ * it returns null and the caller falls back to Anthropic Claude API or regex-based categorization.
  */
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let zaiInstance: any = null
 let zaiAvailable: boolean | null = null
 
-/**
- * Get ZAI config
- */
 function getZAIConfig() {
   return {
     baseUrl: process.env.ZAI_BASE_URL || 'https://internal-api.z.ai/v1',
@@ -28,25 +25,24 @@ function getZAIConfig() {
 /**
  * Try to get a ZAI SDK instance.
  * Returns null if the internal API is not reachable (e.g., on Vercel).
+ * On Vercel, skips the test immediately to avoid 5-second timeout.
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function getAI(): Promise<any | null> {
-  // If we already determined AI is unavailable, don't retry
   if (zaiAvailable === false) return null
-
-  // Return cached instance if available
   if (zaiInstance) return zaiInstance
+
+  // ZAI internal API is only reachable inside the Z.ai sandbox.
+  // Skip the expensive connectivity test on Vercel and similar hosts.
+  if (process.env.VERCEL || process.env.VERCEL_ENV || process.env.VERCEL_URL) {
+    zaiAvailable = false
+    return null
+  }
 
   try {
     const ZAI = (await import('z-ai-web-dev-sdk')).default
     const config = getZAIConfig()
-
-    // Construct ZAI instance directly with config (bypasses file-based ZAI.create())
     const instance = new (ZAI as any)(config)
-
-    // Test if the internal API is reachable with a small request (1s timeout)
-    const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(), 5000)
 
     await instance.chat.completions.create({
       messages: [{ role: 'user', content: 'test' }],
@@ -54,14 +50,13 @@ export async function getAI(): Promise<any | null> {
       max_tokens: 1,
     })
 
-    clearTimeout(timeout)
     zaiInstance = instance
     zaiAvailable = true
-    console.log('[AI] SDK initialized (internal API reachable)')
+    console.log('[AI] ZAI SDK initialized')
     return instance
-  } catch (err) {
+  } catch {
     zaiAvailable = false
-    console.log('[AI] Internal API not reachable, using smart categorization')
+    console.log('[AI] ZAI not reachable, using fallback categorization')
     return null
   }
 }

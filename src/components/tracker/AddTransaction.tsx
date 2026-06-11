@@ -1,14 +1,21 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import VoiceInput from './VoiceInput'
 import TransactionConfirm, { CategorizedTransaction } from './TransactionConfirm'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import { Send, Type, Mic, Receipt } from 'lucide-react'
+import { Send, Type, Mic, Receipt, CheckCircle2, PlusCircle } from 'lucide-react'
 import { toast } from '@/hooks/use-toast'
 import { useCurrency } from './CurrencyContext'
+
+interface Account {
+  id: string
+  name: string
+  type: string
+  icon: string
+}
 
 interface AddTransactionProps {
   onTransactionAdded: () => void
@@ -34,11 +41,35 @@ const ENGLISH_EXAMPLES = [
 export default function AddTransaction({ onTransactionAdded, userName }: AddTransactionProps) {
   const { currencySymbol } = useCurrency()
   const [inputMode, setInputMode] = useState<'voice' | 'text'>('voice')
-  const [language, setLanguage] = useState<'en' | 'bn' | 'hi'>('en') // Default to English for international app
+  const [language, setLanguage] = useState<'en' | 'bn' | 'hi'>('en')
   const [textInput, setTextInput] = useState('')
   const [isProcessing, setIsProcessing] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [categorizedData, setCategorizedData] = useState<CategorizedTransaction | null>(null)
+  const [accounts, setAccounts] = useState<Account[]>([])
+  const [lastAdded, setLastAdded] = useState<{ description: string; amount: number; type: string } | null>(null)
+  const textInputRef = useRef<HTMLInputElement>(null)
+
+  function getAuthHeaders(): Record<string, string> {
+    const headers: Record<string, string> = {}
+    if (userName) headers['x-user-name'] = userName
+    if (typeof window !== 'undefined') {
+      const userEmail = localStorage.getItem('trackr_user_email')
+      const userId = localStorage.getItem('trackr_user_id')
+      if (userEmail) headers['x-user-email'] = userEmail
+      if (userId) headers['x-user-id'] = userId
+    }
+    return headers
+  }
+
+  // Preload accounts once so TransactionConfirm renders instantly without its own fetch
+  useEffect(() => {
+    fetch('/api/accounts', { headers: getAuthHeaders() })
+      .then(res => res.ok ? res.json() : null)
+      .then(result => setAccounts(result?.accounts || []))
+      .catch(() => {})
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userName])
 
   const handleTranscript = async (text: string) => {
     await processInput(text)
@@ -51,23 +82,15 @@ export default function AddTransaction({ onTransactionAdded, userName }: AddTran
 
   const processInput = async (text: string) => {
     setIsProcessing(true)
+    setLastAdded(null)
     try {
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' }
-      if (userName) headers['x-user-name'] = userName
-      if (typeof window !== 'undefined') {
-        const userEmail = localStorage.getItem('trackr_user_email')
-        const userId = localStorage.getItem('trackr_user_id')
-        if (userEmail) headers['x-user-email'] = userEmail
-        if (userId) headers['x-user-id'] = userId
-      }
       const response = await fetch('/api/ai/categorize', {
         method: 'POST',
-        headers,
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         body: JSON.stringify({ text }),
       })
 
       if (!response.ok) {
-        // API error — try to use fallback from error response
         try {
           const errorData = await response.json()
           if (errorData.result) {
@@ -84,8 +107,8 @@ export default function AddTransaction({ onTransactionAdded, userName }: AddTran
       console.error('Error processing input:', error)
       toast({
         title: language === 'bn' ? 'ত্রুটি' : 'Error',
-        description: language === 'bn' 
-          ? 'আপনার ইনপুট প্রক্রিয়া করা যায়নি। আবার চেষ্টা করুন।' 
+        description: language === 'bn'
+          ? 'আপনার ইনপুট প্রক্রিয়া করা যায়নি। আবার চেষ্টা করুন।'
           : 'Failed to process your input. Please try again or enter manually.',
         variant: 'destructive',
       })
@@ -97,45 +120,41 @@ export default function AddTransaction({ onTransactionAdded, userName }: AddTran
   const handleConfirm = async (data: CategorizedTransaction) => {
     setIsSaving(true)
     try {
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' }
-      if (userName) headers['x-user-name'] = userName
-      if (typeof window !== 'undefined') {
-        const userEmail = localStorage.getItem('trackr_user_email')
-        const userId = localStorage.getItem('trackr_user_id')
-        if (userEmail) headers['x-user-email'] = userEmail
-        if (userId) headers['x-user-id'] = userId
-      }
       const response = await fetch('/api/transactions', {
         method: 'POST',
-        headers,
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         body: JSON.stringify(data),
       })
 
-      if (!response.ok) {
-        throw new Error('Failed to save transaction')
-      }
+      if (!response.ok) throw new Error('Failed to save transaction')
+
+      // Show what was just saved for context
+      setLastAdded({ description: data.description, amount: data.amount, type: data.type })
+
+      // Immediately reset to input mode — don't wait for dashboard refresh
+      setCategorizedData(null)
+      setTextInput('')
+      setInputMode('text')
+
+      // Focus the text input so user can type the next transaction right away
+      setTimeout(() => textInputRef.current?.focus(), 80)
+
+      // Refresh dashboard data in background
+      onTransactionAdded()
 
       const today = new Date().toISOString().split('T')[0]
       const isPastDate = data.date && data.date !== today
       toast({
-        title: data.type === 'income' 
-          ? (language === 'bn' ? '💰 আয় যোগ হয়েছে!' : '💰 Income Added!') 
-          : (language === 'bn' ? '💸 খরচ রেকর্ড হয়েছে!' : '💸 Expense Recorded!'),
+        title: data.type === 'income' ? '💰 Income Added!' : '💸 Expense Recorded!',
         description: isPastDate
           ? `${currencySymbol}${data.amount.toLocaleString()} - ${data.description} (${new Date(data.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })})`
           : `${currencySymbol}${data.amount.toLocaleString()} - ${data.description}`,
       })
-
-      setCategorizedData(null)
-      setTextInput('')
-      onTransactionAdded()
     } catch (error) {
       console.error('Error saving transaction:', error)
       toast({
-        title: language === 'bn' ? 'ত্রুটি' : 'Error',
-        description: language === 'bn' 
-          ? 'লেনদেন সংরক্ষণ করা যায়নি।' 
-          : 'Failed to save transaction. Please try again.',
+        title: 'Error',
+        description: 'Failed to save transaction. Please try again.',
         variant: 'destructive',
       })
     } finally {
@@ -146,12 +165,13 @@ export default function AddTransaction({ onTransactionAdded, userName }: AddTran
   const handleReject = () => {
     setCategorizedData(null)
     setTextInput('')
+    setLastAdded(null)
   }
 
   const examples = language === 'bn' ? BANGLA_EXAMPLES : ENGLISH_EXAMPLES
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Mode Toggle */}
       <div className="flex justify-center">
         <div className="inline-flex rounded-lg border bg-card p-1 gap-1">
@@ -180,11 +200,23 @@ export default function AddTransaction({ onTransactionAdded, userName }: AddTran
         </div>
       </div>
 
+      {/* Last added context banner */}
+      {lastAdded && !categorizedData && (
+        <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-emerald-50 border border-emerald-200 text-sm">
+          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+          <span className="text-emerald-800 flex-1 truncate">
+            Saved: <strong>{lastAdded.description}</strong> — {currencySymbol}{lastAdded.amount.toLocaleString()}
+          </span>
+          <PlusCircle className="w-4 h-4 text-emerald-500 shrink-0" />
+          <span className="text-emerald-600 text-xs">Add next</span>
+        </div>
+      )}
+
       {/* Voice Input */}
       {inputMode === 'voice' && !categorizedData && (
         <div className="py-8">
-          <VoiceInput 
-            onTranscript={handleTranscript} 
+          <VoiceInput
+            onTranscript={handleTranscript}
             isProcessing={isProcessing}
             language={language}
             onLanguageChange={setLanguage}
@@ -192,27 +224,15 @@ export default function AddTransaction({ onTransactionAdded, userName }: AddTran
           <div className="mt-6 text-center">
             {language === 'bn' ? (
               <>
-                <p className="text-xs text-muted-foreground">
-                  উচ্চারণ করুন: &quot;বাজারে ৫০০ টাকা খরচ&quot;
-                </p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  অথবা: &quot;গতকাল রিকশায় ১০০ টাকা&quot;
-                </p>
-                <p className="text-xs text-blue-500 mt-1">
-                  তারিখ বললে সেটা অটোমেটিক সেট হবে
-                </p>
+                <p className="text-xs text-muted-foreground">উচ্চারণ করুন: &quot;বাজারে ৫০০ টাকা খরচ&quot;</p>
+                <p className="text-xs text-muted-foreground mt-1">অথবা: &quot;গতকাল রিকশায় ১০০ টাকা&quot;</p>
+                <p className="text-xs text-blue-500 mt-1">তারিখ বললে সেটা অটোমেটিক সেট হবে</p>
               </>
             ) : (
               <>
-                <p className="text-xs text-muted-foreground">
-                  Try saying: &quot;Spent 500 on groceries from cash&quot;
-                </p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  or: &quot;Paid 200 yesterday for transport&quot;
-                </p>
-                <p className="text-xs text-blue-500 mt-1">
-                  Mention date &quot;yesterday&quot;, &quot;last Friday&quot; — it will be auto-set
-                </p>
+                <p className="text-xs text-muted-foreground">Try saying: &quot;Spent 500 on groceries from cash&quot;</p>
+                <p className="text-xs text-muted-foreground mt-1">or: &quot;Paid 200 yesterday for transport&quot;</p>
+                <p className="text-xs text-blue-500 mt-1">Mention &quot;yesterday&quot;, &quot;last Friday&quot; — date will be auto-set</p>
               </>
             )}
           </div>
@@ -229,44 +249,28 @@ export default function AddTransaction({ onTransactionAdded, userName }: AddTran
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {/* Language toggle for text mode */}
+            {/* Language toggle */}
             <div className="flex items-center gap-2 mb-3">
-              <button
-                onClick={() => setLanguage('en')}
-                className={`px-3 py-1 rounded-full text-xs font-medium transition-all ${
-                  language === 'en'
-                    ? 'bg-emerald-500 text-white'
-                    : 'bg-muted text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                English
-              </button>
-              <button
-                onClick={() => setLanguage('bn')}
-                className={`px-3 py-1 rounded-full text-xs font-medium transition-all ${
-                  language === 'bn'
-                    ? 'bg-emerald-500 text-white'
-                    : 'bg-muted text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                বাংলা
-              </button>
-              <button
-                onClick={() => setLanguage('hi')}
-                className={`px-3 py-1 rounded-full text-xs font-medium transition-all ${
-                  language === 'hi'
-                    ? 'bg-emerald-500 text-white'
-                    : 'bg-muted text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                हिन्दी
-              </button>
+              {(['en', 'bn', 'hi'] as const).map((lang) => (
+                <button
+                  key={lang}
+                  onClick={() => setLanguage(lang)}
+                  className={`px-3 py-1 rounded-full text-xs font-medium transition-all ${
+                    language === lang
+                      ? 'bg-emerald-500 text-white'
+                      : 'bg-muted text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  {lang === 'en' ? 'English' : lang === 'bn' ? 'বাংলা' : 'हिन्दी'}
+                </button>
+              ))}
             </div>
 
             <div className="flex gap-2">
               <Input
-                placeholder={language === 'bn' 
-                  ? 'যেমন: গতকাল বাজারে ৫০০ টাকা খরচ' 
+                ref={textInputRef}
+                placeholder={language === 'bn'
+                  ? 'যেমন: গতকাল বাজারে ৫০০ টাকা খরচ'
                   : language === 'hi'
                   ? 'उदा: कल बाजार में 500 रुपये खर्च'
                   : 'e.g., Spent 500 on groceries yesterday'
@@ -293,7 +297,10 @@ export default function AddTransaction({ onTransactionAdded, userName }: AddTran
               {examples.map((example) => (
                 <button
                   key={example}
-                  onClick={() => setTextInput(example)}
+                  onClick={() => {
+                    setTextInput(example)
+                    setTimeout(() => textInputRef.current?.focus(), 50)
+                  }}
                   className="text-xs px-3 py-1.5 rounded-full bg-muted hover:bg-muted/80 transition-colors"
                 >
                   {example}
@@ -312,6 +319,7 @@ export default function AddTransaction({ onTransactionAdded, userName }: AddTran
           onReject={handleReject}
           isSaving={isSaving}
           userName={userName}
+          preloadedAccounts={accounts}
         />
       )}
     </div>
