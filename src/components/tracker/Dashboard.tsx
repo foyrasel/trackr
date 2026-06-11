@@ -419,13 +419,6 @@ export default function Dashboard({ refreshTrigger, userName }: DashboardProps) 
                 <p className="text-[10px] text-white/40 uppercase tracking-widest leading-none mb-0.5">Expenses</p>
                 <p className="text-sm font-bold text-rose-400 leading-tight">{currencySymbol}{data.totalExpense.toLocaleString()}</p>
               </div>
-              <div className="w-px h-8 bg-white/15" />
-              <div className="px-4 text-right">
-                <p className="text-[10px] text-white/40 uppercase tracking-widest leading-none mb-0.5">Balance</p>
-                <p className={`text-sm font-bold leading-tight ${data.balance >= 0 ? 'text-white' : 'text-rose-400'}`}>
-                  {data.balance < 0 ? '-' : ''}{currencySymbol}{Math.abs(data.balance).toLocaleString()}
-                </p>
-              </div>
               {savingsRate !== null && (
                 <>
                   <div className="w-px h-8 bg-white/15" />
@@ -537,20 +530,6 @@ export default function Dashboard({ refreshTrigger, userName }: DashboardProps) 
           ) : (
             <p className="text-[11px] text-muted-foreground mt-1">this month</p>
           )}
-        </div>
-
-        {/* Net Balance */}
-        <div className={`rounded-2xl p-4 shadow-sm ${data.balance >= 0 ? 'bg-gradient-to-br from-emerald-500 to-teal-500' : 'bg-gradient-to-br from-rose-500 to-red-500'}`}>
-          <div className="flex items-center gap-2 mb-2.5">
-            <div className="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center">
-              <Wallet className="w-4 h-4 text-white" />
-            </div>
-            <span className="text-xs text-white/70 font-medium">Net Balance</span>
-          </div>
-          <p className="text-2xl font-bold tracking-tight text-white leading-none">
-            {data.balance < 0 ? '-' : ''}{currencySymbol}{Math.abs(data.balance).toLocaleString()}
-          </p>
-          <p className="text-[11px] text-white/70 mt-1">{data.balance < 0 ? 'Overspent' : 'Surplus'}</p>
         </div>
 
         {/* Daily Avg */}
