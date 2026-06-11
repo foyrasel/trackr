@@ -17,6 +17,7 @@ import InsightsPanel from '@/components/tracker/InsightsPanel'
 import MorePanel from '@/components/tracker/MorePanel'
 import { CurrencyProvider, useCurrency } from '@/components/tracker/CurrencyContext'
 import { useRecurringExecution } from '@/hooks/use-recurring-exec'
+import ErrorBoundary from '@/components/ErrorBoundary'
 import { LayoutDashboard, Plus, History, Lightbulb, Target, LogOut, Loader2, MoreHorizontal, Moon, Sun } from 'lucide-react'
 
 function CurrencyDisplay() {
@@ -469,32 +470,44 @@ export default function Home() {
         {/* Main Content */}
         <main className="w-full mx-auto px-2 sm:px-4 pb-24 pt-2 sm:pt-4 flex-1">
           <TabsContent value="dashboard" className="mt-0">
-            <Dashboard refreshTrigger={refreshTrigger} userName={userName} />
+            <ErrorBoundary label="Dashboard">
+              <Dashboard refreshTrigger={refreshTrigger} userName={userName} />
+            </ErrorBoundary>
           </TabsContent>
 
           <TabsContent value="add" className="mt-0">
-            <AddTransaction onTransactionAdded={handleTransactionAdded} userName={userName} />
+            <ErrorBoundary label="Add Transaction">
+              <AddTransaction onTransactionAdded={handleTransactionAdded} userName={userName} />
+            </ErrorBoundary>
           </TabsContent>
 
           <TabsContent value="budget" className="mt-0">
-            <BudgetPanel refreshTrigger={refreshTrigger} userName={userName} />
+            <ErrorBoundary label="Budget">
+              <BudgetPanel refreshTrigger={refreshTrigger} userName={userName} />
+            </ErrorBoundary>
           </TabsContent>
 
           <TabsContent value="history" className="mt-0">
-            <TransactionList refreshTrigger={refreshTrigger} userName={userName} />
+            <ErrorBoundary label="History">
+              <TransactionList refreshTrigger={refreshTrigger} userName={userName} />
+            </ErrorBoundary>
           </TabsContent>
 
           <TabsContent value="insights" className="mt-0">
-            <InsightsPanel refreshTrigger={refreshTrigger} userName={userName} />
+            <ErrorBoundary label="Insights">
+              <InsightsPanel refreshTrigger={refreshTrigger} userName={userName} />
+            </ErrorBoundary>
           </TabsContent>
 
           <TabsContent value="more" className="mt-0">
-            <MorePanel
-              userName={userName}
-              refreshTrigger={refreshTrigger}
-              onToggleDarkMode={handleToggleDarkMode}
-              isDarkMode={isDarkMode}
-            />
+            <ErrorBoundary label="Settings">
+              <MorePanel
+                userName={userName}
+                refreshTrigger={refreshTrigger}
+                onToggleDarkMode={handleToggleDarkMode}
+                isDarkMode={isDarkMode}
+              />
+            </ErrorBoundary>
           </TabsContent>
         </main>
 

@@ -1,5 +1,6 @@
 import { db } from '@/lib/db'
 import { NextRequest, NextResponse } from 'next/server'
+import { sendPasswordResetEmail, isEmailEnabled } from '@/lib/email'
 
 function generateResetCode(): string {
   return Math.floor(100000 + Math.random() * 900000).toString()
@@ -82,11 +83,17 @@ export async function POST(request: NextRequest) {
         )
       }
 
+      try {
+        await sendPasswordResetEmail(email, resetCode)
+      } catch (emailErr) {
+        console.error('[forgot-password] Email send failed:', emailErr)
+      }
+
       const resetResponse: Record<string, unknown> = {
         success: true,
         message: 'Reset code sent to your email.',
       }
-      if (process.env.NODE_ENV !== 'production') {
+      if (!isEmailEnabled()) {
         resetResponse.resetCode = resetCode
       }
       return NextResponse.json(resetResponse)

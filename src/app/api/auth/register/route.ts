@@ -1,6 +1,7 @@
 import { db } from '@/lib/db'
 import { NextRequest, NextResponse } from 'next/server'
 import { hashPassword } from '@/lib/password'
+import { sendVerificationEmail, isEmailEnabled } from '@/lib/email'
 
 function generateVerificationCode(): string {
   return Math.floor(100000 + Math.random() * 900000).toString()
@@ -73,12 +74,20 @@ export async function POST(request: NextRequest) {
           },
         })
 
+        // Attempt to send verification email; fall back to returning the code
+        // on screen when no email provider is configured (demo / development).
+        try {
+          await sendVerificationEmail(email, name, verificationCode)
+        } catch (emailErr) {
+          console.error('[register] Email send failed:', emailErr)
+        }
+
         const reregResponse: Record<string, unknown> = {
           userId: existingUser.id,
           email,
           message: 'Account updated! Please verify your email.',
         }
-        if (process.env.NODE_ENV !== 'production') {
+        if (!isEmailEnabled()) {
           reregResponse.verificationCode = verificationCode
         }
         return NextResponse.json(reregResponse, { status: 201 })
@@ -134,12 +143,18 @@ export async function POST(request: NextRequest) {
       },
     })
 
+    try {
+      await sendVerificationEmail(email, name, verificationCode)
+    } catch (emailErr) {
+      console.error('[register] Email send failed:', emailErr)
+    }
+
     const regResponse: Record<string, unknown> = {
       userId: user.id,
       email,
       message: 'Account created! Please verify your email.',
     }
-    if (process.env.NODE_ENV !== 'production') {
+    if (!isEmailEnabled()) {
       regResponse.verificationCode = verificationCode
     }
     return NextResponse.json(regResponse, { status: 201 })
