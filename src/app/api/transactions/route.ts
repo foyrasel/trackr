@@ -71,7 +71,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { type, amount, description, category, spendingType, classification, date, isRecurring, receiptUrl, accountId } = body
+    const { type, amount, description, category, spendingType, classification, date, isRecurring, receiptUrl, accountId, tags } = body
 
     if (!type || !amount || !description || !category) {
       return NextResponse.json(
@@ -110,6 +110,7 @@ export async function POST(request: NextRequest) {
         date: date ? new Date(date) : new Date(),
         isRecurring: isRecurring || false,
         ...(receiptUrl ? { receiptUrl } : {}),
+        ...(tags && Array.isArray(tags) && tags.length > 0 ? { tags: JSON.stringify(tags) } : {}),
       },
     })
 

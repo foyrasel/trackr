@@ -345,6 +345,18 @@ export default function Home() {
   // Auto-execute due recurring transactions once per session
   useRecurringExecution(isLoggedIn ? userName : undefined, handleRefreshData)
 
+  // Keyboard shortcut: N = new transaction
+  useEffect(() => {
+    if (!isLoggedIn) return
+    const handler = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement).tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
+      if (e.key === 'n' || e.key === 'N') setActiveTab('add')
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [isLoggedIn])
+
   const handleTransactionAdded = () => {
     setActiveTab('dashboard')
     setTimeout(() => {

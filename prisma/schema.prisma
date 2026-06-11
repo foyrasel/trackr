@@ -101,6 +101,7 @@ model Transaction {
   classification String   @default("need") // "need", "want", "ego", "savings", "debt" (for expenses), "income" (for income)
   date           DateTime @default(now())
   isRecurring    Boolean  @default(false)
+  tags           String?  // JSON array of string tags e.g. '["vacation","work"]'
   receiptUrl     String?  // Path to uploaded receipt photo
   recurringId    String?  // Link to recurring transaction that created this
   createdAt      DateTime @default(now())

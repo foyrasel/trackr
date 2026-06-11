@@ -18,8 +18,39 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
-import { Check, X, Loader2, Calendar, Paperclip, ImagePlus, Trash2 } from 'lucide-react'
+import { Check, X, Loader2, Calendar, Paperclip, ImagePlus, Trash2, Tag } from 'lucide-react'
 import { useCurrency } from './CurrencyContext'
+
+function TagsInput({ tags, onChange }: { tags: string[]; onChange: (tags: string[]) => void }) {
+  const [input, setInput] = useState('')
+  const add = () => {
+    const val = input.trim().replace(/^#+/, '').toLowerCase()
+    if (val && !tags.includes(val)) onChange([...tags, val])
+    setInput('')
+  }
+  const remove = (t: string) => onChange(tags.filter(x => x !== t))
+  return (
+    <div>
+      <Label className="text-xs text-muted-foreground flex items-center gap-1"><Tag className="w-3 h-3" />Tags <span className="opacity-50">(optional)</span></Label>
+      <div className="mt-1.5 flex flex-wrap gap-1.5 min-h-[34px] items-center rounded-lg border border-input bg-background px-2 py-1.5 focus-within:ring-2 focus-within:ring-emerald-500/40">
+        {tags.map(t => (
+          <span key={t} className="flex items-center gap-1 text-[11px] bg-emerald-100 dark:bg-emerald-900/40 text-emerald-800 dark:text-emerald-300 rounded-full px-2 py-0.5 font-medium">
+            #{t}
+            <button type="button" onClick={() => remove(t)} className="opacity-60 hover:opacity-100"><X className="w-2.5 h-2.5" /></button>
+          </span>
+        ))}
+        <input
+          className="flex-1 min-w-[80px] text-xs bg-transparent outline-none placeholder:text-muted-foreground/60"
+          placeholder={tags.length ? 'add tag…' : '#vacation, #work…'}
+          value={input}
+          onChange={e => setInput(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); add() } }}
+          onBlur={add}
+        />
+      </div>
+    </div>
+  )
+}
 
 export interface CategorizedTransaction {
   type: string
@@ -31,6 +62,7 @@ export interface CategorizedTransaction {
   classification: string
   date: string // ISO date string (YYYY-MM-DD)
   receiptUrl?: string
+  tags?: string[]
 }
 
 interface Account {
@@ -463,6 +495,12 @@ export default function TransactionConfirm({ data, onConfirm, onReject, isSaving
             />
           </div>
         </div>
+
+        {/* Tags */}
+        <TagsInput
+          tags={editData.tags || []}
+          onChange={(tags) => setEditData({ ...editData, tags })}
+        />
 
         {/* Action Buttons */}
         <div className="flex gap-3 pt-2">

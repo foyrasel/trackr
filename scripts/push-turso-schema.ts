@@ -187,6 +187,7 @@ async function pushSchema() {
     `ALTER TABLE User ADD COLUMN language TEXT NOT NULL DEFAULT 'en';`,
     `ALTER TABLE User ADD COLUMN onboardingDone BOOLEAN NOT NULL DEFAULT 0;`,
     `ALTER TABLE User ADD COLUMN geminiApiKey TEXT;`,
+    `ALTER TABLE "Transaction" ADD COLUMN tags TEXT;`,
 
     // Indexes for performance
     `CREATE INDEX IF NOT EXISTS idx_account_userId ON Account(userId);`,

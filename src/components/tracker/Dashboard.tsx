@@ -20,7 +20,7 @@ import {
   TrendingUp, TrendingDown, Wallet, AlertTriangle,
   PiggyBank, BarChart3, Calendar, ChevronLeft, ChevronRight,
   ArrowUpRight, ArrowDownRight, Activity, Brain, Lightbulb,
-  Sparkles, CalendarDays, Receipt, Gauge, Flame,
+  Sparkles, CalendarDays, Receipt, Gauge, Flame, X, RefreshCw,
 } from 'lucide-react'
 import BalanceCards from './BalanceCards'
 import { Button } from '@/components/ui/button'
@@ -117,6 +117,13 @@ const CLASSIFICATION_LABELS: Record<string, string> = {
 
 const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
 
+interface BudgetWarning {
+  category: string
+  spent: number
+  budget: number
+  pct: number
+}
+
 export default function Dashboard({ refreshTrigger, userName }: DashboardProps) {
   const { currencySymbol } = useCurrency()
   const [data, setData] = useState<AnalyticsData | null>(null)
@@ -125,9 +132,51 @@ export default function Dashboard({ refreshTrigger, userName }: DashboardProps) 
   const [selectedMonth, setSelectedMonth] = useState<string | null>(null)
   const [yearlyView, setYearlyView] = useState<'overview' | 'yearly'>('overview')
 
+  // Dismissible banners — keyed by string, stored in sessionStorage
+  const [dismissed, setDismissed] = useState<Set<string>>(new Set())
+  const [budgetWarnings, setBudgetWarnings] = useState<BudgetWarning[]>([])
+  const [recurringCount, setRecurringCount] = useState(0)
+
+  const dismiss = (key: string) => {
+    sessionStorage.setItem(`dismissed_${key}`, '1')
+    setDismissed(prev => new Set([...prev, key]))
+  }
+  const isDismissed = (key: string) => dismissed.has(key) || !!sessionStorage.getItem(`dismissed_${key}`)
+
   useEffect(() => {
     setMounted(true)
+    // Read recurring count stored by the hook
+    const count = parseInt(sessionStorage.getItem('trackr_recurring_count') || '0', 10)
+    if (count > 0) setRecurringCount(count)
   }, [])
+
+  // Fetch budget warnings for current month only
+  useEffect(() => {
+    if (!mounted) return
+    const headers: Record<string, string> = {}
+    if (userName) headers['x-user-name'] = userName
+    if (typeof window !== 'undefined') {
+      const e = localStorage.getItem('trackr_user_email')
+      const i = localStorage.getItem('trackr_user_id')
+      if (e) headers['x-user-email'] = e
+      if (i) headers['x-user-id'] = i
+    }
+    fetch('/api/budgets', { headers })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => {
+        if (!d?.budgets) return
+        const warnings: BudgetWarning[] = d.budgets
+          .filter((b: { isIgnored: boolean; percentUsed: number }) => !b.isIgnored && b.percentUsed >= 80)
+          .map((b: { category: string; spent: number; amount: number; percentUsed: number }) => ({
+            category: b.category,
+            spent: b.spent,
+            budget: b.amount,
+            pct: b.percentUsed,
+          }))
+        setBudgetWarnings(warnings)
+      })
+      .catch(() => {})
+  }, [mounted, userName, refreshTrigger])
 
   const fetchAnalytics = useCallback(async () => {
     try {
@@ -307,6 +356,27 @@ export default function Dashboard({ refreshTrigger, userName }: DashboardProps) 
   const top5Max = top5Categories.length > 0 ? top5Categories[0][1] : 1
   const TOP5_COLORS = ['#10b981', '#6366f1', '#f59e0b', '#ef4444', '#8b5cf6']
 
+  // Helper: dismissible inline banner
+  const Banner = ({ id, color, icon: Icon, children }: { id: string; color: 'amber' | 'red' | 'emerald' | 'blue'; icon: React.ElementType; children: React.ReactNode }) => {
+    if (isDismissed(id)) return null
+    const colors = {
+      amber: 'bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800/40 text-amber-900 dark:text-amber-200',
+      red:   'bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-800/40 text-red-900 dark:text-red-200',
+      emerald: 'bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-800/40 text-emerald-900 dark:text-emerald-200',
+      blue: 'bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800/40 text-blue-900 dark:text-blue-200',
+    }
+    const iconColors = { amber: 'text-amber-500', red: 'text-red-500', emerald: 'text-emerald-500', blue: 'text-blue-500' }
+    return (
+      <div className={`flex items-start gap-2.5 rounded-xl border px-3.5 py-2.5 text-sm ${colors[color]}`}>
+        <Icon className={`w-4 h-4 shrink-0 mt-0.5 ${iconColors[color]}`} />
+        <div className="flex-1 min-w-0">{children}</div>
+        <button onClick={() => dismiss(id)} className="shrink-0 opacity-50 hover:opacity-100 transition-opacity mt-0.5">
+          <X className="w-3.5 h-3.5" />
+        </button>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-4">
       {/* ─── 1. COMPACT HEADER CARD ─── */}
@@ -395,6 +465,41 @@ export default function Dashboard({ refreshTrigger, userName }: DashboardProps) 
           )}
         </div>
       </div>
+
+      {/* ─── BANNERS (recurring + budget + general alerts) ─── */}
+      {(recurringCount > 0 || budgetWarnings.length > 0 || data.alerts.length > 0) && (
+        <div className="space-y-2">
+          {/* Recurring transactions ran today */}
+          {recurringCount > 0 && (
+            <Banner id="recurring-ran" color="emerald" icon={RefreshCw}>
+              <span className="font-medium">{recurringCount} recurring transaction{recurringCount > 1 ? 's' : ''} auto-logged today.</span>
+              <span className="text-xs ml-1 opacity-75">Dashboard has been refreshed.</span>
+            </Banner>
+          )}
+
+          {/* Budget threshold warnings */}
+          {budgetWarnings.map(w => (
+            <Banner
+              key={w.category}
+              id={`budget-${w.category}-${w.pct >= 100 ? 'over' : 'near'}`}
+              color={w.pct >= 100 ? 'red' : 'amber'}
+              icon={AlertTriangle}
+            >
+              <span className="font-medium">{w.category}:</span>{' '}
+              {w.pct >= 100
+                ? `Over budget — spent ${currencySymbol}${w.spent.toLocaleString()} of ${currencySymbol}${w.budget.toLocaleString()} (${w.pct}%)`
+                : `${w.pct}% used — ${currencySymbol}${w.spent.toLocaleString()} of ${currencySymbol}${w.budget.toLocaleString()}`}
+            </Banner>
+          ))}
+
+          {/* General spending alerts */}
+          {data.alerts.map((alert, i) => (
+            <Banner key={i} id={`alert-${i}-${alert.slice(0, 20)}`} color="amber" icon={AlertTriangle}>
+              {alert}
+            </Banner>
+          ))}
+        </div>
+      )}
 
       {/* ─── 2. FOUR METRIC CARDS ─── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
@@ -1010,16 +1115,6 @@ export default function Dashboard({ refreshTrigger, userName }: DashboardProps) 
         </Card>
       )}
 
-      {data.alerts.length > 0 && (
-        <div className="space-y-2">
-          {data.alerts.map((alert, i) => (
-            <Alert key={i} variant="destructive" className="border-amber-300 bg-amber-50 text-amber-900 shadow-sm">
-              <AlertTriangle className="h-4 w-4 text-amber-600" />
-              <AlertDescription className="text-sm">{alert}</AlertDescription>
-            </Alert>
-          ))}
-        </div>
-      )}
 
       {(() => {
         const stats = data.spendingTypeStats

@@ -49,6 +49,7 @@ interface Transaction {
   classification: string
   date: string
   isRecurring: boolean
+  tags?: string | null
   receiptUrl?: string
 }
 
@@ -726,6 +727,14 @@ export default function TransactionList({ refreshTrigger, userName }: Transactio
                           <span className="text-xs text-muted-foreground">
                             {formatDate(tx.date)}
                           </span>
+                          {tx.tags && (() => {
+                            try {
+                              const parsed: string[] = JSON.parse(tx.tags)
+                              return parsed.slice(0, 3).map(tag => (
+                                <span key={tag} className="text-[10px] bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 rounded-full px-1.5 py-0.5 font-medium">#{tag}</span>
+                              ))
+                            } catch { return null }
+                          })()}
                           {tx.receiptUrl && (
                             <button
                               type="button"
