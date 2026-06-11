@@ -19,6 +19,7 @@ import { CurrencyProvider, useCurrency } from '@/components/tracker/CurrencyCont
 import { useRecurringExecution } from '@/hooks/use-recurring-exec'
 import ErrorBoundary from '@/components/ErrorBoundary'
 import { LayoutDashboard, Plus, History, Lightbulb, Target, LogOut, Loader2, MoreHorizontal, Moon, Sun } from 'lucide-react'
+import TrackrLogo from '@/components/tracker/TrackrLogo'
 
 function CurrencyDisplay() {
   const { currency } = useCurrency()
@@ -383,11 +384,11 @@ export default function Home() {
     return (
       <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-teal-50 dark:from-gray-900 dark:via-gray-950 dark:to-emerald-950/20 flex items-center justify-center">
         <div className="text-center">
-          <div className="w-16 h-16 rounded-2xl bg-emerald-500 flex items-center justify-center mx-auto mb-4 shadow-lg shadow-emerald-500/30">
-            <span className="text-white text-3xl font-bold">T</span>
+          <div className="mx-auto mb-4 drop-shadow-lg">
+            <TrackrLogo size={64} />
           </div>
-          <Loader2 className="w-6 h-6 animate-spin text-emerald-500 mx-auto" />
-          <p className="text-sm text-muted-foreground mt-2">Loading...</p>
+          <Loader2 className="w-5 h-5 animate-spin text-emerald-500 mx-auto" />
+          <p className="text-xs text-muted-foreground mt-2 tracking-wide">Loading Trackr…</p>
         </div>
       </div>
     )
@@ -422,39 +423,73 @@ export default function Home() {
 
   return (
     <CurrencyProvider>
-    <div className="min-h-screen flex flex-col bg-gradient-to-br from-gray-50 via-white to-emerald-50/30 dark:from-gray-950 dark:via-gray-900 dark:to-emerald-950/10">
+    <div className="min-h-screen flex flex-col bg-gray-50/60 dark:from-gray-950 dark:via-gray-900 dark:to-emerald-950/10 dark:bg-gray-950">
       {/* Header */}
-      <header className="sticky top-0 z-50 bg-white/95 dark:bg-gray-950/95 backdrop-blur-xl border-b border-gray-100/80 dark:border-gray-800/60">
-        <div className="w-full max-w-2xl mx-auto px-4 py-2.5 flex items-center justify-between">
+      <header className="sticky top-0 z-50 bg-white/97 dark:bg-gray-950/97 backdrop-blur-xl border-b border-gray-100 dark:border-gray-800/70 shadow-sm shadow-black/[0.03]">
+        <div className="w-full max-w-6xl mx-auto px-4 h-14 flex items-center justify-between gap-4">
+
+          {/* Logo + wordmark */}
           <button
             onClick={() => setActiveTab('dashboard')}
-            className="flex items-center gap-2.5 hover:opacity-80 transition-opacity"
+            className="flex items-center gap-2.5 shrink-0 hover:opacity-80 transition-opacity"
           >
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-sm shadow-emerald-500/20">
-              <span className="text-white text-base font-extrabold tracking-tight">T</span>
-            </div>
-            <div>
-              <h1 className="text-[15px] font-bold leading-tight tracking-tight">Trackr</h1>
-              <p className="text-[11px] text-muted-foreground leading-tight">
-                {userName ? `Hi, ${userName.split(' ')[0]}` : 'AI Expense Tracker'}
-              </p>
+            <TrackrLogo size={34} />
+            <div className="hidden sm:block">
+              <h1 className="text-[15px] font-extrabold leading-none tracking-tight text-gray-900 dark:text-white">Trackr</h1>
+              <p className="text-[10px] text-muted-foreground leading-none mt-0.5">AI expense tracker</p>
             </div>
           </button>
-          <div className="flex items-center gap-1">
+
+          {/* Desktop pill nav — hidden on mobile (bottom nav handles it) */}
+          <nav className="hidden md:flex items-center gap-0.5 bg-gray-100/80 dark:bg-gray-800/60 rounded-xl p-1">
+            {([
+              { tab: 'dashboard', label: 'Dashboard', Icon: LayoutDashboard },
+              { tab: 'budget',    label: 'Budget',    Icon: Target },
+              { tab: 'history',   label: 'History',   Icon: History },
+              { tab: 'insights',  label: 'Insights',  Icon: Lightbulb },
+              { tab: 'more',      label: 'More',      Icon: MoreHorizontal },
+            ] as const).map(({ tab, label, Icon }) => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-medium transition-all ${
+                  activeTab === tab
+                    ? 'bg-white dark:bg-gray-700 shadow-sm text-emerald-600 dark:text-emerald-400'
+                    : 'text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200'
+                }`}
+              >
+                <Icon className="w-[15px] h-[15px]" />
+                {label}
+              </button>
+            ))}
+          </nav>
+
+          {/* Right: user actions */}
+          <div className="flex items-center gap-1 shrink-0">
+            {/* Desktop Add button */}
+            <button
+              onClick={() => setActiveTab('add')}
+              className="hidden md:flex items-center gap-1.5 bg-gradient-to-br from-emerald-500 to-teal-500 text-white text-[13px] font-semibold px-3 py-1.5 rounded-xl shadow-sm shadow-emerald-500/25 hover:opacity-90 active:scale-95 transition-all mr-1"
+            >
+              <Plus className="w-4 h-4" />
+              Add
+            </button>
+
             <Button
-              variant="ghost"
-              size="sm"
+              variant="ghost" size="sm"
               onClick={handleToggleDarkMode}
               className="text-muted-foreground hover:text-emerald-600 h-9 w-9 p-0 rounded-xl"
             >
-              {isDarkMode ? <Sun className="w-[18px] h-[18px]" /> : <Moon className="w-[18px] h-[18px]" />}
+              {isDarkMode ? <Sun className="w-[17px] h-[17px]" /> : <Moon className="w-[17px] h-[17px]" />}
             </Button>
-            <Avatar className="h-8 w-8 cursor-pointer" onClick={() => setActiveTab('more')}>
+
+            <Avatar className="h-8 w-8 cursor-pointer ring-2 ring-transparent hover:ring-emerald-300 transition-all" onClick={() => setActiveTab('more')}>
               {userImage && <AvatarImage src={userImage} alt={userName} />}
-              <AvatarFallback className="text-[11px] font-semibold bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300">{userInitials || '?'}</AvatarFallback>
+              <AvatarFallback className="text-[11px] font-bold bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300">{userInitials || '?'}</AvatarFallback>
             </Avatar>
+
             <Button variant="ghost" size="sm" onClick={handleLogout} className="text-muted-foreground hover:text-red-500 h-9 w-9 p-0 rounded-xl">
-              <LogOut className="w-[18px] h-[18px]" />
+              <LogOut className="w-[17px] h-[17px]" />
             </Button>
           </div>
         </div>
@@ -462,8 +497,8 @@ export default function Home() {
 
       {/* Single Tabs component wrapping both content and navigation */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        {/* Main Content */}
-        <main className="w-full max-w-2xl mx-auto px-3 sm:px-4 pb-28 pt-4 flex-1">
+        {/* Main Content — wider on desktop */}
+        <main className="w-full max-w-6xl mx-auto px-4 pb-28 md:pb-10 pt-5 flex-1">
           <TabsContent value="dashboard" className="mt-0">
             <ErrorBoundary label="Dashboard">
               <Dashboard refreshTrigger={refreshTrigger} userName={userName} />
@@ -506,8 +541,8 @@ export default function Home() {
           </TabsContent>
         </main>
 
-        {/* Bottom Navigation */}
-        <nav className="fixed bottom-0 left-0 right-0 z-50">
+        {/* Bottom Navigation — mobile only */}
+        <nav className="fixed bottom-0 left-0 right-0 z-50 md:hidden">
           <div className="bg-white/97 dark:bg-gray-950/97 backdrop-blur-xl border-t border-gray-100/80 dark:border-gray-800/60 shadow-[0_-4px_24px_rgba(0,0,0,0.06)]">
             <div className="w-full max-w-2xl mx-auto">
               <TabsList className="w-full h-[62px] bg-transparent justify-around p-0 shadow-none rounded-none">

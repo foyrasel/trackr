@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import { Mic, Banknote, CreditCard, Smartphone, ArrowRight, X, Zap, Clock, TrendingUp, Globe, Check } from 'lucide-react'
 import { useCurrency } from './CurrencyContext'
+import TrackrLogo from './TrackrLogo'
 
 interface OnboardingScreenProps {
   onComplete: () => void
@@ -326,12 +327,12 @@ function CtaVisual() {
     <div className="relative w-56 h-48 mx-auto flex flex-col items-center justify-center">
       {/* Trackr logo large */}
       <motion.div
-        className="w-24 h-24 rounded-3xl bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center shadow-2xl shadow-emerald-500/30 mb-4"
+        className="mb-4"
         initial={{ scale: 0, rotate: -10 }}
         animate={{ scale: 1, rotate: 0 }}
         transition={{ delay: 0.2, type: 'spring', stiffness: 200 }}
       >
-        <span className="text-white text-5xl font-bold">T</span>
+        <TrackrLogo size={88} />
       </motion.div>
       {/* Trust badges */}
       <motion.div
