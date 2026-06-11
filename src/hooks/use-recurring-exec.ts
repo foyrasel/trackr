@@ -28,12 +28,11 @@ export function useRecurringExecution(userName?: string, onExecuted?: () => void
 
         if (response.ok) {
           const data = await response.json()
-          // Mark as checked for this session
+          // Mark as checked for this session, store count for banner
           sessionStorage.setItem(sessionKey, 'true')
-
-          // If transactions were executed, trigger refresh
-          if (data.executedCount > 0 && onExecuted) {
-            onExecuted()
+          if (data.executedCount > 0) {
+            sessionStorage.setItem('trackr_recurring_count', String(data.executedCount))
+            if (onExecuted) onExecuted()
           }
         }
       } catch (error) {

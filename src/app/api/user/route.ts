@@ -26,6 +26,8 @@ export async function GET(request: NextRequest) {
       currencySymbol: dbUser.currencySymbol,
       language: dbUser.language,
       hasGeminiKey: !!dbUser.geminiApiKey,
+      hasTelegramToken: !!dbUser.telegramToken,
+      monthlyReportEnabled: dbUser.monthlyReportEnabled,
     })
   } catch (error) {
     console.error('Error fetching user settings:', error)
@@ -42,7 +44,7 @@ export async function PUT(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { darkMode, currency, currencySymbol, language, onboardingDone, geminiApiKey } = body
+    const { darkMode, currency, currencySymbol, language, onboardingDone, geminiApiKey, telegramToken, monthlyReportEnabled } = body
 
     const updateData: Record<string, unknown> = {}
     if (darkMode !== undefined) updateData.darkMode = darkMode
@@ -51,6 +53,8 @@ export async function PUT(request: NextRequest) {
     if (language !== undefined) updateData.language = language
     if (onboardingDone !== undefined) updateData.onboardingDone = onboardingDone
     if (geminiApiKey !== undefined) updateData.geminiApiKey = geminiApiKey || null
+    if (telegramToken !== undefined) updateData.telegramToken = telegramToken || null
+    if (monthlyReportEnabled !== undefined) updateData.monthlyReportEnabled = monthlyReportEnabled
 
     if (Object.keys(updateData).length === 0) {
       return NextResponse.json({ error: 'No fields to update' }, { status: 400 })

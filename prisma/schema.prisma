@@ -21,7 +21,9 @@ model User {
   currencySymbol String    @default("$") // Display symbol
   language       String    @default("en") // "en", "bn", "hi"
   onboardingDone Boolean   @default(false)
-  geminiApiKey   String?   // User's personal Gemini API key (BYOK)
+  geminiApiKey          String?   // User's personal Gemini API key (BYOK)
+  telegramToken         String?   // Telegram bot token for logging transactions via chat
+  monthlyReportEnabled  Boolean   @default(false) // Send monthly summary email
   accounts       Account[]
   transfers      Transfer[]
   budgets        Budget[]
@@ -101,6 +103,7 @@ model Transaction {
   classification String   @default("need") // "need", "want", "ego", "savings", "debt" (for expenses), "income" (for income)
   date           DateTime @default(now())
   isRecurring    Boolean  @default(false)
+  tags           String?  // JSON array of string tags e.g. '["vacation","work"]'
   receiptUrl     String?  // Path to uploaded receipt photo
   recurringId    String?  // Link to recurring transaction that created this
   createdAt      DateTime @default(now())

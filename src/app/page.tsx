@@ -15,6 +15,7 @@ import OnboardingScreen from '@/components/tracker/OnboardingScreen'
 import AccountSetup from '@/components/tracker/AccountSetup'
 import InsightsPanel from '@/components/tracker/InsightsPanel'
 import MorePanel from '@/components/tracker/MorePanel'
+import FeatureSetupScreen from '@/components/tracker/FeatureSetupScreen'
 import { CurrencyProvider, useCurrency } from '@/components/tracker/CurrencyContext'
 import { useRecurringExecution } from '@/hooks/use-recurring-exec'
 import ErrorBoundary from '@/components/ErrorBoundary'
@@ -52,6 +53,7 @@ export default function Home() {
   const [userId, setUserId] = useState<string | null>(null)
   const [showOnboarding, setShowOnboarding] = useState(false)
   const [showAccountSetup, setShowAccountSetup] = useState(false)
+  const [showFeatureSetup, setShowFeatureSetup] = useState(false)
   const [mounted, setMounted] = useState(false)
 
   // Dark mode state
@@ -254,6 +256,17 @@ export default function Home() {
     }
   }
 
+  const showFeatureSetupIfNeeded = () => {
+    if (!localStorage.getItem('trackr_feature_setup_done')) {
+      setShowFeatureSetup(true)
+    }
+  }
+
+  const handleFeatureSetupComplete = () => {
+    localStorage.setItem('trackr_feature_setup_done', 'true')
+    setShowFeatureSetup(false)
+  }
+
   const handleAccountSetupComplete = async (accounts: { name: string; type: string; balance: number; color: string; icon: string }[]) => {
     localStorage.setItem('trackr_account_setup_done', 'true')
     setShowAccountSetup(false)
@@ -301,6 +314,7 @@ export default function Home() {
     } catch (error) {
       console.error('Error saving accounts:', error)
     }
+    showFeatureSetupIfNeeded()
   }
 
   const handleAccountSetupSkip = () => {
@@ -315,6 +329,7 @@ export default function Home() {
     }).then(res => {
       if (!res.ok) console.error('Failed to mark onboarding done in DB')
     }).catch(err => console.error('Failed to mark onboarding done:', err))
+    showFeatureSetupIfNeeded()
   }
 
   const handleLogout = async () => {
@@ -344,6 +359,18 @@ export default function Home() {
 
   // Auto-execute due recurring transactions once per session
   useRecurringExecution(isLoggedIn ? userName : undefined, handleRefreshData)
+
+  // Keyboard shortcut: N = new transaction
+  useEffect(() => {
+    if (!isLoggedIn) return
+    const handler = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement).tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
+      if (e.key === 'n' || e.key === 'N') setActiveTab('add')
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [isLoggedIn])
 
   const handleTransactionAdded = () => {
     setActiveTab('dashboard')
@@ -413,6 +440,11 @@ export default function Home() {
     return <AccountSetup onComplete={handleAccountSetupComplete} onSkip={handleAccountSetupSkip} userName={userName} />
   }
 
+  // Show optional feature setup screen once after account setup
+  if (showFeatureSetup) {
+    return <FeatureSetupScreen userName={userName} onComplete={handleFeatureSetupComplete} />
+  }
+
   // Get user initials for avatar fallback
   const userInitials = userName
     .split(' ')
@@ -421,91 +453,143 @@ export default function Home() {
     .toUpperCase()
     .slice(0, 2)
 
+  const NAV_ITEMS = [
+    { tab: 'dashboard', label: 'Dashboard', Icon: LayoutDashboard },
+    { tab: 'budget',    label: 'Budget',    Icon: Target },
+    { tab: 'history',   label: 'History',   Icon: History },
+    { tab: 'insights',  label: 'Insights',  Icon: Lightbulb },
+    { tab: 'more',      label: 'Settings',  Icon: MoreHorizontal },
+  ] as const
+
   return (
     <CurrencyProvider>
-    <div className="min-h-screen flex flex-col bg-gray-50/60 dark:from-gray-950 dark:via-gray-900 dark:to-emerald-950/10 dark:bg-gray-950">
-      {/* Header */}
-      <header className="sticky top-0 z-50 bg-white/97 dark:bg-gray-950/97 backdrop-blur-xl border-b border-gray-100 dark:border-gray-800/70 shadow-sm shadow-black/[0.03]">
-        <div className="w-full max-w-6xl mx-auto px-4 h-14 flex items-center justify-between gap-4">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex">
 
-          {/* Logo + wordmark */}
-          <button
-            onClick={() => setActiveTab('dashboard')}
-            className="flex items-center gap-2.5 shrink-0 hover:opacity-80 transition-opacity"
-          >
-            <TrackrLogo size={34} />
-            <div className="hidden sm:block">
-              <h1 className="text-[15px] font-extrabold leading-none tracking-tight text-gray-900 dark:text-white">Trackr</h1>
-              <p className="text-[10px] text-muted-foreground leading-none mt-0.5">AI expense tracker</p>
-            </div>
-          </button>
+      {/* ── FIXED LEFT SIDEBAR (desktop only) ── */}
+      <aside className="hidden md:flex flex-col fixed inset-y-0 left-0 w-56 lg:w-60 bg-white dark:bg-gray-900 border-r border-gray-100 dark:border-gray-800 z-40">
 
-          {/* Desktop pill nav — hidden on mobile (bottom nav handles it) */}
-          <nav className="hidden md:flex items-center gap-0.5 bg-gray-100/80 dark:bg-gray-800/60 rounded-xl p-1">
-            {([
-              { tab: 'dashboard', label: 'Dashboard', Icon: LayoutDashboard },
-              { tab: 'budget',    label: 'Budget',    Icon: Target },
-              { tab: 'history',   label: 'History',   Icon: History },
-              { tab: 'insights',  label: 'Insights',  Icon: Lightbulb },
-              { tab: 'more',      label: 'More',      Icon: MoreHorizontal },
-            ] as const).map(({ tab, label, Icon }) => (
-              <button
-                key={tab}
-                onClick={() => setActiveTab(tab)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-medium transition-all ${
-                  activeTab === tab
-                    ? 'bg-white dark:bg-gray-700 shadow-sm text-emerald-600 dark:text-emerald-400'
-                    : 'text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200'
-                }`}
-              >
-                <Icon className="w-[15px] h-[15px]" />
-                {label}
-              </button>
-            ))}
-          </nav>
+        {/* Logo */}
+        <button
+          onClick={() => setActiveTab('dashboard')}
+          className="flex items-center gap-2.5 px-4 py-4 border-b border-gray-100 dark:border-gray-800 hover:opacity-80 transition-opacity"
+        >
+          <TrackrLogo size={34} />
+          <div className="text-left">
+            <h1 className="text-[14px] font-extrabold leading-none tracking-tight text-gray-900 dark:text-white">Trackr</h1>
+            <p className="text-[10px] text-muted-foreground leading-none mt-0.5">AI expense tracker</p>
+          </div>
+        </button>
 
-          {/* Right: user actions */}
-          <div className="flex items-center gap-1 shrink-0">
-            {/* Desktop Add button */}
+        {/* Nav items */}
+        <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
+          {NAV_ITEMS.map(({ tab, label, Icon }) => (
             <button
-              onClick={() => setActiveTab('add')}
-              className="hidden md:flex items-center gap-1.5 bg-gradient-to-br from-emerald-500 to-teal-500 text-white text-[13px] font-semibold px-3 py-1.5 rounded-xl shadow-sm shadow-emerald-500/25 hover:opacity-90 active:scale-95 transition-all mr-1"
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13px] font-medium transition-all text-left ${
+                activeTab === tab
+                  ? 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400'
+                  : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800/60 hover:text-gray-800 dark:hover:text-gray-200'
+              }`}
             >
-              <Plus className="w-4 h-4" />
-              Add
+              <Icon className={`w-[17px] h-[17px] shrink-0 ${activeTab === tab ? 'text-emerald-600 dark:text-emerald-400' : ''}`} />
+              {label}
+              {activeTab === tab && <span className="ml-auto w-1.5 h-1.5 rounded-full bg-emerald-500" />}
             </button>
+          ))}
+        </nav>
 
-            <Button
-              variant="ghost" size="sm"
-              onClick={handleToggleDarkMode}
-              className="text-muted-foreground hover:text-emerald-600 h-9 w-9 p-0 rounded-xl"
-            >
-              {isDarkMode ? <Sun className="w-[17px] h-[17px]" /> : <Moon className="w-[17px] h-[17px]" />}
-            </Button>
+        {/* Add Transaction button */}
+        <div className="px-3 pb-3">
+          <button
+            onClick={() => setActiveTab('add')}
+            className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-[13px] font-semibold transition-all shadow-sm active:scale-95 ${
+              activeTab === 'add'
+                ? 'bg-gradient-to-br from-emerald-600 to-teal-600 text-white shadow-emerald-500/30'
+                : 'bg-gradient-to-br from-emerald-500 to-teal-500 text-white shadow-emerald-500/20 hover:opacity-90'
+            }`}
+          >
+            <Plus className="w-4 h-4" />
+            Add Transaction
+          </button>
+        </div>
 
-            <Avatar className="h-8 w-8 cursor-pointer ring-2 ring-transparent hover:ring-emerald-300 transition-all" onClick={() => setActiveTab('more')}>
+        {/* User + controls at bottom */}
+        <div className="px-3 pb-4 border-t border-gray-100 dark:border-gray-800 pt-3 space-y-1">
+          <button
+            onClick={() => setActiveTab('more')}
+            className="w-full flex items-center gap-2.5 px-2 py-2 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors text-left"
+          >
+            <Avatar className="h-8 w-8 shrink-0">
               {userImage && <AvatarImage src={userImage} alt={userName} />}
               <AvatarFallback className="text-[11px] font-bold bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300">{userInitials || '?'}</AvatarFallback>
             </Avatar>
-
-            <Button variant="ghost" size="sm" onClick={handleLogout} className="text-muted-foreground hover:text-red-500 h-9 w-9 p-0 rounded-xl">
-              <LogOut className="w-[17px] h-[17px]" />
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-semibold text-gray-900 dark:text-white truncate">{userName}</p>
+              <p className="text-[10px] text-muted-foreground truncate">{userEmail || 'Demo user'}</p>
+            </div>
+          </button>
+          <div className="flex gap-1">
+            <Button variant="ghost" size="sm" onClick={handleToggleDarkMode} className="flex-1 h-8 text-[11px] gap-1.5 text-muted-foreground hover:text-gray-700 dark:hover:text-gray-200 justify-center">
+              {isDarkMode ? <><Sun className="w-3.5 h-3.5" />Light</> : <><Moon className="w-3.5 h-3.5" />Dark</>}
+            </Button>
+            <Button variant="ghost" size="sm" onClick={handleLogout} className="h-8 w-8 p-0 text-muted-foreground hover:text-red-500">
+              <LogOut className="w-3.5 h-3.5" />
             </Button>
           </div>
         </div>
-      </header>
+      </aside>
+
+      {/* ── MAIN AREA (offset for sidebar on desktop) ── */}
+      <div className="flex flex-col flex-1 min-h-screen md:ml-56 lg:ml-60">
+
+        {/* Slim top bar */}
+        <header className="sticky top-0 z-30 bg-white/97 dark:bg-gray-950/97 backdrop-blur-xl border-b border-gray-100 dark:border-gray-800/70 shadow-sm shadow-black/[0.02]">
+          <div className="px-4 md:px-6 h-14 flex items-center justify-between gap-4">
+
+            {/* Mobile: logo */}
+            <button onClick={() => setActiveTab('dashboard')} className="flex md:hidden items-center gap-2 hover:opacity-80 transition-opacity">
+              <TrackrLogo size={30} />
+              <span className="text-sm font-extrabold text-gray-900 dark:text-white">Trackr</span>
+            </button>
+
+            {/* Desktop: current page title */}
+            <div className="hidden md:block">
+              <p className="text-[15px] font-bold text-gray-900 dark:text-white capitalize leading-none">
+                {activeTab === 'dashboard' ? 'Dashboard' : activeTab === 'add' ? 'Add Transaction' : NAV_ITEMS.find(n => n.tab === activeTab)?.label ?? activeTab}
+              </p>
+              <p className="text-[11px] text-muted-foreground leading-none mt-0.5">
+                {userName ? `Hi, ${userName.split(' ')[0]} 👋` : 'Welcome'}
+              </p>
+            </div>
+
+            {/* Mobile controls */}
+            <div className="flex md:hidden items-center gap-1">
+              <Button variant="ghost" size="sm" onClick={handleToggleDarkMode} className="h-9 w-9 p-0 rounded-xl text-muted-foreground">
+                {isDarkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+              </Button>
+              <Avatar className="h-8 w-8 cursor-pointer" onClick={() => setActiveTab('more')}>
+                {userImage && <AvatarImage src={userImage} alt={userName} />}
+                <AvatarFallback className="text-[11px] font-bold bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300">{userInitials || '?'}</AvatarFallback>
+              </Avatar>
+              <Button variant="ghost" size="sm" onClick={handleLogout} className="h-9 w-9 p-0 rounded-xl text-muted-foreground hover:text-red-500">
+                <LogOut className="w-4 h-4" />
+              </Button>
+            </div>
+          </div>
+        </header>
 
       {/* Single Tabs component wrapping both content and navigation */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        {/* Main Content — wider on desktop */}
-        <main className="w-full max-w-6xl mx-auto px-4 pb-28 md:pb-10 pt-5 flex-1">
+        {/* Main Content — full remaining width */}
+        <main className="flex-1 px-4 md:px-6 pb-28 md:pb-8 pt-5">
           <TabsContent value="dashboard" className="mt-0">
             <ErrorBoundary label="Dashboard">
               <Dashboard refreshTrigger={refreshTrigger} userName={userName} />
             </ErrorBoundary>
           </TabsContent>
 
-          <TabsContent value="add" className="mt-0">
+          <TabsContent value="add" className="mt-0 max-w-xl">
             <ErrorBoundary label="Add Transaction">
               <AddTransaction onTransactionAdded={handleTransactionAdded} userName={userName} />
             </ErrorBoundary>
@@ -529,7 +613,7 @@ export default function Home() {
             </ErrorBoundary>
           </TabsContent>
 
-          <TabsContent value="more" className="mt-0">
+          <TabsContent value="more" className="mt-0 max-w-xl">
             <ErrorBoundary label="Settings">
               <MorePanel
                 userName={userName}
@@ -596,6 +680,7 @@ export default function Home() {
           </div>
         </nav>
       </Tabs>
+      </div>
     </div>
     </CurrencyProvider>
   )
