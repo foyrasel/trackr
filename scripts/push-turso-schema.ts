@@ -7,8 +7,8 @@ const TURSO_TOKEN = process.env.DATABASE_AUTH_TOKEN || process.env.TURSO_TOKEN |
 
 async function pushSchema() {
   if (!TURSO_URL || !TURSO_TOKEN) {
-    console.error('Missing TURSO_URL or DATABASE_AUTH_TOKEN env vars')
-    process.exit(1)
+    console.log('ℹ️  TURSO_URL / DATABASE_AUTH_TOKEN not set — skipping Turso schema push (local SQLite build)')
+    process.exit(0)
   }
 
   const client = createClient({

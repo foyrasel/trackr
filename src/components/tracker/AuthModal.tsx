@@ -57,6 +57,15 @@ export default function AuthModal({ isOpen, onClose, defaultMode = 'login', onLo
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const [googleAvailable, setGoogleAvailable] = useState(true)
+
+  // Check if Google OAuth is configured
+  useEffect(() => {
+    fetch('/api/auth/providers')
+      .then((r) => r.json())
+      .then((providers) => setGoogleAvailable('google' in providers))
+      .catch(() => setGoogleAvailable(false))
+  }, [])
 
   // Sync mode when defaultMode changes (e.g. parent changes from login to signup)
   useEffect(() => {
@@ -86,6 +95,10 @@ export default function AuthModal({ isOpen, onClose, defaultMode = 'login', onLo
   }
 
   const handleGoogleLogin = async () => {
+    if (!googleAvailable) {
+      setError('Google sign-in is not configured. Please use email & password instead.')
+      return
+    }
     try {
       await signIn('google', { callbackUrl: '/' })
     } catch {
@@ -398,8 +411,9 @@ export default function AuthModal({ isOpen, onClose, defaultMode = 'login', onLo
                     {/* Google Button */}
                     <button
                       onClick={handleGoogleLogin}
-                      disabled={isLoading}
-                      className="w-full h-11 flex items-center justify-center gap-3 bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 rounded-xl text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-750 hover:border-gray-300 dark:hover:border-gray-600 transition-all disabled:opacity-50"
+                      disabled={isLoading || !googleAvailable}
+                      title={!googleAvailable ? 'Google login not configured on this server' : undefined}
+                      className="w-full h-11 flex items-center justify-center gap-3 bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 rounded-xl text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-750 hover:border-gray-300 dark:hover:border-gray-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <GoogleIcon />
                       Continue with Google
@@ -482,8 +496,9 @@ export default function AuthModal({ isOpen, onClose, defaultMode = 'login', onLo
                     {/* Google Button */}
                     <button
                       onClick={handleGoogleLogin}
-                      disabled={isLoading}
-                      className="w-full h-11 flex items-center justify-center gap-3 bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 rounded-xl text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-750 hover:border-gray-300 dark:hover:border-gray-600 transition-all disabled:opacity-50"
+                      disabled={isLoading || !googleAvailable}
+                      title={!googleAvailable ? 'Google login not configured on this server' : undefined}
+                      className="w-full h-11 flex items-center justify-center gap-3 bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 rounded-xl text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-750 hover:border-gray-300 dark:hover:border-gray-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <GoogleIcon />
                       Continue with Google
