@@ -1,11 +1,13 @@
 import { createClient } from '@libsql/client'
 
 const TURSO_URL = process.env.TURSO_URL || ''
-const TURSO_TOKEN = process.env.TURSO_TOKEN || ''
+// Accept either name so it matches the runtime app (DATABASE_AUTH_TOKEN).
+// TURSO_TOKEN is kept as a fallback for backwards compatibility.
+const TURSO_TOKEN = process.env.DATABASE_AUTH_TOKEN || process.env.TURSO_TOKEN || ''
 
 async function pushSchema() {
   if (!TURSO_URL || !TURSO_TOKEN) {
-    console.error('Missing TURSO_URL or TURSO_TOKEN env vars')
+    console.error('Missing TURSO_URL or DATABASE_AUTH_TOKEN env vars')
     process.exit(1)
   }
 

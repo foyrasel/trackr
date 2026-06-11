@@ -1,4 +1,4 @@
-import { db } from '@/lib/db'
+import { db, ensureDbReady } from '@/lib/db'
 import { NextRequest, NextResponse } from 'next/server'
 
 async function hashPassword(password: string): Promise<string> {
@@ -44,6 +44,10 @@ const TEST_USERS = [
  */
 export async function POST(request: NextRequest) {
   try {
+    // Wait for the Turso schema to be created before the first query on a
+    // freshly provisioned database.
+    await ensureDbReady()
+
     // Skip re-seeding if users already exist and are verified (avoid overwriting passwords)
     const existingCorporate = await db.user.findUnique({ where: { email: 'corporate@test.com' } })
     if (existingCorporate?.emailVerified) {
