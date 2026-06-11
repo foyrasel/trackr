@@ -21,17 +21,18 @@ export async function PUT(
     }
 
     const body = await request.json()
-    const { type, amount, description, category, spendingType, classification, date, isRecurring, receiptUrl } = body
+    const { type, amount, description, category, spendingType, classification, date, isRecurring, receiptUrl, accountId } = body
 
-    // If amount or spendingType changed, we need to reverse the old balance effect and apply the new one
-    if (amount !== undefined || spendingType !== undefined || type !== undefined) {
-      // Reverse old transaction effect
-      const oldAccount = await db.account.findFirst({
-        where: { userId: user.id, type: existing.spendingType },
-      })
+    // If amount, account, or type changed, reverse the old balance effect and apply the new one
+    if (amount !== undefined || spendingType !== undefined || accountId !== undefined || type !== undefined) {
+      // Reverse old transaction effect on the account it was originally charged to.
+      // Prefer the stored accountId; fall back to type-matching for old rows.
+      const oldAccount = existing.accountId
+        ? await db.account.findFirst({ where: { id: existing.accountId, userId: user.id } })
+        : await db.account.findFirst({ where: { userId: user.id, type: existing.spendingType } })
       if (oldAccount) {
         if (existing.type === 'expense') {
-          const reversal = existing.spendingType === 'credit'
+          const reversal = oldAccount.type === 'credit'
             ? oldAccount.balance - existing.amount
             : oldAccount.balance + existing.amount
           await db.account.update({
@@ -49,14 +50,14 @@ export async function PUT(
       // Apply new transaction effect
       const newType = type || existing.type
       const newAmount = amount !== undefined ? parseFloat(amount) : existing.amount
-      const newSpendingType = spendingType || existing.spendingType
+      const newAccountId = accountId !== undefined ? accountId : existing.accountId
 
-      const newAccount = await db.account.findFirst({
-        where: { userId: user.id, type: newSpendingType },
-      })
+      const newAccount = newAccountId
+        ? await db.account.findFirst({ where: { id: newAccountId, userId: user.id } })
+        : await db.account.findFirst({ where: { userId: user.id, type: spendingType || existing.spendingType } })
       if (newAccount) {
         if (newType === 'expense') {
-          const newBalance = newSpendingType === 'credit'
+          const newBalance = newAccount.type === 'credit'
             ? newAccount.balance + newAmount
             : newAccount.balance - newAmount
           await db.account.update({
@@ -78,6 +79,7 @@ export async function PUT(
     if (description !== undefined) updateData.description = description
     if (category !== undefined) updateData.category = category
     if (spendingType !== undefined) updateData.spendingType = spendingType
+    if (accountId !== undefined) updateData.accountId = accountId || null
     if (classification !== undefined) updateData.classification = classification
     if (date !== undefined) updateData.date = new Date(date)
     if (isRecurring !== undefined) updateData.isRecurring = isRecurring
@@ -114,14 +116,15 @@ export async function DELETE(
       return NextResponse.json({ error: 'Transaction not found' }, { status: 404 })
     }
 
-    // Reverse the balance effect
-    const account = await db.account.findFirst({
-      where: { userId: user.id, type: transaction.spendingType },
-    })
+    // Reverse the balance effect on the account it was charged to.
+    // Prefer the stored accountId; fall back to type-matching for old rows.
+    const account = transaction.accountId
+      ? await db.account.findFirst({ where: { id: transaction.accountId, userId: user.id } })
+      : await db.account.findFirst({ where: { userId: user.id, type: transaction.spendingType } })
 
     if (account) {
       if (transaction.type === 'expense') {
-        const newBalance = transaction.spendingType === 'credit'
+        const newBalance = account.type === 'credit'
           ? account.balance - transaction.amount // Credit card: reduce debt
           : account.balance + transaction.amount // Cash/Debit: add back
         await db.account.update({

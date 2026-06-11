@@ -45,10 +45,18 @@ interface Transaction {
   description: string
   category: string
   spendingType: string
+  accountId?: string | null
   classification: string
   date: string
   isRecurring: boolean
   receiptUrl?: string
+}
+
+interface AccountOption {
+  id: string
+  name: string
+  type: string
+  icon: string
 }
 
 interface TransactionListProps {
@@ -112,11 +120,13 @@ export default function TransactionList({ refreshTrigger, userName }: Transactio
     description: string
     category: string
     spendingType: string
+    accountId?: string
     classification: string
     date: string
     type: string
   } | null>(null)
   const [isSaving, setIsSaving] = useState(false)
+  const [accounts, setAccounts] = useState<AccountOption[]>([])
 
   // Receipt viewer state
   const [receiptViewerUrl, setReceiptViewerUrl] = useState<string | null>(null)
@@ -225,6 +235,15 @@ export default function TransactionList({ refreshTrigger, userName }: Transactio
     if (mounted) fetchTransactions()
   }, [filter, debouncedSearch, categoryFilter, fromDate, toDate, refreshTrigger, mounted, fetchTransactions])
 
+  // Load the user's accounts so the edit dialog can offer the real accounts
+  useEffect(() => {
+    if (!mounted) return
+    fetch('/api/accounts', { headers: getAuthHeaders(false) })
+      .then(res => res.ok ? res.json() : null)
+      .then(result => setAccounts(result?.accounts || []))
+      .catch(() => {})
+  }, [mounted, refreshTrigger, getAuthHeaders])
+
   const handleDelete = async () => {
     if (!deleteId) return
     try {
@@ -245,11 +264,17 @@ export default function TransactionList({ refreshTrigger, userName }: Transactio
 
   const handleEditOpen = (tx: Transaction) => {
     setEditTransaction(tx)
+    // Resolve the account: use the stored one, else fall back to the first
+    // account matching the transaction's payment type.
+    const resolvedAccountId = tx.accountId
+      || accounts.find(a => a.type === tx.spendingType)?.id
+      || undefined
     setEditData({
       amount: tx.amount,
       description: tx.description,
       category: tx.category,
       spendingType: tx.spendingType,
+      accountId: resolvedAccountId,
       classification: tx.classification,
       date: tx.date ? new Date(tx.date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
       type: tx.type,
@@ -864,23 +889,46 @@ export default function TransactionList({ refreshTrigger, userName }: Transactio
                 </Select>
               </div>
 
-              {/* Payment Method */}
+              {/* Account / Payment Method */}
               <div>
-                <Label className="text-xs text-muted-foreground">Payment Method</Label>
-                <Select
-                  value={editData.spendingType}
-                  onValueChange={(value) => setEditData({ ...editData, spendingType: value })}
-                >
-                  <SelectTrigger className="mt-1">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="cash">💵 Cash</SelectItem>
-                    <SelectItem value="debit">💳 Debit Card</SelectItem>
-                    <SelectItem value="credit">💳 Credit Card</SelectItem>
-                    <SelectItem value="mobile">📱 Mobile Wallet</SelectItem>
-                  </SelectContent>
-                </Select>
+                <Label className="text-xs text-muted-foreground">
+                  {editData.type === 'income' ? 'Deposit To' : 'Pay From'}
+                </Label>
+                {accounts.length > 0 ? (
+                  <Select
+                    value={editData.accountId || ''}
+                    onValueChange={(value) => {
+                      const selected = accounts.find(a => a.id === value)
+                      setEditData({ ...editData, accountId: value, spendingType: selected?.type || editData.spendingType })
+                    }}
+                  >
+                    <SelectTrigger className="mt-1">
+                      <SelectValue placeholder="Select account" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {accounts.map((acc) => (
+                        <SelectItem key={acc.id} value={acc.id}>
+                          {acc.icon || '💳'} {acc.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <Select
+                    value={editData.spendingType}
+                    onValueChange={(value) => setEditData({ ...editData, spendingType: value })}
+                  >
+                    <SelectTrigger className="mt-1">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="cash">💵 Cash</SelectItem>
+                      <SelectItem value="debit">💳 Debit Card</SelectItem>
+                      <SelectItem value="credit">💳 Credit Card</SelectItem>
+                      <SelectItem value="mobile">📱 Mobile Wallet</SelectItem>
+                    </SelectContent>
+                  </Select>
+                )}
               </div>
 
               {/* Classification */}

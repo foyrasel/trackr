@@ -71,6 +71,7 @@ async function pushSchema() {
       description TEXT NOT NULL,
       category TEXT NOT NULL,
       spendingType TEXT NOT NULL DEFAULT 'cash',
+      accountId TEXT,
       classification TEXT NOT NULL DEFAULT 'need',
       date DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
       isRecurring BOOLEAN NOT NULL DEFAULT 0,

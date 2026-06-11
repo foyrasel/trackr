@@ -95,7 +95,8 @@ model Transaction {
   amount         Float
   description    String
   category       String   // e.g., "Groceries", "Transport", "Salary"
-  spendingType   String   @default("cash") // "cash", "debit", "credit", "mobile"
+  spendingType   String   @default("cash") // "cash", "debit", "credit", "mobile" (derived from the selected account's type)
+  accountId      String?  // Specific account this transaction belongs to (e.g. bKash vs Nagad)
   classification String   @default("need") // "need", "want", "ego", "savings", "debt" (for expenses), "income" (for income)
   date           DateTime @default(now())
   isRecurring    Boolean  @default(false)

@@ -311,6 +311,7 @@ export default function AddTransaction({ onTransactionAdded, userName }: AddTran
           onConfirm={handleConfirm}
           onReject={handleReject}
           isSaving={isSaving}
+          userName={userName}
         />
       )}
     </div>
