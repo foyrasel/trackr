@@ -16,6 +16,7 @@ import AccountSetup from '@/components/tracker/AccountSetup'
 import InsightsPanel from '@/components/tracker/InsightsPanel'
 import MorePanel from '@/components/tracker/MorePanel'
 import FeatureSetupScreen from '@/components/tracker/FeatureSetupScreen'
+import TermsScreen from '@/components/tracker/TermsScreen'
 import { CurrencyProvider, useCurrency } from '@/components/tracker/CurrencyContext'
 import { useRecurringExecution } from '@/hooks/use-recurring-exec'
 import { usePWA } from '@/hooks/use-pwa'
@@ -55,6 +56,7 @@ export default function Home() {
   const [showOnboarding, setShowOnboarding] = useState(false)
   const [showAccountSetup, setShowAccountSetup] = useState(false)
   const [showFeatureSetup, setShowFeatureSetup] = useState(false)
+  const [showTerms, setShowTerms] = useState(false)
   const [mounted, setMounted] = useState(false)
 
   // Dark mode state
@@ -188,8 +190,12 @@ export default function Home() {
       if (id) setUserId(id)
       setIsLoggedIn(true)
 
-      // Check onboarding status (now localStorage has id/email for reliable API calls)
-      checkOnboardingStatus(name, email, id)
+      // Show terms if not yet accepted, else check onboarding
+      if (!localStorage.getItem('trackr_terms_accepted')) {
+        setShowTerms(true)
+      } else {
+        checkOnboardingStatus(name, email, id)
+      }
     }
   }, [session, status, checkOnboardingStatus])
 
@@ -205,8 +211,11 @@ export default function Home() {
         if (savedEmail) setUserEmail(savedEmail)
         setIsLoggedIn(true)
 
-        // Check onboarding
-        checkOnboardingStatus(savedName, savedEmail, savedId)
+        if (!localStorage.getItem('trackr_terms_accepted')) {
+          setShowTerms(true)
+        } else {
+          checkOnboardingStatus(savedName, savedEmail, savedId)
+        }
       }
     }
   }, [status, checkOnboardingStatus])
@@ -240,8 +249,29 @@ export default function Home() {
       localStorage.setItem('trackr_user_id', id)
     }
 
+    // Show terms if not yet accepted
+    if (!localStorage.getItem('trackr_terms_accepted')) {
+      setShowTerms(true)
+      return
+    }
+
     // Check onboarding status
     checkOnboardingStatus(name, email, id)
+  }
+
+  const handleTermsAccept = () => {
+    localStorage.setItem('trackr_terms_accepted', new Date().toISOString())
+    setShowTerms(false)
+    checkOnboardingStatus(userName, userEmail, userId)
+  }
+
+  const handleTermsDecline = async () => {
+    setShowTerms(false)
+    setIsLoggedIn(false)
+    localStorage.removeItem('trackr_user_name')
+    localStorage.removeItem('trackr_user_email')
+    localStorage.removeItem('trackr_user_id')
+    try { await signOut({ redirect: false }) } catch {}
   }
 
   const handleOnboardingComplete = () => {
@@ -431,6 +461,11 @@ export default function Home() {
   // Show landing page if not logged in
   if (!isLoggedIn) {
     return <LandingPage onLogin={handleLogin} />
+  }
+
+  // Show terms & conditions for first-time users
+  if (showTerms) {
+    return <TermsScreen onAccept={handleTermsAccept} onDecline={handleTermsDecline} />
   }
 
   // Show onboarding screen for first-time users
