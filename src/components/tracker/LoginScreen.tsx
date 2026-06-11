@@ -5,16 +5,19 @@ import { signIn } from 'next-auth/react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Loader2 } from 'lucide-react'
+import { Loader2, Mail, Lock, Eye, EyeOff } from 'lucide-react'
 
 interface LoginScreenProps {
-  onLogin: (name: string) => void
+  onLogin: (name: string, email?: string | null, userId?: string | null) => void
 }
 
 export default function LoginScreen({ onLogin }: LoginScreenProps) {
-  const [name, setName] = useState('')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [loginMethod, setLoginMethod] = useState<string | null>(null)
+  const [loginError, setLoginError] = useState('')
   const [googleConfigured, setGoogleConfigured] = useState(false)
   const [facebookConfigured, setFacebookConfigured] = useState(false)
 
@@ -28,25 +31,44 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
     )
   }, [])
 
-  const handleDemoLogin = async () => {
-    const userName = name.trim() || 'User'
+  const handleEmailLogin = async () => {
+    setLoginError('')
+    if (!email.trim() || !password.trim()) {
+      setLoginError('Email and password are required')
+      return
+    }
+
     setIsLoading(true)
-    setLoginMethod('demo')
+    setLoginMethod('email')
     try {
-      // Use next-auth credentials provider to create a proper session
       const result = await signIn('credentials', {
-        name: userName,
+        email: email.trim(),
+        password: password,
         redirect: false,
       })
+
       if (result?.ok) {
-        onLogin(userName)
+        try {
+          const sessionRes = await fetch('/api/auth/session')
+          const sessionData = await sessionRes.json()
+          const displayName = sessionData?.user?.name || email.trim()
+          const sessionId = sessionData?.user?.id || null
+          localStorage.setItem('trackr_user_email', email.trim())
+          if (sessionId) localStorage.setItem('trackr_user_id', sessionId)
+          onLogin(displayName, email.trim(), sessionId)
+        } catch {
+          localStorage.setItem('trackr_user_email', email.trim())
+          onLogin(email.trim(), email.trim())
+        }
       } else {
-        // Fallback: if next-auth fails, still allow login via localStorage
-        onLogin(userName)
+        setLoginError('Invalid email or password. Please try again.')
       }
-    } catch {
-      // Fallback to localStorage-based login
-      onLogin(userName)
+    } catch (error) {
+      console.error('Login error:', error)
+      setLoginError('Something went wrong. Please try again.')
+    } finally {
+      setIsLoading(false)
+      setLoginMethod(null)
     }
   }
 
@@ -97,8 +119,8 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
               disabled={isLoading}
               variant="outline"
               className={`w-full h-12 flex items-center justify-center gap-3 text-sm font-medium ${
-                googleConfigured 
-                  ? 'border-gray-300 hover:bg-gray-50' 
+                googleConfigured
+                  ? 'border-gray-300 hover:bg-gray-50'
                   : 'border-gray-200 opacity-60'
               }`}
             >
@@ -148,35 +170,75 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
                 <span className="w-full border-t" />
               </div>
               <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-card px-2 text-muted-foreground">or continue with name</span>
+                <span className="bg-card px-2 text-muted-foreground">or sign in with email</span>
               </div>
             </div>
 
-            {/* Demo Login */}
+            {/* Error message */}
+            {loginError && (
+              <div className="bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-xl p-3">
+                <p className="text-xs text-red-700 dark:text-red-300">{loginError}</p>
+              </div>
+            )}
+
+            {/* Email & Password Login */}
             <div className="space-y-3">
-              <Input
-                placeholder="Enter your name..."
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleDemoLogin()}
-                className="h-12 text-center"
-                disabled={isLoading}
-              />
+              <div className="relative">
+                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  type="email"
+                  placeholder="Email address"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="h-11 pl-10 border-gray-200 dark:border-gray-700 focus:border-emerald-500 dark:focus:border-emerald-500"
+                  disabled={isLoading}
+                />
+              </div>
+              <div className="relative">
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  type={showPassword ? 'text' : 'password'}
+                  placeholder="Password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleEmailLogin()}
+                  className="h-11 pl-10 pr-10 border-gray-200 dark:border-gray-700 focus:border-emerald-500 dark:focus:border-emerald-500"
+                  disabled={isLoading}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-gray-700"
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
               <Button
-                onClick={handleDemoLogin}
+                onClick={handleEmailLogin}
                 disabled={isLoading}
-                className="w-full h-12 bg-emerald-600 hover:bg-emerald-700 text-white font-medium"
+                className="w-full h-12 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-semibold text-base shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/40 transition-all"
               >
-                {isLoading && loginMethod === 'demo' ? (
+                {isLoading && loginMethod === 'email' ? (
                   <Loader2 className="w-5 h-5 animate-spin mr-2" />
-                ) : null}
-                Get Started
+                ) : (
+                  <Lock className="w-4 h-4 mr-2" />
+                )}
+                Sign In
               </Button>
             </div>
 
-            <p className="text-xs text-center text-muted-foreground">
-              No password needed. Your data stays on your device.
-            </p>
+            <div className="flex items-center justify-between">
+              <button
+                className="text-xs text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 font-medium transition-colors"
+              >
+                Forgot Password?
+              </button>
+              <button
+                className="text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 font-medium transition-colors"
+              >
+                Create Account
+              </button>
+            </div>
           </CardContent>
         </Card>
       </div>
