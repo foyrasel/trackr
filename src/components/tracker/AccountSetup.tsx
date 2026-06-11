@@ -3,6 +3,7 @@
 import React, { useState, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Button } from '@/components/ui/button'
+import TrackrLogo from './TrackrLogo'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
 import { Banknote, Building2, Smartphone, Plus, X, ArrowRight, ArrowLeft, Check, Sparkles, Wallet } from 'lucide-react'
@@ -197,9 +198,7 @@ export default function AccountSetup({ onComplete, onSkip, userName }: AccountSe
       {/* Skip button */}
       <div className="flex justify-between items-center p-4">
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-emerald-500 flex items-center justify-center">
-            <span className="text-white text-sm font-bold">T</span>
-          </div>
+          <TrackrLogo size={32} />
           <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">Account Setup</span>
         </div>
         <button

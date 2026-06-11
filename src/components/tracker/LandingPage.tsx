@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { motion, useScroll, useTransform, useInView } from 'framer-motion'
 import { Button } from '@/components/ui/button'
+import TrackrLogo from './TrackrLogo'
 import { Card, CardContent } from '@/components/ui/card'
 import {
   Mic, Brain, Globe, Shield, BarChart3, Target, Bell, Camera,
@@ -309,10 +310,8 @@ export default function LandingPage({ onLogin }: LandingPageProps) {
         transition={{ duration: 0.6, ease: [0.21, 0.47, 0.32, 0.98] }}
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
-          <a href="/" className="flex items-center gap-2.5 group">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg shadow-emerald-500/25 group-hover:shadow-emerald-500/40 transition-shadow">
-              <span className="text-white text-lg font-bold">T</span>
-            </div>
+          <a href="/" className="flex items-center gap-2.5 group hover:opacity-80 transition-opacity">
+            <TrackrLogo size={36} />
             <span className="text-xl font-bold text-gray-900 dark:text-white tracking-tight">Trackr</span>
           </a>
           <div className="hidden sm:flex items-center gap-6">
@@ -837,9 +836,7 @@ export default function LandingPage({ onLogin }: LandingPageProps) {
             {/* Brand */}
             <div className="col-span-2 md:col-span-1">
               <div className="flex items-center gap-2.5 mb-4">
-                <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg shadow-emerald-500/25">
-                  <span className="text-white text-sm font-bold">T</span>
-                </div>
+                <TrackrLogo size={32} />
                 <span className="text-lg font-bold text-gray-900 dark:text-white tracking-tight">Trackr</span>
               </div>
               <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed">

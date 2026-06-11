@@ -295,44 +295,93 @@ export default function Dashboard({ refreshTrigger, userName }: DashboardProps) 
   const today = new Date()
   const currentDayOfMonth = isCurrentMonth ? today.getDate() : new Date(parseInt(data.currentMonth.split('-')[0]), parseInt(data.currentMonth.split('-')[1]), 0).getDate()
 
+  // Savings rate for header
+  const savingsRate = data.totalIncome > 0
+    ? Math.round(((data.totalIncome - data.totalExpense) / data.totalIncome) * 100)
+    : null
+
+  // Top 5 categories for progress bars
+  const top5Categories = Object.entries(data.categoryBreakdown)
+    .sort(([, a], [, b]) => b - a)
+    .slice(0, 5)
+  const top5Max = top5Categories.length > 0 ? top5Categories[0][1] : 1
+  const TOP5_COLORS = ['#10b981', '#6366f1', '#f59e0b', '#ef4444', '#8b5cf6']
+
   return (
     <div className="space-y-4">
-      {/* Row 1: Month Navigation Header */}
+      {/* ─── 1. COMPACT HEADER CARD ─── */}
       <div className="rounded-2xl bg-gradient-to-br from-gray-900 via-emerald-950 to-slate-900 text-white shadow-xl shadow-emerald-900/20 overflow-hidden">
-        <div className="px-5 pt-5 pb-4">
-          <div className="flex items-center justify-between">
-            <button
-              onClick={() => navigateMonth(-1)}
-              className="w-9 h-9 rounded-xl bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors active:scale-95"
-            >
-              <ChevronLeft className="w-5 h-5" />
-            </button>
-            <div className="text-center">
-              <p className="text-[10px] text-white/40 font-semibold tracking-widest uppercase mb-0.5">
-                {data.monthName.includes(' ') ? data.monthName.split(' ')[1] : new Date().getFullYear()}
-              </p>
-              <h2 className="text-4xl font-bold tracking-tight leading-none">
-                {data.monthShortName || data.monthName.split(' ')[0]}
-              </h2>
-              {!isCurrentMonth && (
-                <button
-                  onClick={goToCurrentMonth}
-                  className="text-[11px] text-emerald-400 hover:text-emerald-300 mt-1.5 transition-colors"
-                >
-                  ← Back to current
-                </button>
+        <div className="px-5 pt-4 pb-3">
+          {/* top row: nav + inline stats */}
+          <div className="flex items-center justify-between gap-3">
+            {/* Left: month nav */}
+            <div className="flex items-center gap-2 min-w-0">
+              <button
+                onClick={() => navigateMonth(-1)}
+                className="w-8 h-8 rounded-xl bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors active:scale-95 flex-shrink-0"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <div className="min-w-0">
+                <p className="text-[10px] text-white/40 font-semibold tracking-widest uppercase leading-none">
+                  {data.monthName.includes(' ') ? data.monthName.split(' ')[1] : new Date().getFullYear()}
+                </p>
+                <h2 className="text-2xl font-bold tracking-tight leading-tight truncate">
+                  {data.monthShortName || data.monthName.split(' ')[0]}
+                </h2>
+              </div>
+              <button
+                onClick={() => navigateMonth(1)}
+                className="w-8 h-8 rounded-xl bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors active:scale-95 flex-shrink-0"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Right: inline stats — hidden on mobile */}
+            <div className="hidden sm:flex items-center gap-0 flex-shrink-0">
+              <div className="px-4 text-right">
+                <p className="text-[10px] text-white/40 uppercase tracking-widest leading-none mb-0.5">Income</p>
+                <p className="text-sm font-bold text-emerald-400 leading-tight">{currencySymbol}{data.totalIncome.toLocaleString()}</p>
+              </div>
+              <div className="w-px h-8 bg-white/15" />
+              <div className="px-4 text-right">
+                <p className="text-[10px] text-white/40 uppercase tracking-widest leading-none mb-0.5">Expenses</p>
+                <p className="text-sm font-bold text-rose-400 leading-tight">{currencySymbol}{data.totalExpense.toLocaleString()}</p>
+              </div>
+              <div className="w-px h-8 bg-white/15" />
+              <div className="px-4 text-right">
+                <p className="text-[10px] text-white/40 uppercase tracking-widest leading-none mb-0.5">Balance</p>
+                <p className={`text-sm font-bold leading-tight ${data.balance >= 0 ? 'text-white' : 'text-rose-400'}`}>
+                  {data.balance < 0 ? '-' : ''}{currencySymbol}{Math.abs(data.balance).toLocaleString()}
+                </p>
+              </div>
+              {savingsRate !== null && (
+                <>
+                  <div className="w-px h-8 bg-white/15" />
+                  <div className="px-4 text-right">
+                    <p className="text-[10px] text-white/40 uppercase tracking-widest leading-none mb-0.5">Savings</p>
+                    <p className="text-sm font-bold text-sky-300 leading-tight">{savingsRate}%</p>
+                  </div>
+                </>
               )}
             </div>
-            <button
-              onClick={() => navigateMonth(1)}
-              className="w-9 h-9 rounded-xl bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors active:scale-95"
-            >
-              <ChevronRight className="w-5 h-5" />
-            </button>
           </div>
+
+          {/* "← Now" link for past months */}
+          {!isCurrentMonth && (
+            <button
+              onClick={goToCurrentMonth}
+              className="text-[11px] text-emerald-400 hover:text-emerald-300 mt-2 transition-colors block"
+            >
+              ← Now
+            </button>
+          )}
+
+          {/* Progress bar — current month only */}
           {isCurrentMonth && data.daysInMonth > 0 && (
-            <div className="mt-4">
-              <div className="flex justify-between text-[10px] text-white/35 mb-1.5">
+            <div className="mt-3">
+              <div className="flex justify-between text-[10px] text-white/35 mb-1">
                 <span>Day {data.daysElapsed} of {data.daysInMonth}</span>
                 <span>{Math.round((data.daysElapsed / data.daysInMonth) * 100)}% through</span>
               </div>
@@ -347,295 +396,208 @@ export default function Dashboard({ refreshTrigger, userName }: DashboardProps) 
         </div>
       </div>
 
-      {/* Row 2: Balance Cards - Cash, Debit, Credit */}
-      <BalanceCards refreshTrigger={refreshTrigger} userName={userName} />
-
-      {/* Row 3: Summary Cards */}
-      <div className="grid grid-cols-2 gap-3">
+      {/* ─── 2. FOUR METRIC CARDS ─── */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        {/* Income */}
         <div className="bg-white dark:bg-gray-900 rounded-2xl p-4 shadow-sm border border-gray-100 dark:border-gray-800">
           <div className="flex items-center gap-2 mb-2.5">
-            <div className="w-7 h-7 rounded-lg bg-emerald-100 dark:bg-emerald-900/40 flex items-center justify-center">
-              <TrendingUp className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+            <div className="w-8 h-8 rounded-xl bg-emerald-100 dark:bg-emerald-900/40 flex items-center justify-center">
+              <TrendingUp className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
             </div>
             <span className="text-xs text-muted-foreground font-medium">Income</span>
           </div>
-          <p className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white leading-none">{currencySymbol}{data.totalIncome.toLocaleString()}</p>
+          <p className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white leading-none">
+            {currencySymbol}{data.totalIncome.toLocaleString()}
+          </p>
+          <p className="text-[11px] text-muted-foreground mt-1">
+            {data.transactionCount} transaction{data.transactionCount !== 1 ? 's' : ''}
+          </p>
         </div>
 
+        {/* Expenses */}
         <div className="bg-white dark:bg-gray-900 rounded-2xl p-4 shadow-sm border border-gray-100 dark:border-gray-800">
           <div className="flex items-center gap-2 mb-2.5">
-            <div className="w-7 h-7 rounded-lg bg-red-100 dark:bg-red-900/40 flex items-center justify-center">
-              <TrendingDown className="w-3.5 h-3.5 text-red-500 dark:text-red-400" />
+            <div className="w-8 h-8 rounded-xl bg-rose-100 dark:bg-rose-900/40 flex items-center justify-center">
+              <TrendingDown className="w-4 h-4 text-rose-500 dark:text-rose-400" />
             </div>
             <span className="text-xs text-muted-foreground font-medium">Expenses</span>
           </div>
-          <p className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white leading-none">{currencySymbol}{data.totalExpense.toLocaleString()}</p>
-          {data.averageMonthlyExpense > 0 && (
-            <p className={`text-[11px] mt-1 font-medium ${diffFromAvg > 10 ? 'text-red-500' : diffFromAvg < -10 ? 'text-emerald-500' : 'text-amber-500'}`}>
-              {diffFromAvg > 0 ? '↑' : '↓'} {Math.abs(diffFromAvg).toFixed(0)}% vs avg
+          <p className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white leading-none">
+            {currencySymbol}{data.totalExpense.toLocaleString()}
+          </p>
+          {data.averageMonthlyExpense > 0 ? (
+            <p className={`text-[11px] mt-1 font-medium ${diffFromAvg > 10 ? 'text-rose-500' : diffFromAvg < -10 ? 'text-emerald-500' : 'text-amber-500'}`}>
+              {diffFromAvg > 0 ? '↑' : '↓'}{Math.abs(diffFromAvg).toFixed(0)}% vs avg
             </p>
+          ) : (
+            <p className="text-[11px] text-muted-foreground mt-1">this month</p>
           )}
         </div>
 
-        <div className={`rounded-2xl p-4 shadow-sm ${data.balance >= 0 ? 'bg-gradient-to-br from-emerald-500 to-teal-500' : 'bg-gradient-to-br from-red-500 to-rose-500'}`}>
+        {/* Net Balance */}
+        <div className={`rounded-2xl p-4 shadow-sm ${data.balance >= 0 ? 'bg-gradient-to-br from-emerald-500 to-teal-500' : 'bg-gradient-to-br from-rose-500 to-red-500'}`}>
           <div className="flex items-center gap-2 mb-2.5">
-            <Wallet className="w-4 h-4 text-white/70" />
+            <div className="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center">
+              <Wallet className="w-4 h-4 text-white" />
+            </div>
             <span className="text-xs text-white/70 font-medium">Net Balance</span>
           </div>
-          <p className="text-2xl font-bold tracking-tight text-white leading-none">{currencySymbol}{Math.abs(data.balance).toLocaleString()}</p>
-          <p className="text-[11px] text-white/60 mt-1">{data.balance < 0 ? 'Overspent' : 'Surplus this month'}</p>
+          <p className="text-2xl font-bold tracking-tight text-white leading-none">
+            {data.balance < 0 ? '-' : ''}{currencySymbol}{Math.abs(data.balance).toLocaleString()}
+          </p>
+          <p className="text-[11px] text-white/70 mt-1">{data.balance < 0 ? 'Overspent' : 'Surplus'}</p>
         </div>
 
+        {/* Daily Avg */}
         <div className="bg-white dark:bg-gray-900 rounded-2xl p-4 shadow-sm border border-gray-100 dark:border-gray-800">
           <div className="flex items-center gap-2 mb-2.5">
-            <div className="w-7 h-7 rounded-lg bg-amber-100 dark:bg-amber-900/40 flex items-center justify-center">
-              <PiggyBank className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+            <div className="w-8 h-8 rounded-xl bg-amber-100 dark:bg-amber-900/40 flex items-center justify-center">
+              <Gauge className="w-4 h-4 text-amber-600 dark:text-amber-400" />
             </div>
-            <span className="text-xs text-muted-foreground font-medium">Savings Rate</span>
+            <span className="text-xs text-muted-foreground font-medium">Daily Avg</span>
           </div>
           <p className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white leading-none">
-            {data.totalIncome > 0
-              ? `${Math.round(((data.totalIncome - data.totalExpense) / data.totalIncome) * 100)}%`
-              : '—'}
+            {currencySymbol}{data.avgDailySpend.toLocaleString()}
           </p>
-        </div>
-      </div>
-
-      {/* Row 3b: Smart Insights — plain-English highlights */}
-      {data.smartInsights.length > 0 && (
-        <Card className="border-2 border-emerald-200 bg-gradient-to-br from-emerald-50/40 via-white to-teal-50/30 dark:from-emerald-950/20 dark:via-gray-900 dark:to-teal-950/10 dark:border-emerald-900/50">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base flex items-center gap-2">
-              <div className="w-7 h-7 rounded-full bg-emerald-100 dark:bg-emerald-900/50 flex items-center justify-center">
-                <Sparkles className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-              </div>
-              Smart Insights
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {data.smartInsights.map((insight, i) => (
-                <div key={i} className="flex items-start gap-2 bg-white/60 dark:bg-gray-800/40 rounded-lg p-3 border border-emerald-100 dark:border-emerald-900/30">
-                  <Lightbulb className="w-4 h-4 text-emerald-500 flex-shrink-0 mt-0.5" />
-                  <p className="text-sm text-gray-700 dark:text-gray-200 leading-snug">{insight}</p>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Row 3c: Spending Pace key metrics */}
-      {data.totalExpense > 0 && (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          <div className="bg-white dark:bg-gray-900 rounded-2xl p-4 shadow-sm border border-gray-100 dark:border-gray-800">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="w-6 h-6 rounded-lg bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center">
-                <Gauge className="w-3 h-3 text-blue-600" />
-              </div>
-              <span className="text-[11px] text-muted-foreground font-medium">Daily Avg</span>
-            </div>
-            <p className="text-xl font-bold text-gray-900 dark:text-white leading-none">{currencySymbol}{data.avgDailySpend.toLocaleString()}</p>
-            <p className="text-[10px] text-muted-foreground mt-1">{data.daysElapsed} day{data.daysElapsed !== 1 ? 's' : ''}</p>
-          </div>
-
-          {data.isViewingCurrentMonth && (
-            <div className="bg-white dark:bg-gray-900 rounded-2xl p-4 shadow-sm border border-gray-100 dark:border-gray-800">
-              <div className="flex items-center gap-2 mb-2">
-                <div className="w-6 h-6 rounded-lg bg-violet-100 dark:bg-violet-900/40 flex items-center justify-center">
-                  <Activity className="w-3 h-3 text-violet-600" />
-                </div>
-                <span className="text-[11px] text-muted-foreground font-medium">Projected</span>
-              </div>
-              <p className="text-xl font-bold text-gray-900 dark:text-white leading-none">{currencySymbol}{data.projectedMonthEnd.toLocaleString()}</p>
-              <p className="text-[10px] text-muted-foreground mt-1">by month end</p>
-            </div>
-          )}
-
-          {data.biggestDay && (
-            <div className="bg-white dark:bg-gray-900 rounded-2xl p-4 shadow-sm border border-gray-100 dark:border-gray-800">
-              <div className="flex items-center gap-2 mb-2">
-                <div className="w-6 h-6 rounded-lg bg-orange-100 dark:bg-orange-900/40 flex items-center justify-center">
-                  <Flame className="w-3 h-3 text-orange-600" />
-                </div>
-                <span className="text-[11px] text-muted-foreground font-medium">Biggest Day</span>
-              </div>
-              <p className="text-xl font-bold text-gray-900 dark:text-white leading-none">{currencySymbol}{data.biggestDay.amount.toLocaleString()}</p>
-              <p className="text-[10px] text-muted-foreground mt-1">
-                {new Date(data.biggestDay.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-              </p>
-            </div>
-          )}
-
-          <div className="bg-white dark:bg-gray-900 rounded-2xl p-4 shadow-sm border border-gray-100 dark:border-gray-800">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="w-6 h-6 rounded-lg bg-teal-100 dark:bg-teal-900/40 flex items-center justify-center">
-                <Receipt className="w-3 h-3 text-teal-600" />
-              </div>
-              <span className="text-[11px] text-muted-foreground font-medium">Transactions</span>
-            </div>
-            <p className="text-xl font-bold text-gray-900 dark:text-white leading-none">{data.transactionCount}</p>
-            <p className="text-[10px] text-muted-foreground mt-1">this month</p>
-          </div>
-        </div>
-      )}
-
-      {/* Row 4: Average vs Current Month Line Chart - FULL WIDTH */}
-      {data.avgVsCurrentLineData.length > 0 && data.averageMonthlyExpense > 0 ? (
-        <Card className="border-2 border-blue-200 bg-gradient-to-br from-blue-50/30 to-white">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base flex items-center gap-2">
-              <Activity className="w-5 h-5 text-blue-500" />
-              Average vs Current Month
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="h-56">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart
-                  data={data.avgVsCurrentLineData}
-                  margin={{ top: 10, right: 15, left: 5, bottom: 5 }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                  <XAxis
-                    dataKey="day"
-                    fontSize={12}
-                    tickFormatter={(v: number) => `${v}`}
-                    ticks={[1, 5, 10, 15, 20, 25, 30]}
-                  />
-                  <YAxis
-                    tickFormatter={(v: number) => `${currencySymbol}${(v / 1000).toFixed(0)}k`}
-                    fontSize={12}
-                  />
-                  <Tooltip
-                    formatter={(value: number, name: string) => [`${currencySymbol}${value.toLocaleString()}`, name]}
-                    labelFormatter={(label: number) => `Day ${label}`}
-                  />
-                  <Legend
-                    verticalAlign="top"
-                    height={28}
-                    formatter={(value: string) => (
-                      <span className="text-sm font-medium">{value === 'current' ? 'Current Month' : 'Average Habit'}</span>
-                    )}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="average"
-                    stroke="#94a3b8"
-                    strokeWidth={2.5}
-                    strokeDasharray="8 4"
-                    dot={false}
-                    name="average"
-                    activeDot={{ r: 4, fill: '#94a3b8' }}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="current"
-                    stroke="#10b981"
-                    strokeWidth={3}
-                    dot={false}
-                    name="current"
-                    activeDot={{ r: 5, fill: '#10b981', stroke: '#fff', strokeWidth: 2 }}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
-      ) : data.totalExpense > 0 ? (
-        <Card className="border-dashed border-2">
-          <CardContent className="p-4 text-center">
-            <Activity className="w-8 h-8 mx-auto text-muted-foreground mb-1" />
-            <h3 className="text-sm font-semibold mb-0.5">Average vs Current Month</h3>
-            <p className="text-muted-foreground text-sm">
-              Keep tracking for 2+ months to unlock the average expense comparison chart.
+          {data.isViewingCurrentMonth && data.projectedMonthEnd > 0 && (
+            <p className="text-[11px] text-muted-foreground mt-1">
+              ~{currencySymbol}{data.projectedMonthEnd.toLocaleString()} projected
             </p>
-          </CardContent>
-        </Card>
-      ) : null}
-
-      {/* Row 5: Pie Chart (LEFT) | Where Money Goes (RIGHT) */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
-        {classificationData.length > 0 && (
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base">Spending Distribution</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="h-56">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={classificationData}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={55}
-                      outerRadius={90}
-                      paddingAngle={3}
-                      dataKey="value"
-                    >
-                      {classificationData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
-                      ))}
-                    </Pie>
-                    <Tooltip
-                      formatter={(value: number) => `${currencySymbol}${value.toLocaleString()}`}
-                    />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
-              <div className="flex flex-wrap justify-center gap-2 mt-2">
-                {classificationData.map((entry) => (
-                  <div key={entry.name} className="flex items-center gap-1.5 text-sm">
-                    <span className="w-3 h-3 rounded-full" style={{ backgroundColor: entry.color }} />
-                    {entry.name}
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {categoryData.length > 0 && (
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base">Where Money Goes</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="h-56">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={categoryData} layout="vertical" margin={{ left: 10 }}>
-                    <CartesianGrid strokeDasharray="3 3" horizontal={false} />
-                    <XAxis type="number" tickFormatter={(v: number) => `${currencySymbol}${v}`} fontSize={12} />
-                    <YAxis type="category" dataKey="name" width={90} fontSize={12} />
-                    <Tooltip formatter={(value: number) => `${currencySymbol}${value.toLocaleString()}`} />
-                    <Bar dataKey="amount" fill="#10b981" radius={[0, 4, 4, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </CardContent>
-          </Card>
-        )}
+          )}
+        </div>
       </div>
 
-      {/* Row 5b: Day-of-week pattern (LEFT) | Top transactions (RIGHT) */}
-      {data.totalExpense > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
-          {data.dayOfWeekSpending.some(d => d.amount > 0) && (
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <CalendarDays className="w-4 h-4 text-indigo-500" />
-                  Spending by Day of Week
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="h-56">
+      {/* ─── 3. BALANCE CARDS ─── */}
+      <BalanceCards refreshTrigger={refreshTrigger} userName={userName} />
+
+      {/* ─── 4. MAIN 2-COLUMN GRID ─── */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+        {/* LEFT: Charts column (col-span-7) */}
+        <div className="lg:col-span-7 space-y-4">
+          {/* Card 1: Spending This Month */}
+          <Card className="shadow-sm border-gray-100 dark:border-gray-800">
+            <CardHeader className="pb-2 pt-4 px-4">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-sm font-semibold">Spending This Month</CardTitle>
+                {data.avgVsCurrentLineData.length > 0 && data.averageMonthlyExpense > 0 && (
+                  <div className="flex items-center gap-3">
+                    <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500" /> Current
+                    </span>
+                    <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                      <span className="w-2 h-2 rounded-full bg-slate-400" /> Avg
+                    </span>
+                  </div>
+                )}
+                {(data.avgVsCurrentLineData.length === 0 || data.averageMonthlyExpense === 0) && trendData.length > 0 && (
+                  <div className="flex items-center gap-3">
+                    <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500" /> Income
+                    </span>
+                    <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                      <span className="w-2 h-2 rounded-full bg-rose-400" /> Expense
+                    </span>
+                  </div>
+                )}
+              </div>
+            </CardHeader>
+            <CardContent className="px-4 pb-4">
+              {data.avgVsCurrentLineData.length > 0 && data.averageMonthlyExpense > 0 ? (
+                <div className="h-52">
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={data.dayOfWeekSpending} margin={{ top: 5, right: 10, left: 5, bottom: 5 }}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                      <XAxis dataKey="day" fontSize={12} />
-                      <YAxis tickFormatter={(v: number) => `${currencySymbol}${(v / 1000).toFixed(0)}k`} fontSize={12} />
+                    <LineChart
+                      data={data.avgVsCurrentLineData}
+                      margin={{ top: 5, right: 10, left: 0, bottom: 0 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
+                      <XAxis
+                        dataKey="day"
+                        fontSize={11}
+                        tickLine={false}
+                        axisLine={false}
+                        tickFormatter={(v: number) => `${v}`}
+                        ticks={[1, 5, 10, 15, 20, 25, 30]}
+                      />
+                      <YAxis
+                        tickFormatter={(v: number) => `${currencySymbol}${(v / 1000).toFixed(0)}k`}
+                        fontSize={11}
+                        tickLine={false}
+                        axisLine={false}
+                      />
+                      <Tooltip
+                        formatter={(value: number, name: string) => [`${currencySymbol}${value.toLocaleString()}`, name === 'current' ? 'Current' : 'Average']}
+                        labelFormatter={(label: number) => `Day ${label}`}
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="average"
+                        stroke="#94a3b8"
+                        strokeWidth={2}
+                        strokeDasharray="6 3"
+                        dot={false}
+                        name="average"
+                        activeDot={{ r: 3, fill: '#94a3b8' }}
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="current"
+                        stroke="#10b981"
+                        strokeWidth={2.5}
+                        dot={false}
+                        name="current"
+                        activeDot={{ r: 4, fill: '#10b981', stroke: '#fff', strokeWidth: 2 }}
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              ) : trendData.length > 0 ? (
+                <div className="h-52">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={trendData} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
+                      <XAxis dataKey="month" fontSize={11} tickLine={false} axisLine={false} />
+                      <YAxis tickFormatter={(v: number) => `${currencySymbol}${(v / 1000).toFixed(0)}k`} fontSize={11} tickLine={false} axisLine={false} />
+                      <Tooltip formatter={(value: number) => `${currencySymbol}${value.toLocaleString()}`} />
+                      <Area type="monotone" dataKey="income" stroke="#10b981" fill="#10b981" fillOpacity={0.15} strokeWidth={2} name="Income" />
+                      <Area type="monotone" dataKey="expense" stroke="#f43f5e" fill="#f43f5e" fillOpacity={0.15} strokeWidth={2} name="Expense" />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+              ) : (
+                <div className="h-52 flex items-center justify-center text-muted-foreground text-sm">
+                  No trend data yet
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Card 2: Spending by Day */}
+          {data.totalExpense > 0 && data.dayOfWeekSpending.some(d => d.amount > 0) && (
+            <Card className="shadow-sm border-gray-100 dark:border-gray-800">
+              <CardHeader className="pb-2 pt-4 px-4">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-sm font-semibold">Spending by Day</CardTitle>
+                  {data.weekendTotal > 0 && data.weekdayTotal > 0 && (
+                    <div className="flex items-center gap-3">
+                      <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                        <span className="w-2 h-2 rounded-full bg-indigo-500" />
+                        Weekday {currencySymbol}{data.weekdayTotal.toLocaleString()}
+                      </span>
+                      <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                        <span className="w-2 h-2 rounded-full bg-amber-500" />
+                        Weekend {currencySymbol}{data.weekendTotal.toLocaleString()}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </CardHeader>
+              <CardContent className="px-4 pb-4">
+                <div className="h-44">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={data.dayOfWeekSpending} margin={{ top: 5, right: 5, left: 0, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
+                      <XAxis dataKey="day" fontSize={11} tickLine={false} axisLine={false} />
+                      <YAxis tickFormatter={(v: number) => `${currencySymbol}${(v / 1000).toFixed(0)}k`} fontSize={11} tickLine={false} axisLine={false} />
                       <Tooltip formatter={(value: number) => [`${currencySymbol}${value.toLocaleString()}`, 'Spent']} />
                       <Bar dataKey="amount" radius={[4, 4, 0, 0]}>
                         {data.dayOfWeekSpending.map((entry, index) => (
@@ -648,42 +610,130 @@ export default function Dashboard({ refreshTrigger, userName }: DashboardProps) 
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
-                {data.weekendTotal > 0 && data.weekdayTotal > 0 && (
-                  <div className="flex items-center justify-center gap-4 mt-2 text-xs text-muted-foreground">
-                    <span className="flex items-center gap-1.5">
-                      <span className="w-2.5 h-2.5 rounded-full bg-indigo-500" /> Weekday {currencySymbol}{data.weekdayTotal.toLocaleString()}
-                    </span>
-                    <span className="flex items-center gap-1.5">
-                      <span className="w-2.5 h-2.5 rounded-full bg-amber-500" /> Weekend {currencySymbol}{data.weekendTotal.toLocaleString()}
-                    </span>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+
+        {/* RIGHT: Breakdown column (col-span-5) */}
+        <div className="lg:col-span-5 space-y-4">
+          {/* Card 1: Spending Breakdown (donut + legend) */}
+          {classificationData.length > 0 && (
+            <Card className="shadow-sm border-gray-100 dark:border-gray-800">
+              <CardHeader className="pb-2 pt-4 px-4">
+                <CardTitle className="text-sm font-semibold">Spending Breakdown</CardTitle>
+              </CardHeader>
+              <CardContent className="px-4 pb-4">
+                <div className="flex items-center gap-3">
+                  {/* Donut */}
+                  <div className="h-44 w-36 flex-shrink-0">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={classificationData}
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={42}
+                          outerRadius={68}
+                          paddingAngle={3}
+                          dataKey="value"
+                        >
+                          {classificationData.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={entry.color} />
+                          ))}
+                        </Pie>
+                        <Tooltip formatter={(value: number) => `${currencySymbol}${value.toLocaleString()}`} />
+                      </PieChart>
+                    </ResponsiveContainer>
                   </div>
-                )}
+                  {/* Legend */}
+                  <div className="flex-1 min-w-0 space-y-1.5">
+                    {classificationData.map((entry) => {
+                      const total = classificationData.reduce((s, e) => s + e.value, 0)
+                      const pct = total > 0 ? Math.round((entry.value / total) * 100) : 0
+                      return (
+                        <div key={entry.name} className="flex items-center justify-between gap-2">
+                          <span className="flex items-center gap-1.5 text-xs text-gray-600 dark:text-gray-400 min-w-0 truncate">
+                            <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: entry.color }} />
+                            {entry.name}
+                          </span>
+                          <span className="text-xs font-semibold text-gray-900 dark:text-white flex-shrink-0">{pct}%</span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+                {/* Mini 3-stat row */}
+                <div className="mt-3 grid grid-cols-3 divide-x divide-gray-100 dark:divide-gray-800 border border-gray-100 dark:border-gray-800 rounded-xl overflow-hidden">
+                  <div className="px-3 py-2 text-center">
+                    <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Needs</p>
+                    <p className="text-sm font-bold text-emerald-600">{needPercent}%</p>
+                  </div>
+                  <div className="px-3 py-2 text-center">
+                    <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Wants</p>
+                    <p className="text-sm font-bold text-amber-600">{wantPercent}%</p>
+                  </div>
+                  <div className="px-3 py-2 text-center">
+                    <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Luxury</p>
+                    <p className="text-sm font-bold text-rose-600">{egoPercent}%</p>
+                  </div>
+                </div>
               </CardContent>
             </Card>
           )}
 
-          {data.topTransactions.length > 0 && (
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <Receipt className="w-4 h-4 text-rose-500" />
-                  Biggest Transactions
-                </CardTitle>
+          {/* Card 2: Where Money Goes (top 5 progress bars) */}
+          {top5Categories.length > 0 && (
+            <Card className="shadow-sm border-gray-100 dark:border-gray-800">
+              <CardHeader className="pb-2 pt-4 px-4">
+                <CardTitle className="text-sm font-semibold">Where Money Goes</CardTitle>
               </CardHeader>
-              <CardContent>
+              <CardContent className="px-4 pb-4">
+                <div className="space-y-2.5">
+                  {top5Categories.map(([name, amount], i) => {
+                    const pct = top5Max > 0 ? Math.round((amount / top5Max) * 100) : 0
+                    const totalExp = data.totalExpense || 1
+                    const sharePct = Math.round((amount / totalExp) * 100)
+                    return (
+                      <div key={name}>
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-xs font-medium text-gray-700 dark:text-gray-300 truncate max-w-[55%]">{name}</span>
+                          <span className="text-xs text-muted-foreground flex-shrink-0">{currencySymbol}{amount.toLocaleString()} <span className="text-gray-400">·</span> {sharePct}%</span>
+                        </div>
+                        <div className="h-1.5 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
+                          <div
+                            className="h-full rounded-full transition-all duration-500"
+                            style={{ width: `${pct}%`, backgroundColor: TOP5_COLORS[i] }}
+                          />
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Card 3: Biggest Expenses */}
+          {data.topTransactions.length > 0 && (
+            <Card className="shadow-sm border-gray-100 dark:border-gray-800">
+              <CardHeader className="pb-2 pt-4 px-4">
+                <CardTitle className="text-sm font-semibold">Biggest Expenses</CardTitle>
+              </CardHeader>
+              <CardContent className="px-4 pb-4">
                 <div className="space-y-2">
-                  {data.topTransactions.map((txn, i) => (
+                  {data.topTransactions.slice(0, 4).map((txn, i) => (
                     <div key={i} className="flex items-center gap-3">
                       <div className="w-6 h-6 rounded-full bg-rose-100 dark:bg-rose-950/40 flex items-center justify-center flex-shrink-0">
-                        <span className="text-xs font-bold text-rose-600 dark:text-rose-400">{i + 1}</span>
+                        <span className="text-[10px] font-bold text-rose-600 dark:text-rose-400">{i + 1}</span>
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className="text-sm font-medium truncate">{txn.description}</p>
-                        <p className="text-xs text-muted-foreground">
+                        <p className="text-xs font-medium truncate text-gray-900 dark:text-white">{txn.description}</p>
+                        <p className="text-[10px] text-muted-foreground">
                           {txn.category} · {new Date(txn.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                         </p>
                       </div>
-                      <p className="text-sm font-bold text-gray-900 dark:text-white flex-shrink-0">
+                      <p className="text-xs font-bold text-gray-900 dark:text-white flex-shrink-0">
                         {currencySymbol}{txn.amount.toLocaleString()}
                       </p>
                     </div>
@@ -693,126 +743,138 @@ export default function Dashboard({ refreshTrigger, userName }: DashboardProps) 
             </Card>
           )}
         </div>
-      )}
+      </div>
 
-      {/* Row 6: 50/30/20 Rule Breakdown - Full Width */}
-      {classificationData.length > 0 && (
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base">50/30/20 Rule Breakdown</CardTitle>
+      {/* ─── 5. SMART INSIGHTS ─── */}
+      {data.smartInsights.length > 0 && (
+        <Card className="shadow-sm border-emerald-200 dark:border-emerald-900/50 bg-gradient-to-br from-emerald-50/30 via-white to-teal-50/20 dark:from-emerald-950/20 dark:via-gray-900 dark:to-teal-950/10">
+          <CardHeader className="pb-2 pt-4 px-4">
+            <CardTitle className="text-sm font-semibold flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-emerald-500" />
+              Smart Insights
+            </CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              <div className="space-y-1">
-                <div className="flex justify-between text-sm">
-                  <span className="flex items-center gap-2">
-                    <span className="w-3 h-3 rounded-full bg-emerald-500" />
-                    Needs (50%)
-                  </span>
-                  <span className="font-medium">{needPercent}%</span>
+          <CardContent className="px-4 pb-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+              {data.smartInsights.map((insight, i) => (
+                <div key={i} className="flex items-start gap-2 bg-white/70 dark:bg-gray-800/40 rounded-lg p-3 border border-emerald-100 dark:border-emerald-900/30">
+                  <Lightbulb className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0 mt-0.5" />
+                  <p className="text-xs text-gray-700 dark:text-gray-200 leading-snug">{insight}</p>
                 </div>
-                <Progress value={Math.min(needPercent, 100)} className="h-2.5" />
-              </div>
-              <div className="space-y-1">
-                <div className="flex justify-between text-sm">
-                  <span className="flex items-center gap-2">
-                    <span className="w-3 h-3 rounded-full bg-amber-500" />
-                    Wants (30%)
-                  </span>
-                  <span className="font-medium">{wantPercent}%</span>
-                </div>
-                <Progress value={Math.min(wantPercent, 100)} className="h-2.5 [&>div]:bg-amber-500" />
-              </div>
-              <div className="space-y-1">
-                <div className="flex justify-between text-sm">
-                  <span className="flex items-center gap-2">
-                    <span className="w-3 h-3 rounded-full bg-red-500" />
-                    Ego/Luxury
-                  </span>
-                  <span className="font-medium">{egoPercent}%</span>
-                </div>
-                <Progress value={Math.min(egoPercent, 100)} className="h-2.5 [&>div]:bg-red-500" />
-              </div>
-              {(data.classificationBreakdown.savings > 0 || data.classificationBreakdown.debt > 0) && (
-                <div className="flex gap-4 text-sm text-muted-foreground pt-1">
-                  {data.classificationBreakdown.savings > 0 && (
-                    <span className="flex items-center gap-1.5">
-                      <span className="w-3 h-3 rounded-full bg-sky-500" />
-                      Savings: {currencySymbol}{data.classificationBreakdown.savings.toLocaleString()}
-                    </span>
-                  )}
-                  {data.classificationBreakdown.debt > 0 && (
-                    <span className="flex items-center gap-1.5">
-                      <span className="w-3 h-3 rounded-full bg-purple-500" />
-                      Debt: {currencySymbol}{data.classificationBreakdown.debt.toLocaleString()}
-                    </span>
-                  )}
-                </div>
-              )}
+              ))}
             </div>
           </CardContent>
         </Card>
       )}
 
-      {/* Row 7: Income vs Expense Trend (LEFT) | Classification Current vs Average (RIGHT) */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
-        {trendData.length > 0 && (
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base">Income vs Expense Trend</CardTitle>
+      {/* ─── 6. SECONDARY ANALYTICS (side by side) ─── */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Left: 50/30/20 Rule */}
+        {classificationData.length > 0 && (
+          <Card className="shadow-sm border-gray-100 dark:border-gray-800">
+            <CardHeader className="pb-2 pt-4 px-4">
+              <CardTitle className="text-sm font-semibold">50/30/20 Rule</CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="h-56">
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={trendData}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="month" fontSize={12} />
-                    <YAxis tickFormatter={(v: number) => `${currencySymbol}${(v / 1000).toFixed(0)}k`} fontSize={12} />
-                    <Tooltip formatter={(value: number) => `${currencySymbol}${value.toLocaleString()}`} />
-                    <Legend wrapperStyle={{ fontSize: '12px' }} />
-                    <Area type="monotone" dataKey="income" stackId="1" stroke="#10b981" fill="#10b981" fillOpacity={0.2} name="Income" />
-                    <Area type="monotone" dataKey="expense" stackId="2" stroke="#ef4444" fill="#ef4444" fillOpacity={0.2} name="Expense" />
-                  </AreaChart>
-                </ResponsiveContainer>
+            <CardContent className="px-4 pb-4">
+              <div className="space-y-3">
+                <div className="space-y-1">
+                  <div className="flex justify-between text-xs">
+                    <span className="flex items-center gap-1.5 text-gray-700 dark:text-gray-300">
+                      <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" /> Needs
+                    </span>
+                    <span className="font-semibold">{needPercent}%</span>
+                  </div>
+                  <Progress value={Math.min(needPercent, 100)} className="h-2" />
+                </div>
+                <div className="space-y-1">
+                  <div className="flex justify-between text-xs">
+                    <span className="flex items-center gap-1.5 text-gray-700 dark:text-gray-300">
+                      <span className="w-2.5 h-2.5 rounded-full bg-amber-500" /> Wants
+                    </span>
+                    <span className="font-semibold">{wantPercent}%</span>
+                  </div>
+                  <Progress value={Math.min(wantPercent, 100)} className="h-2 [&>div]:bg-amber-500" />
+                </div>
+                <div className="space-y-1">
+                  <div className="flex justify-between text-xs">
+                    <span className="flex items-center gap-1.5 text-gray-700 dark:text-gray-300">
+                      <span className="w-2.5 h-2.5 rounded-full bg-rose-500" /> Luxury
+                    </span>
+                    <span className="font-semibold">{egoPercent}%</span>
+                  </div>
+                  <Progress value={Math.min(egoPercent, 100)} className="h-2 [&>div]:bg-rose-500" />
+                </div>
+                {(data.classificationBreakdown.savings > 0 || data.classificationBreakdown.debt > 0) && (
+                  <div className="flex flex-wrap gap-3 text-xs text-muted-foreground pt-1 border-t border-gray-100 dark:border-gray-800">
+                    {data.classificationBreakdown.savings > 0 && (
+                      <span className="flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full bg-sky-500" />
+                        Savings: {currencySymbol}{data.classificationBreakdown.savings.toLocaleString()}
+                      </span>
+                    )}
+                    {data.classificationBreakdown.debt > 0 && (
+                      <span className="flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full bg-purple-500" />
+                        Debt: {currencySymbol}{data.classificationBreakdown.debt.toLocaleString()}
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
         )}
 
-        {data.averageMonthlyExpense > 0 && classificationComparison.length > 0 && (
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base flex items-center gap-2">
-                <BarChart3 className="w-4 h-4 text-amber-500" />
-                Classification: Current vs Average
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="h-56">
+        {/* Right: vs Your Average */}
+        <Card className="shadow-sm border-gray-100 dark:border-gray-800">
+          <CardHeader className="pb-2 pt-4 px-4">
+            <CardTitle className="text-sm font-semibold">vs Your Average</CardTitle>
+          </CardHeader>
+          <CardContent className="px-4 pb-4">
+            {data.averageMonthlyExpense > 0 && classificationComparison.length > 0 ? (
+              <div className="h-52">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={classificationComparison} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="name" fontSize={12} />
-                    <YAxis tickFormatter={(v: number) => `${currencySymbol}${(v / 1000).toFixed(0)}k`} fontSize={12} />
+                  <BarChart data={classificationComparison} margin={{ top: 5, right: 5, left: 0, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
+                    <XAxis dataKey="name" fontSize={11} tickLine={false} axisLine={false} />
+                    <YAxis tickFormatter={(v: number) => `${currencySymbol}${(v / 1000).toFixed(0)}k`} fontSize={11} tickLine={false} axisLine={false} />
                     <Tooltip formatter={(value: number, name: string) => [`${currencySymbol}${value.toLocaleString()}`, name]} />
-                    <Legend wrapperStyle={{ fontSize: '12px' }} />
-                    <Bar dataKey="average" fill="#94a3b8" name="Avg Monthly" radius={[4, 4, 0, 0]} />
-                    <Bar dataKey="current" fill="#10b981" name="This Month" radius={[4, 4, 0, 0]} />
+                    <Legend wrapperStyle={{ fontSize: '11px' }} />
+                    <Bar dataKey="average" fill="#94a3b8" name="Avg" radius={[3, 3, 0, 0]} />
+                    <Bar dataKey="current" fill="#10b981" name="This Month" radius={[3, 3, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
-            </CardContent>
-          </Card>
-        )}
+            ) : trendData.length > 0 ? (
+              <div className="h-52">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={trendData} margin={{ top: 5, right: 5, left: 0, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
+                    <XAxis dataKey="month" fontSize={11} tickLine={false} axisLine={false} />
+                    <YAxis tickFormatter={(v: number) => `${currencySymbol}${(v / 1000).toFixed(0)}k`} fontSize={11} tickLine={false} axisLine={false} />
+                    <Tooltip formatter={(value: number) => `${currencySymbol}${value.toLocaleString()}`} />
+                    <Area type="monotone" dataKey="income" stroke="#10b981" fill="#10b981" fillOpacity={0.15} strokeWidth={2} name="Income" />
+                    <Area type="monotone" dataKey="expense" stroke="#f43f5e" fill="#f43f5e" fillOpacity={0.15} strokeWidth={2} name="Expense" />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            ) : (
+              <div className="h-52 flex flex-col items-center justify-center text-center text-muted-foreground">
+                <BarChart3 className="w-8 h-8 mb-2 opacity-40" />
+                <p className="text-xs">Track 2+ months to compare</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
 
-      {/* Row 8: Yearly Average Comparison - FULL WIDTH */}
+      {/* ─── 7. YEARLY COMPARISON ─── */}
       {data.yearlyComparison.length > 0 && (
-        <Card>
-          <CardHeader className="pb-2">
+        <Card className="shadow-sm border-gray-100 dark:border-gray-800">
+          <CardHeader className="pb-2 pt-4 px-4">
             <div className="flex items-center justify-between">
-              <CardTitle className="text-base flex items-center gap-2">
-                <Calendar className="w-4 h-4 text-violet-500" />
+              <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                <Calendar className="w-3.5 h-3.5 text-violet-500" />
                 Yearly Comparison
               </CardTitle>
               <div className="flex gap-1">
@@ -835,80 +897,63 @@ export default function Dashboard({ refreshTrigger, userName }: DashboardProps) 
               </div>
             </div>
           </CardHeader>
-          <CardContent>
+          <CardContent className="px-4 pb-4">
             {yearlyView === 'overview' ? (
               <div className="space-y-2">
-                {/* All-time Average */}
                 {data.allTimeAvgMonthlyExpense > 0 && (
-                  <div className="bg-violet-50 rounded-lg p-4 border border-violet-200">
+                  <div className="bg-violet-50 dark:bg-violet-950/20 rounded-lg p-3 border border-violet-200 dark:border-violet-900/40">
                     <div className="flex items-center gap-2">
-                      <div className="w-6 h-6 rounded-full bg-violet-100 flex items-center justify-center">
+                      <div className="w-6 h-6 rounded-full bg-violet-100 dark:bg-violet-900/50 flex items-center justify-center">
                         <BarChart3 className="w-3 h-3 text-violet-600" />
                       </div>
                       <div>
-                        <p className="text-sm text-violet-600 font-medium">All-Time Average</p>
-                        <p className="text-base font-bold text-violet-900">{currencySymbol}{data.allTimeAvgMonthlyExpense.toLocaleString()}<span className="text-sm font-normal text-violet-600">/mo</span></p>
+                        <p className="text-xs text-violet-600 font-medium">All-Time Average</p>
+                        <p className="text-sm font-bold text-violet-900 dark:text-violet-300">{currencySymbol}{data.allTimeAvgMonthlyExpense.toLocaleString()}<span className="text-xs font-normal text-violet-600">/mo</span></p>
                       </div>
-                      <div className="ml-auto text-sm text-violet-600">
-                        {data.allTimeMonths} months
-                      </div>
+                      <div className="ml-auto text-xs text-violet-600">{data.allTimeMonths} months</div>
                     </div>
                   </div>
                 )}
-
-                {/* Year by Year Cards */}
                 <div className="space-y-2">
                   {data.yearlyComparison.map((year) => {
                     const isCurrentYear = year.label.includes('Current')
                     return (
-                      <div key={year.year} className={`rounded-md p-4 border ${isCurrentYear ? 'bg-emerald-50 border-emerald-200' : 'bg-gray-50 border-gray-200'}`}>
-                        <div className="flex items-center justify-between mb-1">
+                      <div key={year.year} className={`rounded-lg p-3 border ${isCurrentYear ? 'bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-900/40' : 'bg-gray-50 dark:bg-gray-800/30 border-gray-200 dark:border-gray-700'}`}>
+                        <div className="flex items-center justify-between mb-1.5">
                           <div className="flex items-center gap-2">
                             <span className="font-semibold text-sm">{year.year}</span>
                             {isCurrentYear && (
                               <Badge className="bg-emerald-100 text-emerald-800 border-emerald-300 text-[10px] px-1 py-0">Current</Badge>
                             )}
                           </div>
-                          <div className="flex items-center gap-1 text-sm">
-                            {isCurrentYear ? (
-                              data.yearlyComparison.length > 1 ? (
-                                (() => {
-                                  const prevYear = data.yearlyComparison.find(y => y.year === year.year - 1)
-                                  if (prevYear && prevYear.avgMonthlyExpense > 0) {
-                                    const yearChange = ((year.avgMonthlyExpense - prevYear.avgMonthlyExpense) / prevYear.avgMonthlyExpense) * 100
-                                    return (
-                                      <Badge className={`text-[10px] px-1 py-0 ${yearChange > 0 ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'}`}>
-                                        {yearChange > 0 ? <ArrowUpRight className="w-2.5 h-2.5 mr-0.5" /> : <ArrowDownRight className="w-2.5 h-2.5 mr-0.5" />}
-                                        {yearChange > 0 ? '+' : ''}{yearChange.toFixed(1)}%
-                                      </Badge>
-                                    )
-                                  }
-                                  return null
-                                })()
-                              ) : null
-                            ) : (
-                              (() => {
-                                const nextYear = data.yearlyComparison.find(y => y.year === year.year + 1)
-                                if (nextYear && year.avgMonthlyExpense > 0) {
-                                  return null
-                                }
-                                return null
-                              })()
-                            )}
+                          <div className="flex items-center gap-1">
+                            {isCurrentYear && data.yearlyComparison.length > 1 && (() => {
+                              const prevYear = data.yearlyComparison.find(y => y.year === year.year - 1)
+                              if (prevYear && prevYear.avgMonthlyExpense > 0) {
+                                const yearChange = ((year.avgMonthlyExpense - prevYear.avgMonthlyExpense) / prevYear.avgMonthlyExpense) * 100
+                                return (
+                                  <Badge className={`text-[10px] px-1 py-0 ${yearChange > 0 ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                                    {yearChange > 0 ? <ArrowUpRight className="w-2.5 h-2.5 inline" /> : <ArrowDownRight className="w-2.5 h-2.5 inline" />}
+                                    {yearChange > 0 ? '+' : ''}{yearChange.toFixed(1)}%
+                                  </Badge>
+                                )
+                              }
+                              return null
+                            })()}
                           </div>
                         </div>
-                        <div className="grid grid-cols-3 gap-2 text-sm">
+                        <div className="grid grid-cols-3 gap-2">
                           <div>
-                            <p className="text-muted-foreground">Avg/mo</p>
-                            <p className="font-bold">{currencySymbol}{year.avgMonthlyExpense.toLocaleString()}</p>
+                            <p className="text-[10px] text-muted-foreground">Avg/mo</p>
+                            <p className="text-xs font-bold">{currencySymbol}{year.avgMonthlyExpense.toLocaleString()}</p>
                           </div>
                           <div>
-                            <p className="text-muted-foreground">Expense</p>
-                            <p className="font-bold">{currencySymbol}{year.totalExpense.toLocaleString()}</p>
+                            <p className="text-[10px] text-muted-foreground">Expense</p>
+                            <p className="text-xs font-bold">{currencySymbol}{year.totalExpense.toLocaleString()}</p>
                           </div>
                           <div>
-                            <p className="text-muted-foreground">Income</p>
-                            <p className="font-bold text-emerald-700">{currencySymbol}{year.totalIncome.toLocaleString()}</p>
+                            <p className="text-[10px] text-muted-foreground">Income</p>
+                            <p className="text-xs font-bold text-emerald-700">{currencySymbol}{year.totalIncome.toLocaleString()}</p>
                           </div>
                         </div>
                       </div>
@@ -917,23 +962,22 @@ export default function Dashboard({ refreshTrigger, userName }: DashboardProps) 
                 </div>
               </div>
             ) : (
-              /* Yearly Chart View */
               <div>
-                <div className="h-56">
+                <div className="h-52">
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={yearlyChartData} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="year" fontSize={12} />
-                      <YAxis tickFormatter={(v: number) => `${currencySymbol}${(v / 1000).toFixed(0)}k`} fontSize={12} />
-                      <Tooltip formatter={(value: number, name: string) => [`${currencySymbol}${value.toLocaleString()}`, name === 'avgMonthly' ? 'Avg Monthly Expense' : 'Total Expense']} />
-                      <Legend wrapperStyle={{ fontSize: '12px' }} />
-                      <Bar dataKey="avgMonthly" fill="#8b5cf6" name="Avg Monthly" radius={[4, 4, 0, 0]} />
-                      <Bar dataKey="totalExpense" fill="#c4b5fd" name="Total Expense" radius={[4, 4, 0, 0]} />
+                    <BarChart data={yearlyChartData} margin={{ top: 5, right: 5, left: 0, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
+                      <XAxis dataKey="year" fontSize={11} tickLine={false} axisLine={false} />
+                      <YAxis tickFormatter={(v: number) => `${currencySymbol}${(v / 1000).toFixed(0)}k`} fontSize={11} tickLine={false} axisLine={false} />
+                      <Tooltip formatter={(value: number, name: string) => [`${currencySymbol}${value.toLocaleString()}`, name === 'avgMonthly' ? 'Avg Monthly' : 'Total Expense']} />
+                      <Legend wrapperStyle={{ fontSize: '11px' }} />
+                      <Bar dataKey="avgMonthly" fill="#8b5cf6" name="Avg Monthly" radius={[3, 3, 0, 0]} />
+                      <Bar dataKey="totalExpense" fill="#c4b5fd" name="Total Expense" radius={[3, 3, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
                 {data.allTimeAvgMonthlyExpense > 0 && (
-                  <div className="mt-2 flex items-center justify-center gap-2 text-sm text-muted-foreground">
+                  <div className="mt-2 flex items-center justify-center gap-2 text-xs text-muted-foreground">
                     <div className="w-4 h-0.5 bg-violet-600" />
                     <span>All-time Avg: <strong>{currencySymbol}{data.allTimeAvgMonthlyExpense.toLocaleString()}/mo</strong></span>
                   </div>
@@ -944,21 +988,21 @@ export default function Dashboard({ refreshTrigger, userName }: DashboardProps) 
         </Card>
       )}
 
-      {/* Row 9: Payment Method Breakdown */}
+      {/* ─── 8. PAYMENT METHODS + ALERTS + SPENDING PSYCHOLOGY ─── */}
       {Object.keys(data.spendingTypeBreakdown).length > 0 && (
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base">Payment Method Breakdown</CardTitle>
+        <Card className="shadow-sm border-gray-100 dark:border-gray-800">
+          <CardHeader className="pb-2 pt-4 px-4">
+            <CardTitle className="text-sm font-semibold">Payment Methods</CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="flex flex-wrap gap-3">
+          <CardContent className="px-4 pb-4">
+            <div className="flex flex-wrap gap-2">
               {Object.entries(data.spendingTypeBreakdown).map(([type, amount]) => (
-                <div key={type} className="flex items-center gap-2 bg-muted rounded-lg px-4 py-2">
+                <div key={type} className="flex items-center gap-2 bg-muted dark:bg-gray-800 rounded-lg px-3 py-2">
                   <span className="text-sm">
                     {type === 'cash' ? '💵' : type === 'debit' ? '💳' : type === 'mobile' ? '📱' : '💳'}
                   </span>
-                  <span className="text-sm text-muted-foreground capitalize">{type}</span>
-                  <span className="font-bold text-sm">{currencySymbol}{amount.toLocaleString()}</span>
+                  <span className="text-xs text-muted-foreground capitalize">{type}</span>
+                  <span className="text-xs font-bold">{currencySymbol}{amount.toLocaleString()}</span>
                 </div>
               ))}
             </div>
@@ -966,11 +1010,10 @@ export default function Dashboard({ refreshTrigger, userName }: DashboardProps) 
         </Card>
       )}
 
-      {/* Row 10: Alerts */}
       {data.alerts.length > 0 && (
         <div className="space-y-2">
           {data.alerts.map((alert, i) => (
-            <Alert key={i} variant="destructive" className="border-amber-300 bg-amber-50 text-amber-900">
+            <Alert key={i} variant="destructive" className="border-amber-300 bg-amber-50 text-amber-900 shadow-sm">
               <AlertTriangle className="h-4 w-4 text-amber-600" />
               <AlertDescription className="text-sm">{alert}</AlertDescription>
             </Alert>
@@ -978,31 +1021,6 @@ export default function Dashboard({ refreshTrigger, userName }: DashboardProps) 
         </div>
       )}
 
-      {/* Row 11: Category Comparison Current vs Average */}
-      {categoryComparison.length > 0 && data.averageMonthlyExpense > 0 && (
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">Category: Current vs Average</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="h-56">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={categoryComparison} layout="vertical" margin={{ left: 10 }}>
-                  <CartesianGrid strokeDasharray="3 3" horizontal={false} />
-                  <XAxis type="number" tickFormatter={(v: number) => `${currencySymbol}${v}`} fontSize={12} />
-                  <YAxis type="category" dataKey="name" width={90} fontSize={12} />
-                  <Tooltip formatter={(value: number, name: string) => [`${currencySymbol}${value.toLocaleString()}`, name]} />
-                  <Legend wrapperStyle={{ fontSize: '12px' }} />
-                  <Bar dataKey="average" fill="#94a3b8" name="Avg" radius={[0, 2, 2, 0]} />
-                  <Bar dataKey="current" fill="#10b981" name="Current" radius={[0, 4, 4, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Row 12: Spending Psychology */}
       {(() => {
         const stats = data.spendingTypeStats
         const activeTypes = (['cash', 'debit', 'credit', 'mobile'] as const).filter(
@@ -1013,7 +1031,7 @@ export default function Dashboard({ refreshTrigger, userName }: DashboardProps) 
 
         if (activeTypes.length === 1) {
           return (
-            <Card className="border-2 border-dashed border-amber-300 bg-gradient-to-br from-amber-50/50 to-white">
+            <Card className="shadow-sm border-gray-100 dark:border-gray-800 border-2 border-dashed border-amber-300 bg-gradient-to-br from-amber-50/50 to-white">
               <CardContent className="p-4 text-center">
                 <div className="flex justify-center mb-2">
                   <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center">
@@ -1029,7 +1047,6 @@ export default function Dashboard({ refreshTrigger, userName }: DashboardProps) 
           )
         }
 
-        // Find the highest and lowest avg per transaction
         let maxAvgType = activeTypes[0]
         let minAvgType = activeTypes[0]
         activeTypes.forEach((type) => {
@@ -1065,101 +1082,76 @@ export default function Dashboard({ refreshTrigger, userName }: DashboardProps) 
           mobile: '📱',
         }
 
-        const barData = activeTypes.map((type) => ({
-          name: PAYMENT_LABELS[type],
-          avgPerTxn: stats[type].avgPerTxn,
-          fill: PAYMENT_COLORS[type],
-        }))
-
         const maxAvgForScale = Math.max(...activeTypes.map((t) => stats[t].avgPerTxn), 1)
 
         return (
-          <Card className="border-2 border-amber-200 bg-gradient-to-br from-amber-50/30 via-white to-orange-50/20">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base flex items-center gap-2">
-                <div className="w-7 h-7 rounded-full bg-amber-100 flex items-center justify-center">
+          <Card className="shadow-sm border-amber-200 dark:border-amber-900/40 bg-gradient-to-br from-amber-50/30 via-white to-orange-50/20 dark:from-amber-950/10 dark:via-gray-900">
+            <CardHeader className="pb-2 pt-4 px-4">
+              <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                <div className="w-7 h-7 rounded-full bg-amber-100 dark:bg-amber-900/40 flex items-center justify-center">
                   <Brain className="w-4 h-4 text-amber-600" />
                 </div>
                 Spending Psychology
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-3">
-              {/* Key Insight */}
+            <CardContent className="px-4 pb-4 space-y-3">
               {percentMore > 0 && maxAvgType !== minAvgType && (
-                <div className="bg-gradient-to-r from-amber-100 to-orange-100 rounded-lg p-4 border border-amber-200">
+                <div className="bg-gradient-to-r from-amber-100 to-orange-100 dark:from-amber-900/30 dark:to-orange-900/20 rounded-lg p-3 border border-amber-200 dark:border-amber-800/40">
                   <div className="flex items-start gap-2">
-                    <div className="w-6 h-6 rounded-full bg-amber-200 flex items-center justify-center flex-shrink-0 mt-0.5">
-                      <Lightbulb className="w-3.5 h-3.5 text-amber-700" />
-                    </div>
+                    <Lightbulb className="w-3.5 h-3.5 text-amber-600 flex-shrink-0 mt-0.5" />
                     <div>
-                      <p className="text-sm font-bold text-amber-900">
+                      <p className="text-xs font-bold text-amber-900 dark:text-amber-200">
                         You spend {percentMore}% more per transaction on {PAYMENT_LABELS[maxAvgType]} vs {PAYMENT_LABELS[minAvgType]}
                       </p>
-                      <p className="text-sm text-amber-700 mt-0.5">
+                      <p className="text-xs text-amber-700 dark:text-amber-400 mt-0.5">
                         Avg {PAYMENT_LABELS[maxAvgType]}: {currencySymbol}{stats[maxAvgType].avgPerTxn.toLocaleString()} vs {PAYMENT_LABELS[minAvgType]}: {currencySymbol}{stats[minAvgType].avgPerTxn.toLocaleString()}
                       </p>
                     </div>
                   </div>
                 </div>
               )}
-
-              {/* Visual Comparison Bars */}
               <div className="space-y-2">
                 {activeTypes
                   .sort((a, b) => stats[b].avgPerTxn - stats[a].avgPerTxn)
                   .map((type) => {
-                    const barWidth = Math.max(
-                      (stats[type].avgPerTxn / maxAvgForScale) * 100,
-                      4
-                    )
+                    const barWidth = Math.max((stats[type].avgPerTxn / maxAvgForScale) * 100, 4)
                     return (
                       <div key={type} className="space-y-1">
-                        <div className="flex items-center justify-between text-sm">
+                        <div className="flex items-center justify-between text-xs">
                           <span className="flex items-center gap-1.5 font-medium">
-                            <span className="text-sm">{PAYMENT_ICONS[type]}</span>
+                            <span>{PAYMENT_ICONS[type]}</span>
                             {PAYMENT_LABELS[type]}
-                            <span className="text-sm text-muted-foreground font-normal">
-                              ({stats[type].count} txn{stats[type].count !== 1 ? 's' : ''})
-                            </span>
+                            <span className="text-muted-foreground font-normal">({stats[type].count} txn{stats[type].count !== 1 ? 's' : ''})</span>
                           </span>
-                          <span className="font-bold text-sm" style={{ color: PAYMENT_COLORS[type] }}>
+                          <span className="font-bold" style={{ color: PAYMENT_COLORS[type] }}>
                             {currencySymbol}{stats[type].avgPerTxn.toLocaleString()}
                           </span>
                         </div>
-                        <div className="h-3 bg-muted/50 rounded-full overflow-hidden">
+                        <div className="h-2.5 bg-muted/50 rounded-full overflow-hidden">
                           <div
                             className="h-full rounded-full transition-all duration-700"
-                            style={{
-                              width: `${barWidth}%`,
-                              backgroundColor: PAYMENT_COLORS[type],
-                            }}
+                            style={{ width: `${barWidth}%`, backgroundColor: PAYMENT_COLORS[type] }}
                           />
                         </div>
                       </div>
                     )
                   })}
               </div>
-
-              {/* Summary Stats grid */}
               <div className="grid grid-cols-2 gap-2 pt-1">
                 {activeTypes.map((type) => (
                   <div
                     key={type}
-                    className="rounded-md p-4 border"
+                    className="rounded-lg p-3 border"
                     style={{
                       backgroundColor: `${PAYMENT_COLORS[type]}08`,
                       borderColor: `${PAYMENT_COLORS[type]}30`,
                     }}
                   >
-                    <p className="text-sm font-medium uppercase tracking-wide" style={{ color: PAYMENT_COLORS[type] }}>
+                    <p className="text-xs font-medium uppercase tracking-wide" style={{ color: PAYMENT_COLORS[type] }}>
                       {PAYMENT_ICONS[type]} {PAYMENT_LABELS[type]}
                     </p>
-                    <p className="text-sm font-bold mt-0.5">
-                      {currencySymbol}{stats[type].total.toLocaleString()}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      avg {currencySymbol}{stats[type].avgPerTxn.toLocaleString()}/txn
-                    </p>
+                    <p className="text-sm font-bold mt-0.5">{currencySymbol}{stats[type].total.toLocaleString()}</p>
+                    <p className="text-[10px] text-muted-foreground">avg {currencySymbol}{stats[type].avgPerTxn.toLocaleString()}/txn</p>
                   </div>
                 ))}
               </div>
@@ -1168,9 +1160,33 @@ export default function Dashboard({ refreshTrigger, userName }: DashboardProps) 
         )
       })()}
 
+      {/* ─── 9. CATEGORY vs AVERAGE ─── */}
+      {categoryComparison.length > 0 && data.averageMonthlyExpense > 0 && (
+        <Card className="shadow-sm border-gray-100 dark:border-gray-800">
+          <CardHeader className="pb-2 pt-4 px-4">
+            <CardTitle className="text-sm font-semibold">Category vs Average</CardTitle>
+          </CardHeader>
+          <CardContent className="px-4 pb-4">
+            <div className="h-52">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={categoryComparison} layout="vertical" margin={{ left: 5, right: 5, top: 0, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
+                  <XAxis type="number" tickFormatter={(v: number) => `${currencySymbol}${(v / 1000).toFixed(0)}k`} fontSize={11} tickLine={false} axisLine={false} />
+                  <YAxis type="category" dataKey="name" width={80} fontSize={11} tickLine={false} axisLine={false} />
+                  <Tooltip formatter={(value: number, name: string) => [`${currencySymbol}${value.toLocaleString()}`, name]} />
+                  <Legend wrapperStyle={{ fontSize: '11px' }} />
+                  <Bar dataKey="average" fill="#94a3b8" name="Avg" radius={[0, 2, 2, 0]} />
+                  <Bar dataKey="current" fill="#10b981" name="Current" radius={[0, 3, 3, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Empty State */}
       {data.totalExpense === 0 && data.totalIncome === 0 && (
-        <Card className="border-dashed">
+        <Card className="border-dashed shadow-sm border-gray-100 dark:border-gray-800">
           <CardContent className="p-6 text-center">
             <Wallet className="w-10 h-10 mx-auto text-muted-foreground mb-2" />
             <h3 className="text-sm font-semibold mb-1">No Transactions Yet</h3>

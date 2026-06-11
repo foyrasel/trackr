@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input'
 import {
   Mail, Lock, Eye, EyeOff, Loader2, X, Check, User,
 } from 'lucide-react'
+import TrackrLogo from './TrackrLogo'
 
 interface AuthModalProps {
   isOpen: boolean
@@ -369,8 +370,8 @@ export default function AuthModal({ isOpen, onClose, defaultMode = 'login', onLo
               <div className="p-8">
                 {/* Logo + Header */}
                 <div className="flex flex-col items-center mb-6">
-                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg shadow-emerald-500/30 mb-4">
-                    <span className="text-white text-xl font-bold">T</span>
+                  <div className="mb-4 drop-shadow-md">
+                    <TrackrLogo size={52} />
                   </div>
                   <h2 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight">{modeTitle}</h2>
                   <p className="text-sm text-gray-500 dark:text-gray-400 mt-1 text-center">{modeSubtitle}</p>
