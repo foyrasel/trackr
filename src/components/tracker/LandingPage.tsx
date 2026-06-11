@@ -1,17 +1,16 @@
 'use client'
 
 import React, { useState, useEffect, useRef } from 'react'
-import { signIn } from 'next-auth/react'
-import { motion, useScroll, useTransform, useInView, AnimatePresence } from 'framer-motion'
+import { motion, useScroll, useTransform, useInView } from 'framer-motion'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
 import {
   Mic, Brain, Globe, Shield, BarChart3, Target, Bell, Camera,
-  ArrowRight, Check, Star, Smartphone, ChevronDown, Loader2,
-  Wallet, HandCoins, FileDown, Moon, Users, Sparkles, Mail, Lock, Eye, EyeOff,
+  ArrowRight, Check, Star, Smartphone, ChevronDown,
+  Wallet, HandCoins, FileDown, Moon, Users, Sparkles,
   TrendingUp, PiggyBank, Receipt, Zap
 } from 'lucide-react'
+import AuthModal from './AuthModal'
 
 interface LandingPageProps {
   onLogin: (name: string, email?: string | null, userId?: string | null) => void
@@ -267,12 +266,10 @@ function PhoneMockup() {
 }
 
 export default function LandingPage({ onLogin }: LandingPageProps) {
-  const [name, setName] = useState('')
-  const [isLoading, setIsLoading] = useState(false)
   const [isSeeding, setIsSeeding] = useState(true)
+  const [authModalOpen, setAuthModalOpen] = useState(false)
+  const [authModalMode, setAuthModalMode] = useState<'login' | 'signup'>('login')
 
-  const [showLoginCard, setShowLoginCard] = useState(false)
-  const loginRef = useRef<HTMLDivElement>(null)
   const heroRef = useRef<HTMLDivElement>(null)
 
   // Parallax scroll
@@ -283,32 +280,7 @@ export default function LandingPage({ onLogin }: LandingPageProps) {
   const heroY = useTransform(scrollYProgress, [0, 1], [0, 200])
   const heroOpacity = useTransform(scrollYProgress, [0, 0.8], [1, 0])
 
-  // Email signup state
-  const [authMode, setAuthMode] = useState<'signup' | 'login' | 'verify' | 'forgot'>('login')
-  const [signupName, setSignupName] = useState('')
-  const [signupEmail, setSignupEmail] = useState('')
-  const [signupPassword, setSignupPassword] = useState('')
-  const [showPassword, setShowPassword] = useState(false)
-  const [verifyCode, setVerifyCode] = useState('')
-  const [verificationCode, setVerificationCode] = useState('')
-  const [signupError, setSignupError] = useState('')
-
-  // Login state
-  const [loginEmail, setLoginEmail] = useState('')
-  const [loginPassword, setLoginPassword] = useState('')
-
-  // Forgot password state
-  const [forgotEmail, setForgotEmail] = useState('')
-  const [forgotCode, setForgotCode] = useState('')
-  const [forgotNewPassword, setForgotNewPassword] = useState('')
-  const [forgotStep, setForgotStep] = useState<'email' | 'reset'>('email')
-  const [forgotResetCode, setForgotResetCode] = useState('')
-
-
-
-  // Seed test users on every app start (idempotent). isSeeding blocks form
-  // submission until this completes, preventing the race condition on Vercel
-  // cold starts where users try to log in before test accounts exist in the DB.
+  // Seed test users on every app start (idempotent).
   useEffect(() => {
     fetch('/api/seed', { method: 'POST' })
       .then(res => res.ok ? res.json() : null)
@@ -321,248 +293,11 @@ export default function LandingPage({ onLogin }: LandingPageProps) {
       .finally(() => setIsSeeding(false))
   }, [])
 
-  const handleDemoLogin = async () => {
-    const userName = name.trim() || 'User'
-    setIsLoading(true)
-    try {
-      const result = await signIn('credentials', { name: userName, redirect: false })
-      if (result?.ok) {
-        onLogin(userName)
-      } else {
-        onLogin(userName)
-      }
-    } catch {
-      onLogin(userName)
-    }
-  }
+  // Suppress unused warning — isSeeding retained for future use / seed indicator
+  void isSeeding
 
-
-
-  const handleEmailSignup = async () => {
-    setSignupError('')
-    if (!signupName.trim() || !signupEmail.trim() || !signupPassword.trim()) {
-      setSignupError('All fields are required')
-      return
-    }
-    if (signupPassword.length < 6) {
-      setSignupError('Password must be at least 6 characters')
-      return
-    }
-
-    setIsLoading(true)
-    try {
-      const response = await fetch('/api/auth/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: signupName.trim(),
-          email: signupEmail.trim(),
-          password: signupPassword,
-        }),
-      })
-
-      const data = await response.json()
-
-      if (response.ok) {
-        setVerificationCode(data.verificationCode)
-        setAuthMode('verify')
-      } else {
-        setSignupError(data.error || 'Registration failed')
-      }
-    } catch (error) {
-      console.error('Registration error:', error)
-      setSignupError('Something went wrong. Please try again.')
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  const handleVerifyCode = async () => {
-    if (!verifyCode || verifyCode.length !== 6) {
-      setSignupError('Please enter the 6-digit verification code')
-      return
-    }
-
-    setIsLoading(true)
-    setSignupError('')
-    try {
-      const response = await fetch('/api/auth/verify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: signupEmail.trim(),
-          code: verifyCode,
-        }),
-      })
-
-      const data = await response.json()
-
-      if (response.ok) {
-        const result = await signIn('credentials', {
-          email: signupEmail.trim(),
-          password: signupPassword,
-          redirect: false,
-        })
-        // Store email for reliable API auth
-        localStorage.setItem('trackr_user_email', signupEmail.trim())
-        if (result?.ok) {
-          try {
-            const sessionRes = await fetch('/api/auth/session')
-            const sessionData = await sessionRes.json()
-            const sessionId = sessionData?.user?.id || null
-            if (sessionId) localStorage.setItem('trackr_user_id', sessionId)
-            onLogin(signupName.trim(), signupEmail.trim(), sessionId)
-          } catch {
-            onLogin(signupName.trim(), signupEmail.trim())
-          }
-        } else {
-          onLogin(signupName.trim(), signupEmail.trim())
-        }
-      } else {
-        setSignupError(data.error || 'Verification failed')
-      }
-    } catch (error) {
-      console.error('Verification error:', error)
-      setSignupError('Something went wrong. Please try again.')
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  const handleEmailLogin = async () => {
-    setSignupError('')
-    if (!loginEmail.trim() || !loginPassword.trim()) {
-      setSignupError('Email and password are required')
-      return
-    }
-
-    setIsLoading(true)
-    try {
-      const result = await signIn('credentials', {
-        email: loginEmail.trim(),
-        password: loginPassword,
-        redirect: false,
-      })
-
-      if (result?.ok) {
-        // Fetch the session to get the user's actual name and id
-        try {
-          const sessionRes = await fetch('/api/auth/session')
-          const sessionData = await sessionRes.json()
-          const displayName = sessionData?.user?.name || loginEmail.trim()
-          const sessionId = sessionData?.user?.id || null
-          // Store email and id for reliable API auth
-          localStorage.setItem('trackr_user_email', loginEmail.trim())
-          if (sessionId) localStorage.setItem('trackr_user_id', sessionId)
-          onLogin(displayName, loginEmail.trim(), sessionId)
-        } catch {
-          localStorage.setItem('trackr_user_email', loginEmail.trim())
-          onLogin(loginEmail.trim(), loginEmail.trim())
-        }
-      } else {
-        setSignupError('Invalid email or password. Please try again.')
-      }
-    } catch (error) {
-      console.error('Login error:', error)
-      setSignupError('Something went wrong. Please try again.')
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  const handleForgotPassword = async () => {
-    setSignupError('')
-    if (!forgotEmail.trim()) {
-      setSignupError('Email is required')
-      return
-    }
-
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-    if (!emailRegex.test(forgotEmail.trim())) {
-      setSignupError('Invalid email format')
-      return
-    }
-
-    setIsLoading(true)
-    try {
-      const response = await fetch('/api/auth/forgot-password', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: forgotEmail.trim() }),
-      })
-
-      const data = await response.json()
-
-      if (response.ok) {
-        if (data.resetCode) {
-          setForgotResetCode(data.resetCode)
-        }
-        setForgotStep('reset')
-      } else {
-        setSignupError(data.error || 'Failed to send reset code')
-      }
-    } catch (error) {
-      console.error('Forgot password error:', error)
-      setSignupError('Something went wrong. Please try again.')
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  const handleResetPassword = async () => {
-    setSignupError('')
-    if (!forgotCode || forgotCode.length !== 6) {
-      setSignupError('Please enter the 6-digit reset code')
-      return
-    }
-    if (!forgotNewPassword || forgotNewPassword.length < 6) {
-      setSignupError('New password must be at least 6 characters')
-      return
-    }
-
-    setIsLoading(true)
-    try {
-      const response = await fetch('/api/auth/reset-password', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: forgotEmail.trim(),
-          code: forgotCode,
-          newPassword: forgotNewPassword,
-        }),
-      })
-
-      const data = await response.json()
-
-      if (response.ok) {
-        setSignupError('')
-        // Switch to login mode with the email pre-filled
-        setLoginEmail(forgotEmail.trim())
-        setLoginPassword('')
-        setForgotStep('email')
-        setForgotEmail('')
-        setForgotCode('')
-        setForgotNewPassword('')
-        setForgotResetCode('')
-        setAuthMode('login')
-      } else {
-        setSignupError(data.error || 'Failed to reset password')
-      }
-    } catch (error) {
-      console.error('Reset password error:', error)
-      setSignupError('Something went wrong. Please try again.')
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  const scrollToLogin = () => {
-    setShowLoginCard(true)
-    setTimeout(() => {
-      loginRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
-    }, 100)
-  }
-
+  const openLogin = () => { setAuthModalMode('login'); setAuthModalOpen(true) }
+  const openSignup = () => { setAuthModalMode('signup'); setAuthModalOpen(true) }
 
   return (
     <div className="min-h-screen bg-white dark:bg-gray-950 overflow-x-hidden">
@@ -602,13 +337,13 @@ export default function LandingPage({ onLogin }: LandingPageProps) {
           </div>
           <div className="flex items-center gap-3">
             <button
-              onClick={scrollToLogin}
+              onClick={openLogin}
               className="hidden sm:block text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors"
             >
-              Sign In
+              Log In
             </button>
             <Button
-              onClick={scrollToLogin}
+              onClick={openSignup}
               className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white text-sm px-5 shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/40 transition-all"
             >
               Get Started Free
@@ -677,7 +412,7 @@ export default function LandingPage({ onLogin }: LandingPageProps) {
                 className="flex flex-col sm:flex-row items-center gap-4 mb-12 lg:justify-start justify-center"
               >
                 <Button
-                  onClick={scrollToLogin}
+                  onClick={openSignup}
                   size="lg"
                   className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white text-lg px-8 py-7 shadow-xl shadow-emerald-500/25 hover:shadow-emerald-500/40 transition-all group"
                 >
@@ -754,10 +489,10 @@ export default function LandingPage({ onLogin }: LandingPageProps) {
               </p>
               <div className="space-y-4">
                 {[
-                  { text: '"Spent 250 on uber"', result: 'Transport \u2022 Cash \u2022 Want', color: 'border-l-4 border-l-emerald-500' },
-                  { text: '"খরচ ৫০০ টাকা বাজার"', result: 'Groceries \u2022 Cash \u2022 Need', color: 'border-l-4 border-l-teal-500' },
-                  { text: '"खर्च ५०० रुपये बाजार"', result: 'Groceries \u2022 Cash \u2022 Need', color: 'border-l-4 border-l-violet-500' },
-                  { text: '"Income 50000 salary"', result: 'Salary \u2022 Bank \u2022 Income', color: 'border-l-4 border-l-cyan-500' },
+                  { text: '"Spent 250 on uber"', result: 'Transport • Cash • Want', color: 'border-l-4 border-l-emerald-500' },
+                  { text: '"খরচ ৫০০ টাকা বাজার"', result: 'Groceries • Cash • Need', color: 'border-l-4 border-l-teal-500' },
+                  { text: '"खर्च ५०० रुपये बाजार"', result: 'Groceries • Cash • Need', color: 'border-l-4 border-l-violet-500' },
+                  { text: '"Income 50000 salary"', result: 'Salary • Bank • Income', color: 'border-l-4 border-l-cyan-500' },
                 ].map((example, i) => (
                   <motion.div
                     key={i}
@@ -805,7 +540,7 @@ export default function LandingPage({ onLogin }: LandingPageProps) {
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     {[
-                      { label: 'Amount', value: '\u09F71,200' },
+                      { label: 'Amount', value: '৷1,200' },
                       { label: 'Category', value: 'Dining' },
                       { label: 'Type', value: 'Cash' },
                       { label: 'Class', value: 'Want' },
@@ -1082,7 +817,7 @@ export default function LandingPage({ onLogin }: LandingPageProps) {
                     ))}
                   </ul>
                   <Button
-                    onClick={scrollToLogin}
+                    onClick={openSignup}
                     className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white text-lg py-7 shadow-xl shadow-emerald-500/25 hover:shadow-emerald-500/40 transition-all group"
                   >
                     Get Started Now
@@ -1092,417 +827,6 @@ export default function LandingPage({ onLogin }: LandingPageProps) {
               </Card>
             </div>
           </AnimatedSection>
-        </div>
-      </section>
-
-      {/* ===== LOGIN / SIGNUP SECTION ===== */}
-      <section ref={loginRef} className="relative py-24 bg-white dark:bg-gray-950 overflow-hidden">
-        {/* Background decoration */}
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[600px] bg-gradient-to-br from-emerald-100/40 to-teal-100/40 dark:from-emerald-900/20 dark:to-teal-900/20 rounded-full blur-3xl" />
-
-        <div className="relative max-w-sm mx-auto px-4">
-          <AnimatedSection className="text-center mb-8">
-            <h2 className="text-3xl font-extrabold text-gray-900 dark:text-white mb-2 tracking-tight">Get Started Free</h2>
-            <p className="text-sm text-gray-500 dark:text-gray-400">Sign in or create an account</p>
-          </AnimatedSection>
-
-          <motion.div
-            initial={{ opacity: 0, y: 30 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.5 }}
-          >
-            <Card className="border-2 border-emerald-100 dark:border-emerald-900/50 shadow-2xl shadow-emerald-500/5 bg-white/90 dark:bg-gray-900/80 backdrop-blur-xl">
-              <CardContent className="p-6 space-y-4">
-                {/* Auth Mode Tabs */}
-                <div className="flex gap-1 bg-gray-100 dark:bg-gray-800 rounded-xl p-1">
-                  <button
-                    onClick={() => { setAuthMode('signup'); setSignupError('') }}
-                    className={`flex-1 py-2 px-2 rounded-lg text-xs font-semibold transition-all ${
-                      authMode === 'signup'
-                        ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
-                        : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
-                    }`}
-                  >
-                    Sign Up
-                  </button>
-                  <button
-                    onClick={() => { setAuthMode('login'); setSignupError('') }}
-                    className={`flex-1 py-2 px-2 rounded-lg text-xs font-semibold transition-all ${
-                      authMode === 'login'
-                        ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
-                        : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
-                    }`}
-                  >
-                    Log In
-                  </button>
-                </div>
-
-                {/* Error message */}
-                <AnimatePresence>
-                  {signupError && (
-                    <motion.div
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: 'auto' }}
-                      exit={{ opacity: 0, height: 0 }}
-                      className="bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-xl p-3"
-                    >
-                      <p className="text-xs text-red-700 dark:text-red-300">{signupError}</p>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-
-                {/* Seeding indicator — briefly shown while test accounts initialize */}
-                {isSeeding && (
-                  <div className="flex items-center justify-center gap-2 py-1 text-xs text-muted-foreground">
-                    <Loader2 className="w-3 h-3 animate-spin" />
-                    <span>Initializing test accounts…</span>
-                  </div>
-                )}
-
-                {/* Email Signup Mode */}
-                {authMode === 'signup' && (
-                  <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ duration: 0.3 }}
-                    className="space-y-3"
-                  >
-                    <div className="space-y-3">
-                      <div>
-                        <Input
-                          placeholder="Full name"
-                          value={signupName}
-                          onChange={(e) => setSignupName(e.target.value)}
-                          className="h-11 border-gray-200 dark:border-gray-700 focus:border-emerald-500 dark:focus:border-emerald-500"
-                          disabled={isLoading || isSeeding}
-                        />
-                      </div>
-                      <div className="relative">
-                        <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                        <Input
-                          type="email"
-                          placeholder="Email address"
-                          value={signupEmail}
-                          onChange={(e) => setSignupEmail(e.target.value)}
-                          className="h-11 pl-10 border-gray-200 dark:border-gray-700 focus:border-emerald-500 dark:focus:border-emerald-500"
-                          disabled={isLoading || isSeeding}
-                        />
-                      </div>
-                      <div className="relative">
-                        <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                        <Input
-                          type={showPassword ? 'text' : 'password'}
-                          placeholder="Password (6+ characters)"
-                          value={signupPassword}
-                          onChange={(e) => setSignupPassword(e.target.value)}
-                          className="h-11 pl-10 pr-10 border-gray-200 dark:border-gray-700 focus:border-emerald-500 dark:focus:border-emerald-500"
-                          onKeyDown={(e) => e.key === 'Enter' && handleEmailSignup()}
-                          disabled={isLoading || isSeeding}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowPassword(!showPassword)}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-gray-700"
-                        >
-                          {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                        </button>
-                      </div>
-                    </div>
-
-                    <Button
-                      onClick={handleEmailSignup}
-                      disabled={isLoading || isSeeding}
-                      className="w-full h-12 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-semibold text-base shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/40 transition-all"
-                    >
-                      {isLoading ? (
-                        <Loader2 className="w-5 h-5 animate-spin mr-2" />
-                      ) : (
-                        <Mail className="w-4 h-4 mr-2" />
-                      )}
-                      Create Account
-                    </Button>
-
-                    <div className="flex items-center justify-between">
-                      <button
-                        onClick={() => { setForgotStep('email'); setForgotEmail(signupEmail || ''); setSignupError(''); setAuthMode('forgot') }}
-                        className="text-xs text-gray-500 dark:text-gray-400 hover:text-emerald-600 dark:hover:text-emerald-400 font-medium transition-colors"
-                      >
-                        Forgot Password?
-                      </button>
-                      <button
-                        onClick={() => { setAuthMode('login'); setSignupError('') }}
-                        className="text-xs text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 font-medium transition-colors"
-                      >
-                        Already have an account? Log In
-                      </button>
-                    </div>
-                  </motion.div>
-                )}
-
-                {/* Login Mode */}
-                {authMode === 'login' && (
-                  <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ duration: 0.3 }}
-                    className="space-y-3"
-                  >
-                    <div className="space-y-3">
-                      <div className="relative">
-                        <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                        <Input
-                          type="email"
-                          placeholder="Email address"
-                          value={loginEmail}
-                          onChange={(e) => setLoginEmail(e.target.value)}
-                          className="h-11 pl-10 border-gray-200 dark:border-gray-700 focus:border-emerald-500 dark:focus:border-emerald-500"
-                          disabled={isLoading || isSeeding}
-                        />
-                      </div>
-                      <div className="relative">
-                        <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                        <Input
-                          type={showPassword ? 'text' : 'password'}
-                          placeholder="Password"
-                          value={loginPassword}
-                          onChange={(e) => setLoginPassword(e.target.value)}
-                          className="h-11 pl-10 pr-10 border-gray-200 dark:border-gray-700 focus:border-emerald-500 dark:focus:border-emerald-500"
-                          onKeyDown={(e) => e.key === 'Enter' && handleEmailLogin()}
-                          disabled={isLoading || isSeeding}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowPassword(!showPassword)}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-gray-700"
-                        >
-                          {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                        </button>
-                      </div>
-                    </div>
-
-                    <Button
-                      onClick={handleEmailLogin}
-                      disabled={isLoading || isSeeding}
-                      className="w-full h-12 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-semibold text-base shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/40 transition-all"
-                    >
-                      {isLoading ? (
-                        <Loader2 className="w-5 h-5 animate-spin mr-2" />
-                      ) : (
-                        <Lock className="w-4 h-4 mr-2" />
-                      )}
-                      Log In
-                    </Button>
-
-                    <div className="flex items-center justify-between">
-                      <button
-                        onClick={() => { setForgotStep('email'); setForgotEmail(loginEmail || ''); setSignupError(''); setAuthMode('forgot') }}
-                        className="text-xs text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 font-medium transition-colors"
-                      >
-                        Forgot Password?
-                      </button>
-                      <button
-                        onClick={() => { setAuthMode('signup'); setSignupError('') }}
-                        className="text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 font-medium transition-colors"
-                      >
-                        Create Account
-                      </button>
-                    </div>
-                  </motion.div>
-                )}
-
-                {/* Forgot Password Mode */}
-                {authMode === 'forgot' && (
-                  <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ duration: 0.3 }}
-                    className="space-y-3"
-                  >
-                    {forgotStep === 'email' ? (
-                      <>
-                        <div className="bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 rounded-xl p-4 text-center">
-                          <Lock className="w-8 h-8 mx-auto text-emerald-600 mb-2" />
-                          <p className="text-sm font-semibold text-gray-900 dark:text-white">Reset Your Password</p>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            Enter your email and we&apos;ll send you a reset code
-                          </p>
-                        </div>
-
-                        <div className="relative">
-                          <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                          <Input
-                            type="email"
-                            placeholder="Email address"
-                            value={forgotEmail}
-                            onChange={(e) => setForgotEmail(e.target.value)}
-                            className="h-11 pl-10 border-gray-200 dark:border-gray-700 focus:border-emerald-500 dark:focus:border-emerald-500"
-                            onKeyDown={(e) => e.key === 'Enter' && handleForgotPassword()}
-                            disabled={isLoading || isSeeding}
-                          />
-                        </div>
-
-                        <Button
-                          onClick={handleForgotPassword}
-                          disabled={isLoading || isSeeding}
-                          className="w-full h-12 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-semibold text-base shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/40 transition-all"
-                        >
-                          {isLoading ? (
-                            <Loader2 className="w-5 h-5 animate-spin mr-2" />
-                          ) : (
-                            <Mail className="w-4 h-4 mr-2" />
-                          )}
-                          Send Reset Code
-                        </Button>
-                      </>
-                    ) : (
-                      <>
-                        <div className="bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 rounded-xl p-4 text-center">
-                          <Mail className="w-8 h-8 mx-auto text-emerald-600 mb-2" />
-                          <p className="text-sm font-semibold text-gray-900 dark:text-white">Enter Reset Code</p>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            We sent a code to <strong>{forgotEmail}</strong>
-                          </p>
-                        </div>
-
-                        {/* Show code on screen for demo */}
-                        {forgotResetCode && (
-                          <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-xl p-3 text-center">
-                            <p className="text-xs text-amber-600 dark:text-amber-400 font-medium mb-1">DEMO MODE — Reset Code</p>
-                            <p className="text-2xl font-bold text-amber-700 dark:text-amber-300 tracking-[0.3em]">{forgotResetCode}</p>
-                          </div>
-                        )}
-
-                        <Input
-                          placeholder="Enter 6-digit code"
-                          value={forgotCode}
-                          onChange={(e) => setForgotCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                          className="h-12 text-center text-lg tracking-[0.5em] font-bold border-gray-200 dark:border-gray-700 focus:border-emerald-500 dark:focus:border-emerald-500"
-                          maxLength={6}
-                          disabled={isLoading || isSeeding}
-                        />
-
-                        <div className="relative">
-                          <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                          <Input
-                            type={showPassword ? 'text' : 'password'}
-                            placeholder="New password (6+ characters)"
-                            value={forgotNewPassword}
-                            onChange={(e) => setForgotNewPassword(e.target.value)}
-                            className="h-11 pl-10 pr-10 border-gray-200 dark:border-gray-700 focus:border-emerald-500 dark:focus:border-emerald-500"
-                            onKeyDown={(e) => e.key === 'Enter' && handleResetPassword()}
-                            disabled={isLoading || isSeeding}
-                          />
-                          <button
-                            type="button"
-                            onClick={() => setShowPassword(!showPassword)}
-                            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-gray-700"
-                          >
-                            {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                          </button>
-                        </div>
-
-                        <Button
-                          onClick={handleResetPassword}
-                          disabled={isLoading || isSeeding || forgotCode.length !== 6 || forgotNewPassword.length < 6}
-                          className="w-full h-12 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-semibold text-base shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/40 transition-all"
-                        >
-                          {isLoading ? (
-                            <Loader2 className="w-5 h-5 animate-spin mr-2" />
-                          ) : (
-                            <Check className="w-4 h-4 mr-2" />
-                          )}
-                          Reset Password
-                        </Button>
-
-                        <button
-                          onClick={() => { setForgotStep('email'); setSignupError('') }}
-                          className="w-full text-xs text-muted-foreground hover:text-gray-600 transition-colors"
-                        >
-                          &larr; Back to enter email
-                        </button>
-                      </>
-                    )}
-
-                    <button
-                      onClick={() => { setAuthMode('login'); setSignupError(''); setForgotStep('email') }}
-                      className="w-full text-xs text-muted-foreground hover:text-gray-600 transition-colors"
-                    >
-                      &larr; Back to Log In
-                    </button>
-                  </motion.div>
-                )}
-
-                {/* Verification Mode */}
-                {authMode === 'verify' && (
-                  <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ duration: 0.3 }}
-                    className="space-y-3"
-                  >
-                    <div className="bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 rounded-xl p-4 text-center">
-                      <Mail className="w-8 h-8 mx-auto text-emerald-600 mb-2" />
-                      <p className="text-sm font-semibold text-gray-900 dark:text-white">Verify Your Email</p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        We sent a verification code to <strong>{signupEmail}</strong>
-                      </p>
-                    </div>
-
-                    {/* Show code on screen for demo */}
-                    <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-xl p-3 text-center">
-                      <p className="text-xs text-amber-600 dark:text-amber-400 font-medium mb-1">DEMO MODE — Verification Code</p>
-                      <p className="text-2xl font-bold text-amber-700 dark:text-amber-300 tracking-[0.3em]">{verificationCode}</p>
-                    </div>
-
-                    <Input
-                      placeholder="Enter 6-digit code"
-                      value={verifyCode}
-                      onChange={(e) => setVerifyCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                      className="h-12 text-center text-lg tracking-[0.5em] font-bold border-gray-200 dark:border-gray-700 focus:border-emerald-500 dark:focus:border-emerald-500"
-                      maxLength={6}
-                      disabled={isLoading || isSeeding}
-                    />
-
-                    <Button
-                      onClick={handleVerifyCode}
-                      disabled={isLoading || isSeeding || verifyCode.length !== 6}
-                      className="w-full h-12 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-semibold text-base shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/40 transition-all"
-                    >
-                      {isLoading ? (
-                        <Loader2 className="w-5 h-5 animate-spin mr-2" />
-                      ) : (
-                        <Check className="w-4 h-4 mr-2" />
-                      )}
-                      Verify & Start
-                    </Button>
-
-                    <button
-                      onClick={() => { setAuthMode('signup'); setSignupError('') }}
-                      className="w-full text-xs text-muted-foreground hover:text-gray-600 transition-colors"
-                    >
-                      &larr; Back to sign up
-                    </button>
-                  </motion.div>
-                )}
-
-                <div className="flex items-center justify-center gap-4 pt-2">
-                  <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
-                    <Shield className="w-3.5 h-3.5" />
-                    Private & Secure
-                  </div>
-                  <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
-                    <Smartphone className="w-3.5 h-3.5" />
-                    Mobile Friendly
-                  </div>
-                  <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
-                    <Globe className="w-3.5 h-3.5" />
-                    Multi-Currency
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </motion.div>
         </div>
       </section>
 
@@ -1589,6 +913,14 @@ export default function LandingPage({ onLogin }: LandingPageProps) {
           </div>
         </div>
       </footer>
+
+      {/* Auth Modal */}
+      <AuthModal
+        isOpen={authModalOpen}
+        onClose={() => setAuthModalOpen(false)}
+        defaultMode={authModalMode}
+        onLogin={onLogin}
+      />
     </div>
   )
 }
