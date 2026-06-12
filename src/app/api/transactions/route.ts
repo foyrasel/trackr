@@ -24,7 +24,8 @@ export async function GET(request: NextRequest) {
     if (type) where.type = type
     if (category) where.category = category
     if (search) {
-      where.description = { contains: search, mode: 'insensitive' }
+      // Note: no `mode: 'insensitive'` — unsupported on SQLite; LIKE is already case-insensitive for ASCII
+      where.description = { contains: search }
     }
 
     // Date range filtering

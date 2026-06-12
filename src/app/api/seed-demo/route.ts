@@ -41,7 +41,6 @@ async function seedCorporateUser(userId: string) {
       classification: 'savings', spendingType: 'debit',
       description: `HDFC Salary - ${monthName}`,
       date: new Date(date.getFullYear(), date.getMonth(), 1),
-      accountId: 'debit', // Will be resolved
     })
 
     // ── Day 1-5: Heavy spending ──
@@ -141,13 +140,14 @@ async function seedCorporateUser(userId: string) {
     )
   }
 
-  // Insert in batches
-  for (let i = 0; i < transactions.length; i += 50) {
-    const batch = transactions.slice(i, i + 50)
+  // Drop anything dated past today (mid-month loops can overshoot in the current month), then insert in batches
+  const pastOnly = transactions.filter(t => t.date <= now)
+  for (let i = 0; i < pastOnly.length; i += 50) {
+    const batch = pastOnly.slice(i, i + 50)
     await db.transaction.createMany({ data: batch })
   }
 
-  return transactions.length
+  return pastOnly.length
 }
 
 // ─── User 2: Government Employee ───
@@ -271,12 +271,13 @@ async function seedGovtUser(userId: string) {
     }
   }
 
-  for (let i = 0; i < transactions.length; i += 50) {
-    const batch = transactions.slice(i, i + 50)
+  const pastOnly = transactions.filter(t => t.date <= now)
+  for (let i = 0; i < pastOnly.length; i += 50) {
+    const batch = pastOnly.slice(i, i + 50)
     await db.transaction.createMany({ data: batch })
   }
 
-  return transactions.length
+  return pastOnly.length
 }
 
 export async function GET() {

@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
 
     if (type) where.type = type
     if (category) where.category = category
-    if (search) where.description = { contains: search, mode: 'insensitive' }
+    if (search) where.description = { contains: search } // no `mode` — unsupported on SQLite
 
     // Date range filtering
     if (fromDate || toDate) {
