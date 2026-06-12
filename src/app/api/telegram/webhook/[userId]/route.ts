@@ -125,10 +125,10 @@ Commands:
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { userId: string } }
+  { params }: { params: Promise<{ userId: string }> }
 ) {
   try {
-    const { userId } = params
+    const { userId } = await params
     const update = await request.json()
 
     const message = update.message || update.edited_message
