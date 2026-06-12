@@ -1118,7 +1118,7 @@ export default function MorePanel({
   onToggleDarkMode,
   isDarkMode,
 }: MorePanelProps) {
-  const { currencySymbol } = useCurrency()
+  const { currency, currencySymbol, setCurrency } = useCurrency()
   const [activePanel, setActivePanel] = useState<PanelView>('menu')
 
   // Notification permission state
@@ -1132,6 +1132,124 @@ export default function MorePanel({
   useEffect(() => {
     setNotifPermission(getNotificationPermission())
   }, [])
+
+  // Telegram Bot state
+  const [telegramToken, setTelegramToken] = useState('')
+  const [hasTelegramToken, setHasTelegramToken] = useState(false)
+  const [telegramSaving, setTelegramSaving] = useState(false)
+  const [telegramConnected, setTelegramConnected] = useState(false)
+
+  // Monthly email reports state
+  const [monthlyReportEnabled, setMonthlyReportEnabled] = useState(false)
+
+  // Gemini key state (for quick access in settings)
+  const [geminiKey, setGeminiKey] = useState('')
+  const [hasGeminiKey, setHasGeminiKey] = useState(false)
+  const [geminiSaving, setGeminiSaving] = useState(false)
+  const [showGeminiInput, setShowGeminiInput] = useState(false)
+
+  // PWA install
+  const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null)
+
+  const getAuthHeaders = useCallback((contentType = true): Record<string, string> => {
+    const headers: Record<string, string> = {}
+    if (contentType) headers['Content-Type'] = 'application/json'
+    if (userName) headers['x-user-name'] = userName
+    if (typeof window !== 'undefined') {
+      const userEmail = localStorage.getItem('trackr_user_email')
+      const userId = localStorage.getItem('trackr_user_id')
+      if (userEmail) headers['x-user-email'] = userEmail
+      if (userId) headers['x-user-id'] = userId
+    }
+    return headers
+  }, [userName])
+
+  // Load user settings on mount
+  useEffect(() => {
+    const storedPrompt = (window as unknown as Record<string, unknown>).beforeInstallPromptEvent
+    if (storedPrompt) queueMicrotask(() => setInstallPrompt(storedPrompt as BeforeInstallPromptEvent))
+
+    const load = async () => {
+      try {
+        const res = await fetch('/api/user', { headers: getAuthHeaders(false) })
+        if (res.ok) {
+          const data = await res.json()
+          setHasTelegramToken(!!data.hasTelegramToken)
+          setMonthlyReportEnabled(!!data.monthlyReportEnabled)
+          setHasGeminiKey(!!data.hasGeminiKey)
+        }
+      } catch {}
+    }
+    load()
+  }, [userName, getAuthHeaders])
+
+  const handleTelegramConnect = async () => {
+    if (!telegramToken.trim()) return
+    setTelegramSaving(true)
+    try {
+      const res = await fetch('/api/user', {
+        method: 'PUT',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ telegramToken: telegramToken.trim() }),
+      })
+      if (res.ok) {
+        setHasTelegramToken(true)
+        setTelegramConnected(true)
+        setTelegramToken('')
+        toast({ title: '✅ Telegram bot connected! Webhook registered.' })
+      } else {
+        toast({ title: 'Failed to connect bot', variant: 'destructive' })
+      }
+    } catch {
+      toast({ title: 'Failed to connect bot', variant: 'destructive' })
+    } finally {
+      setTelegramSaving(false)
+    }
+  }
+
+  const handleMonthlyReportToggle = async () => {
+    const newVal = !monthlyReportEnabled
+    setMonthlyReportEnabled(newVal)
+    try {
+      await fetch('/api/user', {
+        method: 'PUT',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ monthlyReportEnabled: newVal }),
+      })
+      toast({ title: newVal ? 'Monthly reports enabled' : 'Monthly reports disabled' })
+    } catch {
+      setMonthlyReportEnabled(!newVal)
+    }
+  }
+
+  const handleGeminiSave = async () => {
+    setGeminiSaving(true)
+    try {
+      const res = await fetch('/api/user', {
+        method: 'PUT',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ geminiApiKey: geminiKey.trim() || null }),
+      })
+      if (res.ok) {
+        setHasGeminiKey(!!geminiKey.trim())
+        setGeminiKey('')
+        setShowGeminiInput(false)
+        toast({ title: geminiKey.trim() ? '🧠 Gemini AI activated!' : 'Gemini key removed' })
+      }
+    } catch {
+      toast({ title: 'Failed to save key', variant: 'destructive' })
+    } finally {
+      setGeminiSaving(false)
+    }
+  }
+
+  const handleInstall = async () => {
+    if (!installPrompt) return
+    installPrompt.prompt()
+    const result = await installPrompt.userChoice
+    if (result.outcome === 'accepted') toast({ title: 'App installed!' })
+    setInstallPrompt(null)
+  }
 
   const handleEnableNotifications = async () => {
     const granted = await requestPermission()
@@ -1163,77 +1281,19 @@ export default function MorePanel({
       }
       fetch('/api/notifications?period=weekly', { headers })
         .then(res => res.ok ? res.json() : null)
-        .then(data => {
-          if (data?.summary) {
-            setSummary(data.summary)
-          }
-        })
+        .then(data => { if (data?.summary) setSummary(data.summary) })
         .catch(() => {})
     }
   }, [userName, refreshTrigger])
 
-  const menuItems = [
-    {
-      id: 'goals' as PanelView,
-      icon: '🎯',
-      title: 'Goals',
-      description: 'Track savings targets',
-    },
-    {
-      id: 'lendBorrow' as PanelView,
-      icon: '🤝',
-      title: 'Lend/Borrow',
-      description: 'Money lent & borrowed',
-    },
-    {
-      id: 'reminders' as PanelView,
-      icon: '🔔',
-      title: 'Bill Reminders',
-      description: 'Never miss a bill',
-    },
-    {
-      id: 'recurring' as PanelView,
-      icon: '🔄',
-      title: 'Recurring',
-      description: 'Auto-add transactions',
-    },
-    {
-      id: 'export' as PanelView,
-      icon: '📤',
-      title: 'Export Data',
-      description: 'Download CSV or PDF',
-    },
-    {
-      id: 'accounts' as PanelView,
-      icon: '💳',
-      title: 'Accounts',
-      description: 'Manage payment accounts',
-    },
-    {
-      id: 'darkMode' as PanelView,
-      icon: isDarkMode ? '☀️' : '🌙',
-      title: 'Dark Mode',
-      description: isDarkMode ? 'On' : 'Off',
-      isToggle: true,
-    },
-    {
-      id: 'settings' as PanelView,
-      icon: '⚙️',
-      title: 'Settings',
-      description: 'Currency & preferences',
-    },
+  const toolItems = [
+    { id: 'goals' as PanelView,      icon: '🎯', title: 'Goals',         description: 'Savings targets' },
+    { id: 'lendBorrow' as PanelView, icon: '🤝', title: 'Lend/Borrow',   description: 'Money lent & borrowed' },
+    { id: 'reminders' as PanelView,  icon: '🔔', title: 'Reminders',     description: 'Never miss a bill' },
+    { id: 'recurring' as PanelView,  icon: '🔄', title: 'Recurring',     description: 'Auto-add transactions' },
+    { id: 'export' as PanelView,     icon: '📤', title: 'Export',        description: 'CSV or PDF download' },
+    { id: 'accounts' as PanelView,   icon: '💳', title: 'Accounts',      description: 'Manage payment accounts' },
   ]
-
-  // Show notification enable prompt if notifications are supported but not yet granted
-  const showNotifPrompt = isNotificationSupported() && notifPermission === 'default'
-
-  const handleCardClick = (item: typeof menuItems[number]) => {
-    if (item.isToggle) {
-      onToggleDarkMode?.()
-      return
-    }
-    setActivePanel(item.id)
-  }
 
   const handleBack = () => {
     setActivePanel('menu')
@@ -1317,88 +1377,233 @@ export default function MorePanel({
     )
   }
 
-  // Menu mode (default)
+  // Menu mode (default) — mockup-style Settings layout
   return (
-    <div className="space-y-4">
-      <div className="flex items-center gap-2">
-        <h2 className="text-lg font-bold">More</h2>
-        <Badge variant="outline" className="text-xs bg-emerald-50 text-emerald-700 border-emerald-200">
-          {menuItems.length} features
-        </Badge>
-      </div>
+    <div className="space-y-6 max-w-xl mx-auto">
 
-      {/* Weekly Summary Card */}
+      {/* ── Weekly Summary ── */}
       {summary && (
-        <Card className="border-emerald-200 bg-gradient-to-br from-emerald-50/50 to-white">
-          <CardContent className="p-4">
-            <p className="text-xs font-semibold text-emerald-700 mb-2">This Week&apos;s Summary</p>
-            <div className="grid grid-cols-3 gap-2 text-center">
-              <div>
-                <p className="text-xs text-muted-foreground">Income</p>
-                <p className="text-sm font-bold text-emerald-600">{currencySymbol}{summary.totalIncome.toLocaleString()}</p>
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Expense</p>
-                <p className="text-sm font-bold text-red-600">{currencySymbol}{summary.totalExpense.toLocaleString()}</p>
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Savings</p>
-                <p className={`text-sm font-bold ${summary.savingsRate >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>{summary.savingsRate}%</p>
-              </div>
+        <div className="rounded-2xl p-4 border border-emerald-100 dark:border-emerald-900/50" style={{ background: 'rgba(16,185,129,0.06)' }}>
+          <p className="text-xs font-semibold text-emerald-700 dark:text-emerald-400 mb-3">This Week&apos;s Summary</p>
+          <div className="grid grid-cols-3 gap-2 text-center">
+            <div>
+              <p className="text-[11px] text-muted-foreground">Income</p>
+              <p className="text-sm font-bold text-emerald-600">{currencySymbol}{summary.totalIncome.toLocaleString()}</p>
             </div>
-          </CardContent>
-        </Card>
+            <div>
+              <p className="text-[11px] text-muted-foreground">Expense</p>
+              <p className="text-sm font-bold text-red-500">{currencySymbol}{summary.totalExpense.toLocaleString()}</p>
+            </div>
+            <div>
+              <p className="text-[11px] text-muted-foreground">Savings</p>
+              <p className={`text-sm font-bold ${summary.savingsRate >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>{summary.savingsRate}%</p>
+            </div>
+          </div>
+        </div>
       )}
 
-      {/* Enable Notifications Card */}
-      {showNotifPrompt && (
-        <Card className="border-amber-200 bg-gradient-to-br from-amber-50/50 to-white">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center">
-                  <Bell className="w-5 h-5 text-amber-600" />
-                </div>
-                <div>
-                  <p className="text-sm font-semibold">Enable Notifications</p>
-                  <p className="text-xs text-muted-foreground">Get bill reminders & weekly summaries</p>
-                </div>
+      {/* ── 1. Telegram Bot ── */}
+      <div>
+        <div className="flex items-center gap-2 mb-3">
+          <h3 className="text-base font-bold" style={{ color: '#065f46' }}>🤖 Telegram Bot</h3>
+          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded" style={{ background: 'rgba(16,185,129,0.15)', color: '#065f46' }}>NEW</span>
+        </div>
+        <div className="rounded-2xl p-4 border border-gray-100 dark:border-gray-800" style={{ background: 'linear-gradient(135deg, #e3f2fd, #f0f9f0)' }}>
+          <div className="flex gap-3">
+            <span className="text-3xl shrink-0">✈️</span>
+            <div className="flex-1 min-w-0">
+              <p className="font-semibold text-sm text-gray-900 dark:text-white mb-1">Log transactions via Telegram</p>
+              <p className="text-xs text-muted-foreground mb-3 leading-relaxed">
+                Connect your Trackr bot. Type any transaction in plain language — English or বাংলা — and it&apos;s categorised and saved automatically.
+              </p>
+              <div className="flex flex-wrap gap-1.5 mb-3">
+                {['Coffee 5', 'Groceries 1200 yesterday', 'বাজারে ৫০০ টাকা', '/stats', '/help'].map(cmd => (
+                  <span key={cmd} className="font-mono text-[11px] px-2 py-1 rounded-lg border border-emerald-200 bg-white dark:bg-gray-900 text-emerald-800 dark:text-emerald-300">{cmd}</span>
+                ))}
               </div>
-              <Button
-                size="sm"
-                className="bg-amber-500 hover:bg-amber-600 text-white"
-                onClick={handleEnableNotifications}
-              >
-                Enable
+              {telegramConnected || hasTelegramToken ? (
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 px-3 py-2 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800">
+                    <p className="text-xs text-emerald-700 dark:text-emerald-300 font-medium">✅ Bot connected! Send /help to your bot to get started.</p>
+                  </div>
+                  <Button size="sm" variant="outline" className="text-xs border-red-200 text-red-600 hover:bg-red-50 shrink-0"
+                    onClick={async () => {
+                      await fetch('/api/user', { method: 'PUT', headers: getAuthHeaders(), body: JSON.stringify({ telegramToken: null }) })
+                      setHasTelegramToken(false)
+                      setTelegramConnected(false)
+                      toast({ title: 'Bot disconnected' })
+                    }}>
+                    Disconnect
+                  </Button>
+                </div>
+              ) : (
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    placeholder="Paste your bot token…"
+                    value={telegramToken}
+                    onChange={e => setTelegramToken(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') handleTelegramConnect() }}
+                    className="flex-1 px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-700 text-sm bg-white dark:bg-gray-900 outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 dark:focus:ring-emerald-900/40"
+                  />
+                  <Button size="sm" disabled={!telegramToken.trim() || telegramSaving} onClick={handleTelegramConnect}
+                    className="shrink-0 text-white" style={{ background: '#065f46' }}>
+                    {telegramSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Connect'}
+                  </Button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ── 2. PWA & Offline ── */}
+      <div>
+        <h3 className="text-base font-bold mb-3" style={{ color: '#065f46' }}>📱 PWA &amp; Offline</h3>
+        <div className="space-y-2">
+          <div className="flex items-center justify-between p-4 bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800">
+            <div>
+              <p className="text-sm font-semibold text-gray-900 dark:text-white">Install App</p>
+              <p className="text-xs text-muted-foreground">Add Trackr to home screen for offline access</p>
+            </div>
+            {installPrompt ? (
+              <Button size="sm" variant="outline" onClick={handleInstall} className="shrink-0 text-xs border-emerald-200 text-emerald-700 hover:bg-emerald-50">
+                <Smartphone className="w-3.5 h-3.5 mr-1" /> Install
+              </Button>
+            ) : (
+              <Badge variant="outline" className="text-xs text-muted-foreground">Installed</Badge>
+            )}
+          </div>
+          <div className="flex items-center justify-between p-4 bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800">
+            <div>
+              <p className="text-sm font-semibold text-gray-900 dark:text-white">Offline Mode</p>
+              <p className="text-xs text-muted-foreground">App works without internet using cached data</p>
+            </div>
+            <div className="w-11 h-6 rounded-full flex items-center cursor-default shrink-0" style={{ background: '#10b981' }}>
+              <div className="w-5 h-5 rounded-full bg-white shadow ml-auto mr-0.5 transition-transform" />
+            </div>
+          </div>
+          {isNotificationSupported() && notifPermission !== 'granted' && (
+            <div className="flex items-center justify-between p-4 bg-white dark:bg-gray-900 rounded-2xl border border-amber-100 dark:border-amber-900/30">
+              <div>
+                <p className="text-sm font-semibold text-gray-900 dark:text-white">Push Notifications</p>
+                <p className="text-xs text-muted-foreground">Bill reminders &amp; weekly summaries</p>
+              </div>
+              <Button size="sm" className="bg-amber-500 hover:bg-amber-600 text-white text-xs shrink-0" onClick={handleEnableNotifications}>
+                <Bell className="w-3 h-3 mr-1" /> Enable
               </Button>
             </div>
-          </CardContent>
-        </Card>
-      )}
-
-      <div className="grid grid-cols-2 gap-3">
-        {menuItems.map((item) => (
-          <Card
-            key={item.id}
-            className={`cursor-pointer hover:shadow-md transition-all hover:border-emerald-200 ${
-              item.isToggle && isDarkMode ? 'border-amber-200 bg-gradient-to-br from-amber-50/50 to-white' : ''
-            }`}
-            onClick={() => handleCardClick(item)}
-          >
-            <CardContent className="p-4">
-              <div className="flex flex-col items-center text-center gap-2">
-                <span className="text-2xl" role="img" aria-label={item.title}>
-                  {item.icon}
-                </span>
-                <div>
-                  <p className="font-semibold text-sm">{item.title}</p>
-                  <p className="text-[11px] text-muted-foreground">{item.description}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+          )}
+        </div>
       </div>
+
+      {/* ── 3. AI & Integrations ── */}
+      <div>
+        <h3 className="text-base font-bold mb-3" style={{ color: '#065f46' }}>🧠 AI &amp; Integrations</h3>
+        <div className="space-y-2">
+          {/* Gemini API Key */}
+          <div className="p-4 bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="flex items-center gap-2">
+                  <p className="text-sm font-semibold text-gray-900 dark:text-white">Gemini API Key (BYOK)</p>
+                  {hasGeminiKey && <Badge className="text-[10px] bg-emerald-100 text-emerald-700 border-emerald-200">Active</Badge>}
+                </div>
+                <p className="text-xs text-muted-foreground">Use your own key for smarter categorisation</p>
+              </div>
+              <Button size="sm" variant="outline" onClick={() => setShowGeminiInput(v => !v)}
+                className="text-xs border-emerald-200 text-emerald-700 hover:bg-emerald-50 shrink-0">
+                {hasGeminiKey ? 'Update' : 'Set up'}
+              </Button>
+            </div>
+            {showGeminiInput && (
+              <div className="mt-3 flex gap-2">
+                <input
+                  type="password"
+                  placeholder={hasGeminiKey ? '••••••••••••••••' : 'AIzaSy…'}
+                  value={geminiKey}
+                  onChange={e => setGeminiKey(e.target.value)}
+                  className="flex-1 px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-700 text-sm font-mono bg-gray-50 dark:bg-gray-800 outline-none focus:border-emerald-400"
+                  autoComplete="off"
+                />
+                <Button size="sm" onClick={handleGeminiSave} disabled={geminiSaving || (!geminiKey.trim() && !hasGeminiKey)}
+                  className="shrink-0 bg-violet-600 hover:bg-violet-700 text-white text-xs">
+                  {geminiSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : hasGeminiKey && !geminiKey.trim() ? 'Clear' : 'Save'}
+                </Button>
+              </div>
+            )}
+          </div>
+
+          {/* Monthly Email Reports */}
+          <div className="flex items-center justify-between p-4 bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800">
+            <div>
+              <p className="text-sm font-semibold text-gray-900 dark:text-white">Monthly Email Reports</p>
+              <p className="text-xs text-muted-foreground">Spending summary on the 1st of each month</p>
+            </div>
+            <button
+              onClick={handleMonthlyReportToggle}
+              className="w-11 h-6 rounded-full flex items-center shrink-0 transition-colors duration-200"
+              style={{ background: monthlyReportEnabled ? '#10b981' : '#d1d5db' }}
+            >
+              <div className={`w-5 h-5 rounded-full bg-white shadow transition-transform duration-200 ${monthlyReportEnabled ? 'translate-x-5' : 'translate-x-0.5'}`} />
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* ── 4. Preferences ── */}
+      <div>
+        <h3 className="text-base font-bold mb-3" style={{ color: '#065f46' }}>⚙️ Preferences</h3>
+        <div className="space-y-2">
+          {/* Dark Mode */}
+          <div className="flex items-center justify-between p-4 bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800">
+            <div>
+              <p className="text-sm font-semibold text-gray-900 dark:text-white">Dark Mode</p>
+              <p className="text-xs text-muted-foreground">Easier on the eyes at night</p>
+            </div>
+            <button
+              onClick={() => onToggleDarkMode?.()}
+              className="w-11 h-6 rounded-full flex items-center shrink-0 transition-colors duration-200"
+              style={{ background: isDarkMode ? '#10b981' : '#d1d5db' }}
+            >
+              <div className={`w-5 h-5 rounded-full bg-white shadow transition-transform duration-200 ${isDarkMode ? 'translate-x-5' : 'translate-x-0.5'}`} />
+            </button>
+          </div>
+
+          {/* Currency */}
+          <div className="flex items-center justify-between p-4 bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800">
+            <div>
+              <p className="text-sm font-semibold text-gray-900 dark:text-white">Currency</p>
+              <p className="text-xs text-muted-foreground">Currently {currency} ({currencySymbol})</p>
+            </div>
+            <Button size="sm" variant="outline" onClick={() => setActivePanel('settings')}
+              className="text-xs border-gray-200 text-gray-600 hover:bg-gray-50 shrink-0">
+              Change
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      {/* ── 5. Tools (existing features) ── */}
+      <div>
+        <h3 className="text-base font-bold mb-3" style={{ color: '#065f46' }}>🛠️ Tools</h3>
+        <div className="grid grid-cols-2 gap-2">
+          {toolItems.map(item => (
+            <button
+              key={item.id}
+              onClick={() => setActivePanel(item.id)}
+              className="flex items-center gap-3 p-4 bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 hover:border-emerald-200 hover:shadow-sm transition-all text-left"
+            >
+              <span className="text-2xl shrink-0">{item.icon}</span>
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-gray-900 dark:text-white">{item.title}</p>
+                <p className="text-[11px] text-muted-foreground truncate">{item.description}</p>
+              </div>
+            </button>
+          ))}
+        </div>
+      </div>
+
     </div>
   )
 }
