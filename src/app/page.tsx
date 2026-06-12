@@ -49,6 +49,8 @@ function buildAuthHeaders(userName?: string): Record<string, string> {
 export default function Home() {
   const [activeTab, setActiveTab] = useState('dashboard')
   const [refreshTrigger, setRefreshTrigger] = useState(0)
+  // Track which tabs have ever been visited so we mount them lazily
+  const [visitedTabs, setVisitedTabs] = useState<Set<string>>(new Set(['dashboard']))
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [userName, setUserName] = useState('')
   const [userEmail, setUserEmail] = useState<string | null>(null)
@@ -76,7 +78,7 @@ export default function Home() {
     setMounted(true)
     const params = new URLSearchParams(window.location.search)
     const tab = params.get('tab')
-    if (tab) setActiveTab(tab)
+    if (tab) { setVisitedTabs(prev => { const next = new Set(prev); next.add(tab); return next }); setActiveTab(tab) }
   }, [])
 
   // Fetch user settings (dark mode, language, currency) after login
@@ -398,6 +400,12 @@ export default function Home() {
     setRefreshTrigger(prev => prev + 1)
   }, [])
 
+  // Wrap tab navigation to track visited tabs for lazy mounting
+  const navigateTab = useCallback((tab: string) => {
+    setVisitedTabs(prev => { const next = new Set(prev); next.add(tab); return next })
+    setActiveTab(tab)
+  }, [])
+
   // Auto-execute due recurring transactions once per session
   useRecurringExecution(isLoggedIn ? userName : undefined, handleRefreshData)
 
@@ -412,7 +420,7 @@ export default function Home() {
       }
       const tag = (e.target as HTMLElement).tagName
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
-      if (e.key === 'n' || e.key === 'N') setActiveTab('add')
+      if (e.key === 'n' || e.key === 'N') navigateTab('add')
       if (e.key === '/') {
         e.preventDefault()
         setSearchOpen(true)
@@ -423,7 +431,7 @@ export default function Home() {
   }, [isLoggedIn])
 
   const handleTransactionAdded = () => {
-    setActiveTab('dashboard')
+    navigateTab('dashboard')
     setTimeout(() => {
       setRefreshTrigger(prev => prev + 1)
     }, 300)
@@ -525,7 +533,7 @@ export default function Home() {
         <div className="max-w-5xl mx-auto px-4 h-14 flex items-center gap-3">
 
           {/* Logo */}
-          <button onClick={() => setActiveTab('dashboard')} className="flex items-center gap-2 shrink-0 hover:opacity-80 transition-opacity">
+          <button onClick={() => navigateTab('dashboard')} className="flex items-center gap-2 shrink-0 hover:opacity-80 transition-opacity">
             <TrackrLogo size={28} />
             <span className="hidden sm:block text-[14px] font-extrabold text-gray-900 dark:text-white tracking-tight">Trackr</span>
           </button>
@@ -536,7 +544,7 @@ export default function Home() {
               {NAV_PILLS.map(({ tab, label, Icon }) => (
                 <button
                   key={tab}
-                  onClick={() => setActiveTab(tab)}
+                  onClick={() => navigateTab(tab)}
                   className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-medium transition-all whitespace-nowrap ${
                     activeTab === tab
                       ? 'bg-white dark:bg-gray-900 text-emerald-700 dark:text-emerald-400 shadow-sm font-semibold'
@@ -563,7 +571,7 @@ export default function Home() {
             <button onClick={handleToggleDarkMode} className="h-8 w-8 flex items-center justify-center rounded-xl text-gray-400 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors" aria-label="Toggle dark mode">
               {isDarkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
             </button>
-            <button onClick={() => setActiveTab('more')} className="shrink-0" aria-label="Profile">
+            <button onClick={() => navigateTab('more')} className="shrink-0" aria-label="Profile">
               <Avatar className="h-7 w-7">
                 {userImage && <AvatarImage src={userImage} alt={userName} />}
                 <AvatarFallback className="text-[10px] font-bold bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300">{userInitials || '?'}</AvatarFallback>
@@ -577,54 +585,70 @@ export default function Home() {
       </header>
 
       {/* ── MAIN CONTENT ── */}
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
+      <Tabs value={activeTab} onValueChange={navigateTab}>
         <main className="max-w-5xl mx-auto px-4 md:px-6 pt-5 pb-28">
+          {/* Dashboard always mounted — it's the default tab */}
           <TabsContent value="dashboard" className="mt-0">
             <ErrorBoundary label="Dashboard">
               <Dashboard refreshTrigger={refreshTrigger} userName={userName} />
             </ErrorBoundary>
           </TabsContent>
 
+          {/* Add — mount lazily on first visit, keep mounted afterwards */}
           <TabsContent value="add" className="mt-0 max-w-xl mx-auto">
-            <ErrorBoundary label="Add Transaction">
-              <AddTransaction onTransactionAdded={handleTransactionAdded} userName={userName} />
-            </ErrorBoundary>
+            {visitedTabs.has('add') && (
+              <ErrorBoundary label="Add Transaction">
+                <AddTransaction onTransactionAdded={handleTransactionAdded} userName={userName} />
+              </ErrorBoundary>
+            )}
           </TabsContent>
 
+          {/* Budget — lazy mount */}
           <TabsContent value="budget" className="mt-0">
-            <ErrorBoundary label="Budget">
-              <BudgetPanel refreshTrigger={refreshTrigger} userName={userName} />
-            </ErrorBoundary>
+            {visitedTabs.has('budget') && (
+              <ErrorBoundary label="Budget">
+                <BudgetPanel refreshTrigger={refreshTrigger} userName={userName} />
+              </ErrorBoundary>
+            )}
           </TabsContent>
 
+          {/* History — lazy mount */}
           <TabsContent value="history" className="mt-0">
-            <ErrorBoundary label="History">
-              <TransactionList refreshTrigger={refreshTrigger} userName={userName} />
-            </ErrorBoundary>
+            {visitedTabs.has('history') && (
+              <ErrorBoundary label="History">
+                <TransactionList refreshTrigger={refreshTrigger} userName={userName} />
+              </ErrorBoundary>
+            )}
           </TabsContent>
 
+          {/* Insights — lazy mount */}
           <TabsContent value="insights" className="mt-0">
-            <ErrorBoundary label="Insights">
-              <InsightsPanel refreshTrigger={refreshTrigger} userName={userName} />
-            </ErrorBoundary>
+            {visitedTabs.has('insights') && (
+              <ErrorBoundary label="Insights">
+                <InsightsPanel refreshTrigger={refreshTrigger} userName={userName} />
+              </ErrorBoundary>
+            )}
           </TabsContent>
 
+          {/* Settings — lazy mount */}
           <TabsContent value="more" className="mt-0 max-w-xl mx-auto">
-            <ErrorBoundary label="Settings">
-              <MorePanel
-                userName={userName}
-                refreshTrigger={refreshTrigger}
-                onToggleDarkMode={handleToggleDarkMode}
-                isDarkMode={isDarkMode}
-              />
-            </ErrorBoundary>
+            {visitedTabs.has('more') && (
+              <ErrorBoundary label="Settings">
+                <MorePanel
+                  userName={userName}
+                  refreshTrigger={refreshTrigger}
+                  onToggleDarkMode={handleToggleDarkMode}
+                  isDarkMode={isDarkMode}
+                />
+              </ErrorBoundary>
+            )}
           </TabsContent>
         </main>
       </Tabs>
 
       {/* ── FLOATING ACTION BUTTON ── */}
       <button
-        onClick={() => setActiveTab('add')}
+        onClick={() => navigateTab('add')}
         aria-label="Add transaction"
         className={`fixed z-50 w-14 h-14 rounded-full flex items-center justify-center text-white shadow-lg transition-all duration-200 hover:scale-105 active:scale-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-500 ${
           activeTab === 'add'

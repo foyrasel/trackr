@@ -28,10 +28,9 @@ async function seedCorporateUser(userId: string) {
   const transactions: any[] = []
   const SPENDING_TYPES = ['debit', 'credit', 'mobile', 'cash']
   
-  for (let monthOffset = 4; monthOffset >= 0; monthOffset--) {
-    const year = now.getFullYear()
-    const month = now.getMonth() - monthOffset
-    const date = new Date(year, month, 1)
+  for (let monthOffset = 11; monthOffset >= 0; monthOffset--) {
+    const baseDate = new Date(now.getFullYear(), now.getMonth() - monthOffset, 1)
+    const date = baseDate
     const daysInMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate()
     const maxDay = monthOffset === 0 ? now.getDate() : daysInMonth
     const monthName = date.toLocaleString('default', { month: 'long' })
@@ -89,10 +88,10 @@ async function seedCorporateUser(userId: string) {
     for (let day = 5; day <= 15; day++) {
       if (Math.random() > 0.5) {
         const expense = randomChoice([
-          { amount: randomBetween(200, 500), cat: 'Transport', desc: 'Uber/Ola ride', cls: 'need', st: 'mobile' },
-          { amount: randomBetween(300, 800), cat: 'Groceries', desc: 'BigBasket order', cls: 'need', st: 'debit' },
-          { amount: randomBetween(100, 300), cat: 'Personal Care', desc: randomChoice(['Sugar salon', 'The Man Company', 'Nykaa order']), cls: 'want', st: 'mobile' },
-          { amount: randomBetween(200, 600), cat: 'Fuel', desc: 'Petrol fill-up', cls: 'need', st: 'debit' },
+          { amount: randomBetween(200, 500), category: 'Transport', description: 'Uber/Ola ride', classification: 'need', spendingType: 'mobile' },
+          { amount: randomBetween(300, 800), category: 'Groceries', description: 'BigBasket order', classification: 'need', spendingType: 'debit' },
+          { amount: randomBetween(100, 300), category: 'Personal Care', description: randomChoice(['Sugar salon', 'The Man Company', 'Nykaa order']), classification: 'want', spendingType: 'mobile' },
+          { amount: randomBetween(200, 600), category: 'Transport', description: 'Petrol fill-up', classification: 'need', spendingType: 'debit' },
         ])
         transactions.push({
           userId, type: 'expense', ...expense,
@@ -166,10 +165,9 @@ async function seedGovtUser(userId: string) {
 
   const transactions: any[] = []
   
-  for (let monthOffset = 4; monthOffset >= 0; monthOffset--) {
-    const year = now.getFullYear()
-    const month = now.getMonth() - monthOffset
-    const date = new Date(year, month, 1)
+  for (let monthOffset = 11; monthOffset >= 0; monthOffset--) {
+    const baseDate = new Date(now.getFullYear(), now.getMonth() - monthOffset, 1)
+    const date = baseDate
     const daysInMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate()
     const maxDay = monthOffset === 0 ? now.getDate() : daysInMonth
     const monthName = date.toLocaleString('default', { month: 'long' })
@@ -212,9 +210,9 @@ async function seedGovtUser(userId: string) {
     for (let day = 5; day <= 15; day++) {
       if (Math.random() > 0.7) { // Only 30% chance per day
         const expense = randomChoice([
-          { amount: randomBetween(50, 150), cat: 'Transport', desc: 'Bus pass / Auto', cls: 'need', st: 'cash' },
-          { amount: randomBetween(80, 200), cat: 'Fuel', desc: 'Petrol for scooter', cls: 'need', st: 'debit' },
-          { amount: randomBetween(200, 500), cat: 'Health', desc: 'Medicine / Pharmacy', cls: 'need', st: 'debit' },
+          { amount: randomBetween(50, 150), category: 'Transport', description: 'Bus pass / Auto', classification: 'need', spendingType: 'cash' },
+          { amount: randomBetween(80, 200), category: 'Transport', description: 'Petrol for scooter', classification: 'need', spendingType: 'debit' },
+          { amount: randomBetween(200, 500), category: 'Healthcare', description: 'Medicine / Pharmacy', classification: 'need', spendingType: 'debit' },
         ])
         transactions.push({
           userId, type: 'expense', ...expense,
@@ -298,13 +296,18 @@ export async function GET() {
           emailVerified: new Date(),
           currency: 'INR',
           currencySymbol: '₹',
+          onboardingDone: true,
         },
       })
-      const count = await seedCorporateUser(corpUser.id)
-      results.push({ email: 'corporate@test.com', password: 'password123', transactionCount: count })
-    } else {
-      const count = await db.transaction.count({ where: { userId: corpUser.id } })
-      results.push({ email: 'corporate@test.com', password: 'password123', transactionCount: count })
+    }
+    {
+      const existingTxnCount = await db.transaction.count({ where: { userId: corpUser.id } })
+      if (existingTxnCount < 10) {
+        const count = await seedCorporateUser(corpUser.id)
+        results.push({ email: 'corporate@test.com', password: 'password123', transactionCount: count })
+      } else {
+        results.push({ email: 'corporate@test.com', password: 'password123', transactionCount: existingTxnCount })
+      }
     }
 
     // ── User 2: Government Employee ──
@@ -320,13 +323,18 @@ export async function GET() {
           emailVerified: new Date(),
           currency: 'INR',
           currencySymbol: '₹',
+          onboardingDone: true,
         },
       })
-      const count = await seedGovtUser(govtUser.id)
-      results.push({ email: 'govt@test.com', password: 'password123', transactionCount: count })
-    } else {
-      const count = await db.transaction.count({ where: { userId: govtUser.id } })
-      results.push({ email: 'govt@test.com', password: 'password123', transactionCount: count })
+    }
+    {
+      const existingTxnCount = await db.transaction.count({ where: { userId: govtUser.id } })
+      if (existingTxnCount < 10) {
+        const count = await seedGovtUser(govtUser.id)
+        results.push({ email: 'govt@test.com', password: 'password123', transactionCount: count })
+      } else {
+        results.push({ email: 'govt@test.com', password: 'password123', transactionCount: existingTxnCount })
+      }
     }
 
     return NextResponse.json({
@@ -344,46 +352,39 @@ export async function POST() {
     // Same logic as GET
     const results: Array<{ email: string; password: string; transactionCount: number }> = []
 
+    // POST handler reuses same logic as GET
     let corpUser = await db.user.findUnique({ where: { email: 'corporate@test.com' } })
     if (!corpUser) {
       const hashedPassword = await hashPassword('password123')
       corpUser = await db.user.create({
-        data: {
-          name: 'Corporate Employee',
-          email: 'corporate@test.com',
-          password: hashedPassword,
-          provider: 'email',
-          emailVerified: new Date(),
-          currency: 'INR',
-          currencySymbol: '₹',
-        },
+        data: { name: 'Corporate Employee', email: 'corporate@test.com', password: hashedPassword, provider: 'email', emailVerified: new Date(), currency: 'INR', currencySymbol: '₹', onboardingDone: true },
       })
-      const count = await seedCorporateUser(corpUser.id)
-      results.push({ email: 'corporate@test.com', password: 'password123', transactionCount: count })
-    } else {
-      const count = await db.transaction.count({ where: { userId: corpUser.id } })
-      results.push({ email: 'corporate@test.com', password: 'password123', transactionCount: count })
+    }
+    {
+      const existingTxnCount = await db.transaction.count({ where: { userId: corpUser.id } })
+      if (existingTxnCount < 10) {
+        const count = await seedCorporateUser(corpUser.id)
+        results.push({ email: 'corporate@test.com', password: 'password123', transactionCount: count })
+      } else {
+        results.push({ email: 'corporate@test.com', password: 'password123', transactionCount: existingTxnCount })
+      }
     }
 
     let govtUser = await db.user.findUnique({ where: { email: 'govt@test.com' } })
     if (!govtUser) {
       const hashedPassword = await hashPassword('password123')
       govtUser = await db.user.create({
-        data: {
-          name: 'Government Employee',
-          email: 'govt@test.com',
-          password: hashedPassword,
-          provider: 'email',
-          emailVerified: new Date(),
-          currency: 'INR',
-          currencySymbol: '₹',
-        },
+        data: { name: 'Government Employee', email: 'govt@test.com', password: hashedPassword, provider: 'email', emailVerified: new Date(), currency: 'INR', currencySymbol: '₹', onboardingDone: true },
       })
-      const count = await seedGovtUser(govtUser.id)
-      results.push({ email: 'govt@test.com', password: 'password123', transactionCount: count })
-    } else {
-      const count = await db.transaction.count({ where: { userId: govtUser.id } })
-      results.push({ email: 'govt@test.com', password: 'password123', transactionCount: count })
+    }
+    {
+      const existingTxnCount = await db.transaction.count({ where: { userId: govtUser.id } })
+      if (existingTxnCount < 10) {
+        const count = await seedGovtUser(govtUser.id)
+        results.push({ email: 'govt@test.com', password: 'password123', transactionCount: count })
+      } else {
+        results.push({ email: 'govt@test.com', password: 'password123', transactionCount: existingTxnCount })
+      }
     }
 
     return NextResponse.json({
