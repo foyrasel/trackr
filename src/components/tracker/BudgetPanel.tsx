@@ -295,6 +295,58 @@ export default function BudgetPanel({ refreshTrigger, userName }: BudgetPanelPro
         </Card>
       )}
 
+      {/* ── Budget branches — each category is a branch, fill shows capacity ── */}
+      {activeBudgets.length > 0 && (
+        <Card style={{ background: 'linear-gradient(150deg, #F9F8F5, rgba(107,173,61,0.05))', border: '1px solid rgba(45,80,22,0.1)' }}>
+          <CardContent className="p-4">
+            <h3 className="font-display font-bold text-sm mb-3" style={{ color: '#2D5016' }}>
+              🌿 Budget Branches
+            </h3>
+            <div className="relative pl-5">
+              {/* Trunk */}
+              <div className="absolute left-[7px] top-1 bottom-1 w-[3px] rounded-full" style={{ background: '#8B7355' }} aria-hidden="true" />
+              <div className="space-y-3">
+                {[...activeBudgets].sort((a, b) => b.percentUsed - a.percentUsed).map((b) => {
+                  const pct = Math.min(b.percentUsed, 100)
+                  const over = b.percentUsed >= 100
+                  const warn = b.percentUsed >= 80
+                  const fill = over ? '#E8B4A8' : warn ? '#d9b380' : '#6BAD3D'
+                  return (
+                    <div key={b.id} className="relative">
+                      {/* Branch connector */}
+                      <span className="absolute -left-[13px] top-[13px] w-3 h-[2px] rounded-full" style={{ background: '#8B7355' }} aria-hidden="true" />
+                      <div className="flex items-baseline justify-between gap-2 mb-1">
+                        <span className="text-[13px] font-medium truncate" style={{ color: '#2C2C2C' }}>{b.category}</span>
+                        <span className="font-data text-[11px] whitespace-nowrap" style={{ color: over ? '#b3776a' : '#8B7355' }}>
+                          {currencySymbol}{b.spent.toLocaleString()} / {currencySymbol}{b.amount.toLocaleString()}
+                          {over ? ' · over' : warn ? ' · nearly full' : ''}
+                        </span>
+                      </div>
+                      {/* Branch capacity bar with leaf tip */}
+                      <div className="relative h-[10px] rounded-full overflow-visible" style={{ background: 'rgba(139,115,85,0.15)' }}>
+                        <div
+                          className="h-full rounded-full transition-all duration-700"
+                          style={{ width: `${pct}%`, background: fill }}
+                        />
+                        {/* Leaf at the branch tip */}
+                        <span
+                          className="absolute top-1/2 -translate-y-1/2 w-[9px] h-[13px] rounded-full rotate-45 transition-all duration-700"
+                          style={{ left: `calc(${pct}% - 5px)`, background: over ? '#c98f82' : '#2D5016' }}
+                          aria-hidden="true"
+                        />
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+            <p className="text-[11px] mt-3" style={{ color: '#8B7355' }}>
+              A branch can only hold so much — when the leaf reaches the end, that branch is at capacity.
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
       {/* AI Suggestion Button */}
       <div className="flex gap-2">
         <Button

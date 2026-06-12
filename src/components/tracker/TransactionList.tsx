@@ -483,6 +483,17 @@ export default function TransactionList({ refreshTrigger, userName }: Transactio
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
   }
 
+  // Group transactions by month — each month is a "branch", each transaction a "leaf"
+  const groupedByMonth: [string, Transaction[]][] = React.useMemo(() => {
+    const map = new Map<string, Transaction[]>()
+    for (const tx of transactions) {
+      const key = new Date(tx.date).toISOString().slice(0, 7) // YYYY-MM
+      if (!map.has(key)) map.set(key, [])
+      map.get(key)!.push(tx)
+    }
+    return Array.from(map.entries()).sort(([a], [b]) => b.localeCompare(a))
+  }, [transactions])
+
   // Show loading skeleton until mounted (avoids hydration mismatch from Date/fetch)
   if (loading || !mounted) {
     return (
@@ -672,12 +683,45 @@ export default function TransactionList({ refreshTrigger, userName }: Transactio
         </Card>
       ) : (
         <div className="space-y-2">
-          <div className="max-h-[60vh] overflow-y-auto pr-1 space-y-2">
-            {transactions.map((tx) => {
+          {/* Branches & leaves: months are branches on a trunk, transactions are leaves */}
+          <div className="max-h-[60vh] overflow-y-auto pr-1 relative">
+            {/* Trunk line */}
+            <div className="absolute left-[11px] top-2 bottom-2 w-[2px] rounded-full" style={{ background: 'linear-gradient(to bottom, #8B7355, #8B735533)' }} aria-hidden="true" />
+
+            {groupedByMonth.map(([monthKey, group]) => {
+              const monthLabel = new Date(monthKey + '-01').toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+              const monthIncome = group.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0)
+              const monthExpense = group.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0)
+              return (
+                <div key={monthKey} className="relative">
+                  {/* Branch node — month header */}
+                  <div className="flex items-center gap-2 pt-3 pb-1.5 sticky top-0 bg-background/95 backdrop-blur-sm z-10">
+                    <span className="relative z-10 w-[24px] flex justify-center shrink-0">
+                      <span className="w-3 h-3 rounded-full border-2" style={{ background: '#6BAD3D', borderColor: '#2D5016' }} />
+                    </span>
+                    <span className="h-[2px] w-3 rounded-full shrink-0 -ml-1" style={{ background: '#8B7355' }} aria-hidden="true" />
+                    <h3 className="font-display font-bold text-sm" style={{ color: '#2D5016' }}>{monthLabel}</h3>
+                    <span className="font-data text-[11px] text-muted-foreground ml-auto whitespace-nowrap">
+                      <span className="text-emerald-600">+{currencySymbol}{monthIncome.toLocaleString()}</span>
+                      {' · '}
+                      <span style={{ color: '#8B7355' }}>−{currencySymbol}{monthExpense.toLocaleString()}</span>
+                    </span>
+                  </div>
+
+                  <div className="space-y-2 pb-1">
+            {group.map((tx) => {
               const badge = CLASSIFICATION_BADGE[tx.classification] || CLASSIFICATION_BADGE.need
               const isSelected = selectedIds.has(tx.id)
               return (
-                <Card key={tx.id} className={`hover:shadow-sm transition-shadow group ${isSelected ? 'ring-2 ring-emerald-400 border-emerald-300' : ''}`}>
+                <div key={tx.id} className="flex items-center gap-0">
+                  {/* Leaf on the trunk */}
+                  <span className="relative z-10 w-[24px] flex justify-center shrink-0 self-center" aria-hidden="true">
+                    <span
+                      className="block w-2 h-3 rounded-full rotate-45"
+                      style={{ background: tx.type === 'income' ? '#6BAD3D' : '#C9A87C' }}
+                    />
+                  </span>
+                <Card className={`flex-1 min-w-0 hover:shadow-sm transition-shadow group ${isSelected ? 'ring-2 ring-emerald-400 border-emerald-300' : ''}`}>
                   <CardContent className="p-3 sm:p-4">
                     <div className="flex items-start gap-3">
                       {/* Checkbox (select mode) or Icon */}
@@ -775,6 +819,11 @@ export default function TransactionList({ refreshTrigger, userName }: Transactio
                     </div>
                   </CardContent>
                 </Card>
+                </div>
+              )
+            })}
+                  </div>
+                </div>
               )
             })}
           </div>

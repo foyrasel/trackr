@@ -214,16 +214,91 @@ export default function InsightsPanel({ refreshTrigger, userName }: InsightsPane
     .map(([name, amount]) => ({ name, amount }))
     .sort((a, b) => b.amount - a.amount)
 
+  // ── Money Tree anatomy data ────────────────────────────────────────────────
+  const savingsRate = data.totalIncome > 0
+    ? Math.max(0, Math.round(((data.totalIncome - data.totalExpense) / data.totalIncome) * 100))
+    : 0
+  const topBranches = Object.entries(data.categoryBreakdown)
+    .sort(([, a], [, b]) => b - a)
+    .slice(0, 4)
+  const maxBranch = topBranches.length > 0 ? topBranches[0][1] : 1
+
   return (
     <div className="space-y-4">
       {/* Section Header */}
       <div className="flex items-center gap-2">
         <Lightbulb className="w-5 h-5 text-amber-500" />
-        <h2 className="text-lg font-bold">Smart Insights</h2>
+        <h2 className="text-lg font-bold font-display" style={{ color: '#2D5016' }}>Smart Insights</h2>
         <Badge variant="outline" className="text-xs bg-amber-50 text-amber-700 border-amber-200">
           AI-Powered
         </Badge>
       </div>
+
+      {/* ── Money Tree anatomy ── */}
+      <Card style={{ background: 'linear-gradient(150deg, #F9F8F5, rgba(107,173,61,0.06))', border: '1px solid rgba(45,80,22,0.1)' }}>
+        <CardContent className="p-4 sm:p-5">
+          <h3 className="font-display font-bold text-sm mb-3" style={{ color: '#2D5016' }}>
+            🌳 Your Money Tree — {data.currentMonth}
+          </h3>
+          <div className="flex flex-col sm:flex-row gap-4 items-center">
+            {/* Mini tree SVG */}
+            <svg viewBox="0 0 160 190" className="w-32 shrink-0" role="img" aria-label="Money tree anatomy">
+              {/* Roots — savings */}
+              <path d="M80 160 C70 170 55 173 42 177" stroke="#8B7355" strokeWidth="4" fill="none" strokeLinecap="round" opacity={savingsRate > 0 ? 1 : 0.3} />
+              <path d="M80 160 C90 170 105 173 118 177" stroke="#8B7355" strokeWidth="4" fill="none" strokeLinecap="round" opacity={savingsRate > 0 ? 1 : 0.3} />
+              <path d="M80 160 C80 168 78 174 75 180" stroke="#8B7355" strokeWidth="3" fill="none" strokeLinecap="round" opacity={savingsRate > 10 ? 1 : 0.3} />
+              {/* Trunk — income */}
+              <path d="M74 160 C76 130 74 115 77 96 L83 96 C86 115 84 130 86 160 Z" fill="#8B7355" />
+              {/* Branches — top categories, thickness ∝ spend */}
+              {topBranches.map(([, amount], i) => {
+                const t = 2 + (amount / maxBranch) * 4
+                const dirs = [
+                  'M78 110 C62 100 50 96 38 94',
+                  'M82 102 C98 92 110 88 124 86',
+                  'M78 122 C66 118 56 116 46 116',
+                  'M82 116 C96 110 108 108 118 108',
+                ]
+                return <path key={i} d={dirs[i]} stroke="#8B7355" strokeWidth={t} fill="none" strokeLinecap="round" />
+              })}
+              {/* Canopy — leaves ∝ transactions */}
+              <circle cx="80" cy="62" r="38" fill="#2D5016" />
+              <circle cx="52" cy="78" r="24" fill="#3d6b1f" />
+              <circle cx="110" cy="76" r="22" fill="#3d6b1f" />
+              <circle cx="68" cy="46" r="18" fill="#4a7d28" />
+              <circle cx="96" cy="48" r="17" fill="#4a7d28" />
+              {Array.from({ length: Math.min(8, Math.ceil(data.transactionCount / 5)) }).map((_, i) => (
+                <ellipse key={i} cx={50 + (i * 17) % 70} cy={42 + (i * 23) % 48} rx="4.5" ry="6.5" fill={i % 2 ? '#8fc763' : '#6BAD3D'} />
+              ))}
+            </svg>
+
+            {/* Legend with live numbers */}
+            <div className="flex-1 w-full grid grid-cols-2 gap-2.5 text-[12px]">
+              <div className="rounded-xl px-3 py-2.5" style={{ background: 'rgba(139,115,85,0.1)' }}>
+                <p className="font-data text-[10px] uppercase tracking-wide" style={{ color: '#8B7355' }}>Roots · Savings</p>
+                <p className="font-display font-bold text-lg" style={{ color: savingsRate >= 20 ? '#2D5016' : '#8B7355' }}>{savingsRate}%</p>
+                <p className="text-[10px] text-muted-foreground">of income kept</p>
+              </div>
+              <div className="rounded-xl px-3 py-2.5" style={{ background: 'rgba(139,115,85,0.1)' }}>
+                <p className="font-data text-[10px] uppercase tracking-wide" style={{ color: '#8B7355' }}>Trunk · Income</p>
+                <p className="font-display font-bold text-lg" style={{ color: '#2D5016' }}>{currencySymbol}{data.totalIncome.toLocaleString()}</p>
+                <p className="text-[10px] text-muted-foreground">flowing this month</p>
+              </div>
+              <div className="rounded-xl px-3 py-2.5" style={{ background: 'rgba(107,173,61,0.1)' }}>
+                <p className="font-data text-[10px] uppercase tracking-wide" style={{ color: '#2D5016' }}>Branches · Spending</p>
+                <p className="font-display font-bold text-lg" style={{ color: '#2D5016' }}>{topBranches.length}</p>
+                <p className="text-[10px] text-muted-foreground truncate">
+                  biggest: {topBranches[0]?.[0] ?? '—'}
+                </p>
+              </div>
+              <div className="rounded-xl px-3 py-2.5" style={{ background: 'rgba(107,173,61,0.1)' }}>
+                <p className="font-data text-[10px] uppercase tracking-wide" style={{ color: '#2D5016' }}>Leaves · Entries</p>
+                <p className="font-display font-bold text-lg" style={{ color: '#2D5016' }}>{data.transactionCount}</p>
+                <p className="text-[10px] text-muted-foreground">logged this month</p>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Alerts */}
       {data.alerts.length > 0 && (

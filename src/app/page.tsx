@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import AddTransaction from '@/components/tracker/AddTransaction'
 import TreeDashboard from '@/components/tracker/TreeDashboard'
+import QuickSearch from '@/components/tracker/QuickSearch'
 import TransactionList from '@/components/tracker/TransactionList'
 import BudgetPanel from '@/components/tracker/BudgetPanel'
 import LandingPage from '@/components/tracker/LandingPage'
@@ -21,7 +22,7 @@ import { CurrencyProvider, useCurrency } from '@/components/tracker/CurrencyCont
 import { useRecurringExecution } from '@/hooks/use-recurring-exec'
 import { usePWA } from '@/hooks/use-pwa'
 import ErrorBoundary from '@/components/ErrorBoundary'
-import { LayoutDashboard, Plus, History, Lightbulb, Target, LogOut, Loader2, MoreHorizontal, Moon, Sun, Download } from 'lucide-react'
+import { LayoutDashboard, Plus, History, Lightbulb, Target, LogOut, Loader2, MoreHorizontal, Moon, Sun, Download, Search } from 'lucide-react'
 import TrackrLogo from '@/components/tracker/TrackrLogo'
 
 function CurrencyDisplay() {
@@ -64,6 +65,9 @@ export default function Home() {
 
   // PWA install
   const { canInstall, isInstalled, install } = usePWA()
+
+  // Global quick search (Cmd+K or /)
+  const [searchOpen, setSearchOpen] = useState(false)
 
   const { data: session, status } = useSession()
 
@@ -397,13 +401,22 @@ export default function Home() {
   // Auto-execute due recurring transactions once per session
   useRecurringExecution(isLoggedIn ? userName : undefined, handleRefreshData)
 
-  // Keyboard shortcut: N = new transaction
+  // Keyboard shortcuts: N = new transaction, / or Cmd+K = search
   useEffect(() => {
     if (!isLoggedIn) return
     const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault()
+        setSearchOpen(p => !p)
+        return
+      }
       const tag = (e.target as HTMLElement).tagName
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
       if (e.key === 'n' || e.key === 'N') setActiveTab('add')
+      if (e.key === '/') {
+        e.preventDefault()
+        setSearchOpen(true)
+      }
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
@@ -521,6 +534,18 @@ export default function Home() {
             <p className="text-[10px] text-muted-foreground leading-none mt-0.5">AI expense tracker</p>
           </div>
         </button>
+
+        {/* Search */}
+        <div className="px-3 pt-3">
+          <button
+            onClick={() => setSearchOpen(true)}
+            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-[12px] text-gray-400 dark:text-gray-500 border border-gray-200 dark:border-gray-700 hover:border-emerald-300 dark:hover:border-emerald-700 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+          >
+            <Search className="w-3.5 h-3.5 shrink-0" />
+            Search…
+            <kbd className="ml-auto font-mono text-[9px] px-1.5 py-0.5 rounded border border-gray-200 dark:border-gray-700 text-gray-400">⌘K</kbd>
+          </button>
+        </div>
 
         {/* Nav items */}
         <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
@@ -730,10 +755,15 @@ export default function Home() {
                 </TabsTrigger>
               </TabsList>
             </div>
+            {/* iPhone home-indicator safe area */}
+            <div className="h-[env(safe-area-inset-bottom)]" />
           </div>
         </nav>
       </Tabs>
       </div>
+
+      {/* Global quick search overlay */}
+      <QuickSearch open={searchOpen} onClose={() => setSearchOpen(false)} userName={userName} />
     </div>
     </CurrencyProvider>
   )

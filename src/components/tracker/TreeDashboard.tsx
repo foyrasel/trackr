@@ -397,11 +397,12 @@ export default function TreeDashboard({ refreshTrigger, userName, onTransactionA
       <button
         onClick={() => setModalOpen(true)}
         aria-label="Add transaction"
-        className="fixed bottom-20 md:bottom-8 right-5 md:right-8 w-14 h-14 rounded-full flex items-center justify-center text-white transition-all duration-200 hover:scale-[1.08] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 z-50"
+        className="fixed md:bottom-8 right-5 md:right-8 w-14 h-14 rounded-full flex items-center justify-center text-white transition-all duration-200 hover:scale-[1.08] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 z-50"
         style={{
           background: fabSuccess ? C.leaf : C.forest,
           boxShadow: '0 6px 18px rgba(45,80,22,0.35)',
           outlineColor: C.forest,
+          bottom: 'max(5rem, calc(4.5rem + env(safe-area-inset-bottom)))',
         }}
         onMouseEnter={e => { if (!fabSuccess) (e.currentTarget as HTMLButtonElement).style.background = C.leaf }}
         onMouseLeave={e => { if (!fabSuccess) (e.currentTarget as HTMLButtonElement).style.background = C.forest }}
