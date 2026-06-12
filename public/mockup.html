@@ -1,0 +1,844 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Trackr — Redesign Mockup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@600;700&family=Plus+Jakarta+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400&display=swap" rel="stylesheet" />
+<style>
+/* ── Reset & tokens ─────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --forest:  #2D5016;
+  --leaf:    #6BAD3D;
+  --earth:   #8B7355;
+  --cream:   #F9F8F5;
+  --bark:    #C9A87C;
+  --text:    #2C2C2C;
+  --muted:   #9B9083;
+  --warn:    #E8B4A8;
+  --white:   #FFFFFF;
+  --shadow:  rgba(45,80,22,0.12);
+  --radius:  16px;
+  --nav-h:   64px;
+}
+html { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; font-size: 16px; }
+body { background: var(--cream); color: var(--text); min-height: 100vh; overflow-x: hidden; }
+button { cursor: pointer; border: none; background: none; font-family: inherit; }
+.font-display { font-family: 'Fraunces', Georgia, serif; }
+.font-mono    { font-family: 'IBM Plex Mono', monospace; }
+
+/* ── Annotation overlay ─────────────────────────────────────────── */
+#annotations { position: fixed; top: 12px; right: 12px; z-index: 999; display: flex; flex-direction: column; gap: 6px; max-width: 240px; }
+.ann-toggle { background: var(--forest); color: #fff; font-size: 11px; font-weight: 600; padding: 6px 12px; border-radius: 20px; letter-spacing: 0.5px; }
+#ann-panel { background: #fff; border: 1px solid rgba(45,80,22,.2); border-radius: 12px; padding: 14px; font-size: 11px; line-height: 1.6; color: var(--text); max-height: 70vh; overflow-y: auto; }
+#ann-panel h4 { font-size: 11px; font-weight: 700; color: var(--forest); margin-bottom: 4px; margin-top: 10px; }
+#ann-panel h4:first-child { margin-top: 0; }
+#ann-panel ul { padding-left: 14px; }
+#ann-panel li { color: var(--earth); margin-bottom: 2px; }
+
+/* ── PWA banner ─────────────────────────────────────────────────── */
+#pwa-banner {
+  display: flex; align-items: center; gap: 10px; padding: 10px 16px;
+  background: linear-gradient(90deg, var(--forest), #3d6b20);
+  color: #fff; font-size: 12px; font-weight: 500;
+  position: relative; z-index: 50;
+}
+#pwa-banner .pwa-install-btn {
+  margin-left: auto; background: rgba(255,255,255,0.2); color: #fff;
+  padding: 4px 12px; border-radius: 20px; font-size: 11px; font-weight: 600;
+  border: 1px solid rgba(255,255,255,0.35); white-space: nowrap;
+  transition: background 0.2s;
+}
+#pwa-banner .pwa-install-btn:hover { background: rgba(255,255,255,0.35); }
+#pwa-banner .pwa-dismiss { opacity: 0.7; padding: 2px 6px; font-size: 14px; }
+#pwa-banner .pwa-dismiss:hover { opacity: 1; }
+#pwa-banner.hidden { display: none; }
+
+/* ── Header ─────────────────────────────────────────────────────── */
+header {
+  position: sticky; top: 0; z-index: 40;
+  background: rgba(249,248,245,0.97); backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(139,115,85,0.12);
+  height: var(--nav-h); display: flex; align-items: center;
+  padding: 0 20px; gap: 12px;
+}
+.logo { display: flex; align-items: center; gap: 8px; }
+.logo-icon {
+  width: 36px; height: 36px; border-radius: 10px;
+  background: linear-gradient(135deg, var(--forest), var(--leaf));
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px;
+}
+.logo-text { font-family: 'Fraunces',serif; font-weight: 700; font-size: 18px; color: var(--forest); }
+.header-pill-nav {
+  display: flex; gap: 2px; margin: 0 auto;
+  background: rgba(139,115,85,0.08); border-radius: 24px; padding: 3px;
+}
+.pill-btn {
+  padding: 6px 16px; border-radius: 20px; font-size: 13px; font-weight: 500;
+  color: var(--muted); transition: all 0.15s; white-space: nowrap;
+}
+.pill-btn.active { background: var(--white); color: var(--forest); font-weight: 600; box-shadow: 0 1px 4px var(--shadow); }
+.pill-btn:hover:not(.active) { color: var(--text); background: rgba(139,115,85,0.06); }
+.header-right { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+.avatar {
+  width: 32px; height: 32px; border-radius: 50%; background: var(--leaf);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px; font-weight: 700; color: #fff;
+}
+
+/* ── Tab panels ─────────────────────────────────────────────────── */
+.tab-panel { display: none; animation: fadeIn 0.18s ease; }
+.tab-panel.active { display: block; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+
+/* ── Page shell ─────────────────────────────────────────────────── */
+.page { max-width: 960px; margin: 0 auto; padding: 24px 20px 120px; }
+
+/* ── Hero stat ──────────────────────────────────────────────────── */
+.hero {
+  text-align: center; padding: 32px 20px 24px;
+  background: linear-gradient(135deg, rgba(45,80,22,0.06), rgba(107,173,61,0.04));
+  border-radius: var(--radius); margin-bottom: 20px;
+  border: 1px solid rgba(45,80,22,0.08);
+}
+.hero-label { font-size: 12px; color: var(--muted); letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 6px; }
+.hero-amount { font-family: 'Fraunces',serif; font-size: 52px; font-weight: 700; color: var(--forest); line-height: 1; }
+.hero-sub { font-size: 12px; color: var(--earth); margin-top: 6px; }
+.hero-chips { display: flex; justify-content: center; gap: 10px; margin-top: 16px; flex-wrap: wrap; }
+.hero-chip {
+  display: flex; align-items: center; gap: 6px; padding: 6px 14px;
+  border-radius: 20px; font-size: 12px; font-weight: 500;
+}
+.hero-chip.income { background: rgba(107,173,61,0.12); color: var(--forest); }
+.hero-chip.expense { background: rgba(139,115,85,0.12); color: var(--earth); }
+.hero-chip.savings { background: rgba(45,80,22,0.08); color: var(--forest); }
+
+/* ── Quick-stats row ────────────────────────────────────────────── */
+.stats-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 20px; }
+.stat-card {
+  background: var(--white); border-radius: 14px; padding: 16px;
+  border: 1px solid rgba(139,115,85,0.1); text-align: center;
+}
+.stat-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; }
+.stat-value { font-family: 'Fraunces',serif; font-size: 26px; font-weight: 700; color: var(--text); margin: 4px 0 2px; }
+.stat-meta { font-size: 11px; color: var(--earth); }
+.stat-value.up { color: var(--leaf); }
+.stat-value.warn { color: #C9826F; }
+
+/* ── Section header ─────────────────────────────────────────────── */
+.section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.section-title { font-family: 'Fraunces',serif; font-size: 16px; font-weight: 600; color: var(--forest); }
+.section-link { font-size: 12px; color: var(--leaf); font-weight: 500; }
+
+/* ── Recent transactions (leaf list) ────────────────────────────── */
+.leaf-list { background: var(--white); border-radius: var(--radius); overflow: hidden; border: 1px solid rgba(139,115,85,0.1); margin-bottom: 20px; }
+.leaf-month {
+  display: flex; align-items: center; gap: 8px; padding: 10px 16px;
+  background: rgba(45,80,22,0.04); border-bottom: 1px solid rgba(139,115,85,0.08);
+  font-size: 12px; font-weight: 600; color: var(--forest); sticky top 0;
+}
+.branch-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--leaf); flex-shrink: 0; }
+.leaf-item {
+  display: flex; align-items: center; gap: 12px; padding: 12px 16px;
+  border-bottom: 1px solid rgba(139,115,85,0.06); transition: background 0.12s;
+}
+.leaf-item:last-child { border-bottom: none; }
+.leaf-item:hover { background: rgba(107,173,61,0.04); }
+.leaf-icon {
+  width: 36px; height: 36px; border-radius: 10px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center; font-size: 16px;
+}
+.leaf-icon.expense { background: rgba(201,162,124,0.15); }
+.leaf-icon.income  { background: rgba(107,173,61,0.12); }
+.leaf-body { flex: 1; min-width: 0; }
+.leaf-desc { font-size: 14px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.leaf-meta { font-size: 11px; color: var(--muted); margin-top: 1px; }
+.leaf-amount { font-family: 'IBM Plex Mono',monospace; font-size: 13px; font-weight: 400; flex-shrink: 0; }
+.leaf-amount.income { color: var(--leaf); }
+.leaf-amount.expense { color: var(--earth); }
+
+/* ── Budget branches ────────────────────────────────────────────── */
+.budget-card { background: var(--white); border-radius: var(--radius); padding: 20px; border: 1px solid rgba(139,115,85,0.1); margin-bottom: 20px; }
+.branch-row { margin-bottom: 14px; }
+.branch-header { display: flex; justify-content: space-between; margin-bottom: 5px; font-size: 13px; }
+.branch-cat { font-weight: 500; }
+.branch-nums { font-family: 'IBM Plex Mono',monospace; font-size: 11px; color: var(--muted); }
+.branch-bar { height: 10px; border-radius: 5px; background: rgba(139,115,85,0.12); position: relative; overflow: visible; }
+.branch-fill { height: 100%; border-radius: 5px; position: relative; transition: width 1s ease; }
+.branch-fill::after { /* leaf tip */
+  content: ''; position: absolute; right: -4px; top: 50%; transform: translateY(-50%) rotate(45deg);
+  width: 9px; height: 13px; border-radius: 50% 50% 50% 0; background: inherit;
+}
+.branch-fill.ok   { background: var(--leaf); }
+.branch-fill.warn { background: var(--bark); }
+.branch-fill.over { background: var(--warn); }
+
+/* ── Insight card ───────────────────────────────────────────────── */
+.insight-card {
+  border-radius: var(--radius); padding: 18px; margin-bottom: 20px;
+  background: rgba(107,173,61,0.07); border: 1px solid rgba(107,173,61,0.2);
+  font-size: 13px; line-height: 1.6; color: var(--forest);
+}
+.insight-tip {
+  display: flex; gap: 12px; padding: 12px; border-radius: 12px;
+  background: var(--white); margin-top: 10px; align-items: flex-start;
+}
+.insight-tip-icon { font-size: 18px; flex-shrink: 0; margin-top: 1px; }
+.insight-tip-body p:first-child { font-weight: 600; font-size: 13px; margin-bottom: 2px; }
+.insight-tip-body p:last-child  { font-size: 12px; color: var(--earth); }
+.priority-high   { border-left: 3px solid #E8B4A8; }
+.priority-medium { border-left: 3px solid var(--bark); }
+.priority-low    { border-left: 3px solid var(--leaf); }
+
+/* ── Telegram panel ─────────────────────────────────────────────── */
+.tg-card {
+  background: linear-gradient(135deg, #e3f2fd, #f0f9f0);
+  border: 1px solid rgba(45,80,22,0.12); border-radius: var(--radius);
+  padding: 20px; margin-bottom: 20px; display: flex; gap: 16px; align-items: flex-start;
+}
+.tg-icon { font-size: 36px; flex-shrink: 0; }
+.tg-body h3 { font-family: 'Fraunces',serif; font-size: 16px; color: var(--forest); margin-bottom: 4px; }
+.tg-body p  { font-size: 12px; color: var(--earth); line-height: 1.6; margin-bottom: 12px; }
+.tg-commands { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+.tg-cmd { background: var(--white); border: 1px solid rgba(45,80,22,0.15); border-radius: 8px; padding: 4px 10px; font-family: 'IBM Plex Mono',monospace; font-size: 11px; color: var(--forest); }
+.tg-input-row { display: flex; gap: 8px; align-items: center; }
+.tg-input {
+  flex: 1; padding: 8px 12px; border-radius: 10px; border: 1px solid rgba(139,115,85,0.25);
+  font-size: 13px; background: var(--white); outline: none; font-family: inherit;
+}
+.tg-input:focus { border-color: var(--leaf); box-shadow: 0 0 0 2px rgba(107,173,61,0.15); }
+.btn-primary {
+  background: var(--forest); color: #fff; padding: 8px 16px; border-radius: 10px;
+  font-size: 13px; font-weight: 600; transition: background 0.15s;
+  display: inline-flex; align-items: center; gap: 6px;
+}
+.btn-primary:hover { background: #1f3810; }
+.btn-outline {
+  background: transparent; color: var(--forest); padding: 8px 16px; border-radius: 10px;
+  font-size: 13px; font-weight: 600; border: 1.5px solid var(--forest); transition: all 0.15s;
+}
+.btn-outline:hover { background: rgba(45,80,22,0.05); }
+
+/* ── Add transaction panel ──────────────────────────────────────── */
+.add-panel { background: var(--white); border-radius: var(--radius); padding: 24px; border: 1px solid rgba(139,115,85,0.12); }
+.type-toggle { display: flex; gap: 8px; margin-bottom: 20px; }
+.type-btn {
+  flex: 1; padding: 10px; border-radius: 12px; font-size: 13px; font-weight: 600;
+  border: 1.5px solid transparent; transition: all 0.15s;
+}
+.type-btn.expense { background: rgba(201,162,124,0.1); color: var(--earth); border-color: var(--bark); }
+.type-btn.income  { background: rgba(107,173,61,0.1);  color: var(--forest); border-color: var(--leaf); }
+.type-btn:not(.expense):not(.income) { background: rgba(139,115,85,0.06); color: var(--muted); border-color: transparent; }
+.type-btn.active.expense { background: rgba(201,162,124,0.25); }
+.type-btn.active.income  { background: rgba(107,173,61,0.2); }
+.amount-row { display: flex; align-items: center; gap: 8px; margin-bottom: 20px; }
+.currency-sym { font-family: 'Fraunces',serif; font-size: 32px; color: var(--forest); }
+.amount-input {
+  flex: 1; font-family: 'Fraunces',serif; font-size: 48px; font-weight: 700;
+  background: transparent; border: none; outline: none; color: var(--text);
+}
+.amount-input::placeholder { color: rgba(44,44,44,0.2); }
+.field-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--muted); margin-bottom: 6px; }
+.cat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 20px; }
+.cat-btn {
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  padding: 10px 4px; border-radius: 12px; font-size: 10px; font-weight: 500; line-height: 1.3;
+  background: rgba(139,115,85,0.06); color: var(--text); text-align: center;
+  border: 1.5px solid transparent; transition: all 0.12s;
+}
+.cat-btn .emoji { font-size: 20px; }
+.cat-btn:hover { background: rgba(107,173,61,0.08); border-color: var(--leaf); }
+.cat-btn.selected { background: rgba(107,173,61,0.12); border-color: var(--leaf); color: var(--forest); }
+.note-input {
+  width: 100%; padding: 10px 14px; border-radius: 12px; border: 1px solid rgba(139,115,85,0.2);
+  font-size: 13px; background: rgba(249,248,245,0.8); outline: none; font-family: inherit;
+  margin-bottom: 20px;
+}
+.note-input:focus { border-color: var(--leaf); box-shadow: 0 0 0 2px rgba(107,173,61,0.1); }
+.add-actions { display: flex; gap: 10px; }
+.bulk-toggle { font-size: 12px; color: var(--leaf); font-weight: 500; padding: 8px 0; display: block; text-align: center; margin-top: 8px; }
+.bulk-area { background: rgba(249,248,245,0.8); border: 1px solid rgba(139,115,85,0.2); border-radius: 12px; padding: 12px 14px; width: 100%; min-height: 100px; font-size: 13px; font-family: 'IBM Plex Mono',monospace; outline: none; resize: vertical; margin-bottom: 12px; }
+.bulk-area::placeholder { color: var(--muted); }
+
+/* ── Settings panel ─────────────────────────────────────────────── */
+.settings-section { margin-bottom: 24px; }
+.settings-section h3 { font-family: 'Fraunces',serif; font-size: 16px; color: var(--forest); margin-bottom: 14px; }
+.setting-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 16px; background: var(--white); border-radius: 12px;
+  border: 1px solid rgba(139,115,85,0.1); margin-bottom: 8px;
+}
+.setting-info h4 { font-size: 14px; font-weight: 600; margin-bottom: 2px; }
+.setting-info p  { font-size: 11px; color: var(--muted); }
+.toggle { width: 44px; height: 24px; border-radius: 12px; background: rgba(139,115,85,0.2); position: relative; transition: background 0.2s; flex-shrink: 0; }
+.toggle.on { background: var(--leaf); }
+.toggle::after { content: ''; position: absolute; left: 2px; top: 2px; width: 20px; height: 20px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.2); transition: transform 0.2s; }
+.toggle.on::after { transform: translateX(20px); }
+.badge-new { background: rgba(107,173,61,0.15); color: var(--forest); font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 6px; letter-spacing: 0.5px; }
+
+/* ── FAB ────────────────────────────────────────────────────────── */
+#fab {
+  position: fixed; bottom: 28px; right: 24px; z-index: 30;
+  width: 56px; height: 56px; border-radius: 50%;
+  background: var(--forest); color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 26px; line-height: 1;
+  box-shadow: 0 6px 20px rgba(45,80,22,0.35);
+  transition: transform 0.15s, background 0.15s;
+}
+#fab:hover { background: #1f3810; transform: scale(1.07); }
+#fab.success { background: var(--leaf); }
+
+/* ── Responsive ─────────────────────────────────────────────────── */
+@media (max-width: 600px) {
+  .header-pill-nav .pill-btn { padding: 6px 10px; font-size: 12px; }
+  .hero-amount { font-size: 40px; }
+  .stats-row { grid-template-columns: repeat(3,1fr); gap: 8px; }
+  .stat-value { font-size: 20px; }
+  .cat-grid { grid-template-columns: repeat(4, 1fr); }
+  .tg-card { flex-direction: column; }
+  .page { padding: 16px 14px 110px; }
+  #annotations { right: 6px; top: 6px; }
+}
+</style>
+</head>
+<body>
+
+<!-- ── Design Notes Panel ─────────────────────────────────────── -->
+<div id="annotations">
+  <button class="ann-toggle" onclick="toggleAnn()">📐 Design Notes</button>
+  <div id="ann-panel" style="display:none">
+    <h4>❌ Current Issues</h4>
+    <ul>
+      <li>Sidebar has 6 nav items — equal weight, no hierarchy</li>
+      <li>4 metric cards + 2 charts above fold — cognitive overload</li>
+      <li>No dominant number — eye doesn't know where to land</li>
+      <li>Primary CTA ("Add") buried in sidebar</li>
+      <li>Mobile/desktop nav inconsistent feel</li>
+    </ul>
+    <h4>✅ Redesign Decisions</h4>
+    <ul>
+      <li>One hero number: net monthly position</li>
+      <li>Pill nav — 5 items max, centered, always visible</li>
+      <li>FAB (+) always bottom-right — one clear action</li>
+      <li>Branches & leaves for history (months = branches)</li>
+      <li>Budget = branch capacity bars with leaf-tip indicator</li>
+      <li>Insight card with money-tree anatomy SVG</li>
+      <li>Telegram card in Settings — clear setup path</li>
+      <li>PWA banner: top, dismissible, one-time</li>
+    </ul>
+    <h4>♿ Accessibility</h4>
+    <ul>
+      <li>All focusable elements have focus-visible rings</li>
+      <li>Colour contrast ≥ 4.5:1 on text (WCAG AA)</li>
+      <li>Touch targets ≥ 44px (WCAG 2.5.5)</li>
+      <li>Respects prefers-reduced-motion</li>
+      <li>ARIA roles on nav, dialogs, buttons</li>
+    </ul>
+    <h4>📱 PWA Features</h4>
+    <ul>
+      <li>Install banner on first visit</li>
+      <li>Works offline (service worker cache)</li>
+      <li>Home screen icon + app shortcuts</li>
+    </ul>
+    <h4>🤖 Telegram Bot</h4>
+    <ul>
+      <li>Type any transaction in chat → auto-categorised</li>
+      <li>/stats → monthly summary</li>
+      <li>/help → command list</li>
+      <li>Setup in Settings → paste bot token</li>
+    </ul>
+  </div>
+</div>
+
+<!-- ── PWA Install Banner ─────────────────────────────────────── -->
+<div id="pwa-banner" role="banner" aria-label="Install Trackr as an app">
+  <span>📲</span>
+  <span>Add Trackr to your home screen for the best experience</span>
+  <button class="pwa-install-btn" onclick="dismissPwa()">Install App</button>
+  <button class="pwa-dismiss" onclick="dismissPwa()" aria-label="Dismiss">×</button>
+</div>
+
+<!-- ── Header ────────────────────────────────────────────────────── -->
+<header role="banner">
+  <div class="logo">
+    <div class="logo-icon">🌱</div>
+    <span class="logo-text">Trackr</span>
+  </div>
+  <nav class="header-pill-nav" role="navigation" aria-label="Main navigation">
+    <button class="pill-btn active" onclick="show('dashboard',this)">Home</button>
+    <button class="pill-btn" onclick="show('add',this)">Add</button>
+    <button class="pill-btn" onclick="show('history',this)">History</button>
+    <button class="pill-btn" onclick="show('budget',this)">Budget</button>
+    <button class="pill-btn" onclick="show('settings',this)">Settings</button>
+  </nav>
+  <div class="header-right">
+    <div class="avatar" title="Profile">F</div>
+  </div>
+</header>
+
+<!-- ── Dashboard ─────────────────────────────────────────────────── -->
+<div class="tab-panel active" id="panel-dashboard">
+  <div class="page">
+    <!-- Hero -->
+    <div class="hero">
+      <p class="hero-label">Net Position · June 2026</p>
+      <p class="hero-amount font-display">৳ 28,450</p>
+      <p class="hero-sub">💚 You saved 34% of income this month</p>
+      <div class="hero-chips">
+        <span class="hero-chip income">⬆ Income ৳ 85,000</span>
+        <span class="hero-chip expense">⬇ Expenses ৳ 56,550</span>
+        <span class="hero-chip savings">🌱 Saved ৳ 28,450</span>
+      </div>
+    </div>
+
+    <!-- Quick stats -->
+    <div class="stats-row">
+      <div class="stat-card">
+        <p class="stat-label">This Week</p>
+        <p class="stat-value up">12</p>
+        <p class="stat-meta">entries ↑4</p>
+      </div>
+      <div class="stat-card">
+        <p class="stat-label">Weekly Spend</p>
+        <p class="stat-value">৳ 8.2k</p>
+        <p class="stat-meta">vs ৳ 9.1k</p>
+      </div>
+      <div class="stat-card">
+        <p class="stat-label">Budget Used</p>
+        <p class="stat-value warn">74%</p>
+        <p class="stat-meta">৳ 13.3k left</p>
+      </div>
+    </div>
+
+    <!-- Insight -->
+    <div class="insight-card">
+      🌿 <strong>Great momentum!</strong> 12 entries this week — your tree is thriving. Groceries (+18%) is your fastest-growing branch.
+      <div class="insight-tip priority-high">
+        <span class="insight-tip-icon">⚠️</span>
+        <div class="insight-tip-body">
+          <p>Boost Your Savings</p>
+          <p>You're saving 34% — above target! Consider moving ৳ 5,000 to a goal this month.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Recent transactions -->
+    <div class="section-header">
+      <h2 class="section-title">Recent</h2>
+      <button class="section-link" onclick="show('history',document.querySelectorAll('.pill-btn')[2])">See all →</button>
+    </div>
+    <div class="leaf-list">
+      <div class="leaf-month"><span class="branch-dot"></span> June 2026</div>
+      <div class="leaf-item">
+        <div class="leaf-icon expense">🛒</div>
+        <div class="leaf-body"><p class="leaf-desc">Groceries — Shwapno</p><p class="leaf-meta">Groceries · Jun 12</p></div>
+        <span class="leaf-amount expense">−৳ 1,450</span>
+      </div>
+      <div class="leaf-item">
+        <div class="leaf-icon income">💼</div>
+        <div class="leaf-body"><p class="leaf-desc">Monthly Salary</p><p class="leaf-meta">Salary · Jun 10</p></div>
+        <span class="leaf-amount income">+৳ 85,000</span>
+      </div>
+      <div class="leaf-item">
+        <div class="leaf-icon expense">🛺</div>
+        <div class="leaf-body"><p class="leaf-desc">Rickshaw × 3</p><p class="leaf-meta">Transport · Jun 10</p></div>
+        <span class="leaf-amount expense">−৳ 120</span>
+      </div>
+      <div class="leaf-item">
+        <div class="leaf-icon expense">🍛</div>
+        <div class="leaf-body"><p class="leaf-desc">Lunch — Fakruddin</p><p class="leaf-meta">Food & Dining · Jun 9</p></div>
+        <span class="leaf-amount expense">−৳ 380</span>
+      </div>
+      <div class="leaf-item">
+        <div class="leaf-icon expense">💡</div>
+        <div class="leaf-body"><p class="leaf-desc">Electricity bill</p><p class="leaf-meta">Utilities · Jun 8</p></div>
+        <span class="leaf-amount expense">−৳ 2,200</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Add Transaction ────────────────────────────────────────────── -->
+<div class="tab-panel" id="panel-add">
+  <div class="page" style="max-width:520px">
+    <div class="add-panel">
+      <h2 class="font-display" style="font-size:20px;color:var(--forest);margin-bottom:20px">Add Transaction</h2>
+
+      <!-- Bulk mode toggle -->
+      <div style="display:flex;gap:8px;margin-bottom:16px">
+        <button class="btn-outline" style="flex:1;font-size:12px" onclick="toggleBulk()">⚡ Bulk mode</button>
+        <button class="btn-outline" style="flex:1;font-size:12px">🎤 Voice</button>
+      </div>
+
+      <!-- Normal mode -->
+      <div id="normal-mode">
+        <div class="type-toggle">
+          <button class="type-btn expense active" onclick="setType(this,'expense')">💸 Expense</button>
+          <button class="type-btn income" onclick="setType(this,'income')">💰 Income</button>
+        </div>
+
+        <p class="field-label">Amount</p>
+        <div class="amount-row">
+          <span class="currency-sym font-display">৳</span>
+          <input class="amount-input" type="number" inputmode="decimal" placeholder="0" id="amount-inp" />
+        </div>
+
+        <p class="field-label">Category</p>
+        <div class="cat-grid" id="cat-grid">
+          <button class="cat-btn" onclick="selectCat(this)"><span class="emoji">🛒</span>Groceries</button>
+          <button class="cat-btn" onclick="selectCat(this)"><span class="emoji">🍛</span>Food</button>
+          <button class="cat-btn" onclick="selectCat(this)"><span class="emoji">🛺</span>Transport</button>
+          <button class="cat-btn" onclick="selectCat(this)"><span class="emoji">💡</span>Utilities</button>
+          <button class="cat-btn" onclick="selectCat(this)"><span class="emoji">🏠</span>Rent</button>
+          <button class="cat-btn" onclick="selectCat(this)"><span class="emoji">🩺</span>Health</button>
+          <button class="cat-btn" onclick="selectCat(this)"><span class="emoji">🎬</span>Entertain</button>
+          <button class="cat-btn" onclick="selectCat(this)"><span class="emoji">🛍️</span>Shopping</button>
+        </div>
+
+        <p class="field-label">Note (optional)</p>
+        <input class="note-input" type="text" placeholder="e.g. Lunch with friends" onkeydown="if(event.key==='Enter')saveNormal()" />
+
+        <div class="add-actions">
+          <button class="btn-outline" style="flex:1" onclick="show('dashboard',document.querySelector('.pill-btn'))">Cancel</button>
+          <button class="btn-primary" style="flex:2" onclick="saveNormal()" id="save-btn">Add Transaction</button>
+        </div>
+      </div>
+
+      <!-- Bulk mode -->
+      <div id="bulk-mode" style="display:none">
+        <p style="font-size:12px;color:var(--muted);margin-bottom:10px">Paste multiple transactions, one per line:</p>
+        <textarea class="bulk-area" placeholder="Coffee 5&#10;Groceries 1200 yesterday&#10;Salary 85000 income&#10;বাজারে ৫০০ টাকা খরচ"></textarea>
+        <div class="add-actions">
+          <button class="btn-outline" onclick="toggleBulk()">← Single mode</button>
+          <button class="btn-primary" onclick="saveBulk()" id="bulk-btn">⚡ Process All</button>
+        </div>
+
+        <!-- Bulk results -->
+        <div id="bulk-results" style="margin-top:16px;display:none">
+          <p class="field-label" style="margin-bottom:8px">Review parsed entries</p>
+          <div id="bulk-list"></div>
+          <button class="btn-primary" style="width:100%;margin-top:12px" onclick="bulkSaveAll()">✅ Save All</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── History ────────────────────────────────────────────────────── -->
+<div class="tab-panel" id="panel-history">
+  <div class="page">
+    <!-- Search bar -->
+    <div style="display:flex;gap:8px;margin-bottom:16px">
+      <input style="flex:1;padding:10px 14px;border-radius:12px;border:1px solid rgba(139,115,85,0.2);font-size:13px;outline:none;font-family:inherit;background:var(--white)" placeholder="🔍  Search transactions…" oninput="filterHistory(this.value)" />
+      <button class="btn-outline" style="padding:10px 14px;font-size:12px">Filter</button>
+    </div>
+
+    <!-- Branches & leaves -->
+    <div class="leaf-list" id="history-list">
+      <div class="leaf-month"><span class="branch-dot"></span> June 2026 · ⬆ ৳ 85,000 · ⬇ ৳ 56,550</div>
+      <div class="leaf-item" data-desc="groceries shwapno">
+        <div class="leaf-icon expense">🛒</div>
+        <div class="leaf-body"><p class="leaf-desc">Groceries — Shwapno</p><p class="leaf-meta">Groceries · Jun 12 · Need</p></div>
+        <span class="leaf-amount expense">−৳ 1,450</span>
+      </div>
+      <div class="leaf-item" data-desc="salary">
+        <div class="leaf-icon income">💼</div>
+        <div class="leaf-body"><p class="leaf-desc">Monthly Salary</p><p class="leaf-meta">Salary · Jun 10 · Income</p></div>
+        <span class="leaf-amount income">+৳ 85,000</span>
+      </div>
+      <div class="leaf-item" data-desc="rickshaw transport">
+        <div class="leaf-icon expense">🛺</div>
+        <div class="leaf-body"><p class="leaf-desc">Rickshaw × 3</p><p class="leaf-meta">Transport · Jun 10 · Need</p></div>
+        <span class="leaf-amount expense">−৳ 120</span>
+      </div>
+      <div class="leaf-item" data-desc="lunch fakruddin food dining">
+        <div class="leaf-icon expense">🍛</div>
+        <div class="leaf-body"><p class="leaf-desc">Lunch — Fakruddin</p><p class="leaf-meta">Food & Dining · Jun 9 · Want</p></div>
+        <span class="leaf-amount expense">−৳ 380</span>
+      </div>
+      <div class="leaf-item" data-desc="electricity utilities bill">
+        <div class="leaf-icon expense">💡</div>
+        <div class="leaf-body"><p class="leaf-desc">Electricity bill</p><p class="leaf-meta">Utilities · Jun 8 · Need</p></div>
+        <span class="leaf-amount expense">−৳ 2,200</span>
+      </div>
+      <div class="leaf-month" style="margin-top:8px"><span class="branch-dot" style="background:var(--bark)"></span> May 2026 · ⬆ ৳ 85,000 · ⬇ ৳ 62,300</div>
+      <div class="leaf-item" data-desc="groceries market">
+        <div class="leaf-icon expense">🛒</div>
+        <div class="leaf-body"><p class="leaf-desc">Agora Market</p><p class="leaf-meta">Groceries · May 30 · Need</p></div>
+        <span class="leaf-amount expense">−৳ 3,200</span>
+      </div>
+      <div class="leaf-item" data-desc="internet bill utilities">
+        <div class="leaf-icon expense">💡</div>
+        <div class="leaf-body"><p class="leaf-desc">Internet bill</p><p class="leaf-meta">Utilities · May 28 · Need</p></div>
+        <span class="leaf-amount expense">−৳ 900</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Budget ─────────────────────────────────────────────────────── -->
+<div class="tab-panel" id="panel-budget">
+  <div class="page">
+    <div class="section-header">
+      <h2 class="section-title">🌿 Budget Branches · June 2026</h2>
+      <button class="btn-primary" style="padding:6px 14px;font-size:12px">+ Add</button>
+    </div>
+
+    <!-- Overall card -->
+    <div class="stat-card" style="text-align:left;margin-bottom:16px;padding:18px 20px">
+      <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:10px">
+        <div><p class="stat-label">Total Budget</p><p class="stat-value">৳ 50,000</p></div>
+        <div style="text-align:right"><p class="stat-label">Spent</p><p class="stat-value warn">৳ 36,700</p></div>
+      </div>
+      <div class="branch-bar"><div class="branch-fill warn" style="width:73%"></div></div>
+      <p style="font-size:11px;color:var(--muted);margin-top:6px">73% used · ৳ 13,300 remaining</p>
+    </div>
+
+    <div class="budget-card">
+      <h3 class="section-title" style="margin-bottom:16px">Branch Capacity</h3>
+
+      <div class="branch-row">
+        <div class="branch-header"><span class="branch-cat">🛒 Groceries</span><span class="branch-nums">৳ 9,800 / ৳ 10,000</span></div>
+        <div class="branch-bar"><div class="branch-fill warn" style="width:98%"></div></div>
+      </div>
+      <div class="branch-row">
+        <div class="branch-header"><span class="branch-cat">🍛 Food & Dining</span><span class="branch-nums">৳ 6,200 / ৳ 8,000</span></div>
+        <div class="branch-bar"><div class="branch-fill ok" style="width:78%"></div></div>
+      </div>
+      <div class="branch-row">
+        <div class="branch-header"><span class="branch-cat">🛺 Transport</span><span class="branch-nums">৳ 2,100 / ৳ 3,000</span></div>
+        <div class="branch-bar"><div class="branch-fill ok" style="width:70%"></div></div>
+      </div>
+      <div class="branch-row">
+        <div class="branch-header"><span class="branch-cat">💡 Utilities</span><span class="branch-nums">৳ 3,100 / ৳ 3,500</span></div>
+        <div class="branch-bar"><div class="branch-fill warn" style="width:89%"></div></div>
+      </div>
+      <div class="branch-row">
+        <div class="branch-header"><span class="branch-cat">🏠 Rent</span><span class="branch-nums">৳ 15,000 / ৳ 15,000</span></div>
+        <div class="branch-bar"><div class="branch-fill over" style="width:100%"></div></div>
+      </div>
+      <div class="branch-row" style="margin-bottom:0">
+        <div class="branch-header"><span class="branch-cat">🛍️ Shopping</span><span class="branch-nums">৳ 500 / ৳ 5,000</span></div>
+        <div class="branch-bar"><div class="branch-fill ok" style="width:10%"></div></div>
+      </div>
+
+      <p style="font-size:11px;color:var(--muted);margin-top:14px">
+        🍃 A branch can only hold so much — when the leaf hits the end, that branch is at capacity.
+      </p>
+    </div>
+  </div>
+</div>
+
+<!-- ── Settings ───────────────────────────────────────────────────── -->
+<div class="tab-panel" id="panel-settings">
+  <div class="page" style="max-width:560px">
+    <div class="settings-section">
+      <h3>🤖 Telegram Bot <span class="badge-new">NEW</span></h3>
+      <div class="tg-card">
+        <span class="tg-icon">✈️</span>
+        <div class="tg-body">
+          <h3>Log transactions via Telegram</h3>
+          <p>Connect your Trackr bot. Type any transaction in plain language — English or বাংলা — and it's categorised and saved automatically.</p>
+          <div class="tg-commands">
+            <span class="tg-cmd">Coffee 5</span>
+            <span class="tg-cmd">Groceries 1200 yesterday</span>
+            <span class="tg-cmd">বাজারে ৫০০ টাকা</span>
+            <span class="tg-cmd">/stats</span>
+            <span class="tg-cmd">/help</span>
+          </div>
+          <div class="tg-input-row">
+            <input class="tg-input" placeholder="Paste your bot token…" id="tg-token-inp" />
+            <button class="btn-primary" onclick="saveTgToken()">Connect</button>
+          </div>
+          <p id="tg-status" style="font-size:11px;color:var(--leaf);margin-top:8px;display:none">✅ Bot connected! Webhook registered.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="settings-section">
+      <h3>📱 PWA & Offline</h3>
+      <div class="setting-row">
+        <div class="setting-info"><h4>Install App</h4><p>Add Trackr to home screen for offline access</p></div>
+        <button class="btn-outline" style="font-size:12px;padding:6px 12px" onclick="this.textContent='✅ Installed'">Install</button>
+      </div>
+      <div class="setting-row">
+        <div class="setting-info"><h4>Offline Mode</h4><p>App works without internet using cached data</p></div>
+        <div class="toggle on" onclick="this.classList.toggle('on')"></div>
+      </div>
+    </div>
+
+    <div class="settings-section">
+      <h3>🧠 AI & Integrations</h3>
+      <div class="setting-row">
+        <div class="setting-info"><h4>Gemini API Key (BYOK)</h4><p>Use your own key for smarter categorisation</p></div>
+        <button class="btn-outline" style="font-size:12px;padding:6px 12px">Set up</button>
+      </div>
+      <div class="setting-row">
+        <div class="setting-info"><h4>Monthly Email Reports</h4><p>Spending summary on the 1st of each month</p></div>
+        <div class="toggle" onclick="this.classList.toggle('on')"></div>
+      </div>
+    </div>
+
+    <div class="settings-section">
+      <h3>⚙️ Preferences</h3>
+      <div class="setting-row">
+        <div class="setting-info"><h4>Dark Mode</h4><p>Easier on the eyes at night</p></div>
+        <div class="toggle" onclick="this.classList.toggle('on')"></div>
+      </div>
+      <div class="setting-row">
+        <div class="setting-info"><h4>Currency</h4><p>Currently BDT (৳)</p></div>
+        <button class="btn-outline" style="font-size:12px;padding:6px 12px">Change</button>
+      </div>
+    </div>
+
+    <div class="settings-section">
+      <h3>⚠️ Danger Zone</h3>
+      <div class="setting-row" style="border-color:rgba(232,180,168,0.4)">
+        <div class="setting-info"><h4 style="color:#c55">Delete Account</h4><p>Permanently delete all data</p></div>
+        <button style="font-size:12px;padding:6px 12px;border-radius:10px;border:1.5px solid #E8B4A8;color:#c55;background:transparent;font-weight:600;cursor:pointer">Delete</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── FAB ────────────────────────────────────────────────────────── -->
+<button id="fab" aria-label="Add transaction" onclick="show('add',document.querySelectorAll('.pill-btn')[1])">+</button>
+
+<script>
+// ── Tab switching ────────────────────────────────────────────────
+function show(tab, btn) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'))
+  document.querySelectorAll('.pill-btn').forEach(b => b.classList.remove('active'))
+  document.getElementById('panel-' + tab).classList.add('active')
+  if (btn) btn.classList.add('active')
+  window.scrollTo({ top: 0, behavior: 'smooth' })
+}
+
+// ── Annotation toggle ────────────────────────────────────────────
+function toggleAnn() {
+  const p = document.getElementById('ann-panel')
+  p.style.display = p.style.display === 'none' ? 'block' : 'none'
+}
+
+// ── PWA banner dismiss ───────────────────────────────────────────
+function dismissPwa() { document.getElementById('pwa-banner').classList.add('hidden') }
+
+// ── Add form: type select ────────────────────────────────────────
+function setType(btn, type) {
+  document.querySelectorAll('.type-btn').forEach(b => b.classList.remove('active'))
+  btn.classList.add('active')
+}
+
+// ── Add form: category select ────────────────────────────────────
+function selectCat(btn) {
+  document.querySelectorAll('.cat-btn').forEach(b => b.classList.remove('selected'))
+  btn.classList.add('selected')
+}
+
+// ── Normal save (demo) ───────────────────────────────────────────
+function saveNormal() {
+  const amt = document.getElementById('amount-inp').value
+  if (!amt || parseFloat(amt) <= 0) { alert('Enter an amount first.'); return }
+  const btn = document.getElementById('save-btn')
+  btn.textContent = '✅ Saved!'
+  btn.style.background = 'var(--leaf)'
+  const fab = document.getElementById('fab')
+  fab.textContent = '✓'; fab.classList.add('success')
+  setTimeout(() => {
+    btn.textContent = 'Add Transaction'; btn.style.background = ''
+    fab.textContent = '+'; fab.classList.remove('success')
+    document.getElementById('amount-inp').value = ''
+    document.querySelectorAll('.cat-btn').forEach(b => b.classList.remove('selected'))
+    show('dashboard', document.querySelector('.pill-btn'))
+  }, 1200)
+}
+
+// ── Bulk mode toggle ─────────────────────────────────────────────
+function toggleBulk() {
+  const n = document.getElementById('normal-mode')
+  const b = document.getElementById('bulk-mode')
+  n.style.display = n.style.display === 'none' ? 'block' : 'none'
+  b.style.display = b.style.display === 'none' ? 'block' : 'none'
+  document.getElementById('bulk-results').style.display = 'none'
+}
+
+// ── Bulk process (demo) ──────────────────────────────────────────
+const DEMO_CATS = { coffee:'Food & Dining', lunch:'Food & Dining', dinner:'Food & Dining', groceries:'Groceries', বাজার:'Groceries', rickshaw:'Transport', uber:'Transport', rent:'Rent', electricity:'Utilities', internet:'Utilities', salary:'Salary', income:'Salary', বেতন:'Salary' }
+function bulkParse(line) {
+  const lower = line.toLowerCase()
+  const amtMatch = line.match(/[\d,]+(\.\d+)?/)
+  const amt = amtMatch ? parseFloat(amtMatch[0].replace(',','')) : 0
+  const isIncome = /salary|income|বেতন|received/i.test(lower)
+  let cat = isIncome ? 'Salary' : 'Other'
+  for (const [k, v] of Object.entries(DEMO_CATS)) if (lower.includes(k.toLowerCase())) { cat = v; break }
+  return { line, amt, type: isIncome ? 'income' : 'expense', cat }
+}
+function saveBulk() {
+  const raw = document.querySelector('.bulk-area').value.trim()
+  if (!raw) { alert('Paste some transactions first.'); return }
+  const lines = raw.split('\n').filter(l => l.trim())
+  const btn = document.getElementById('bulk-btn')
+  btn.textContent = '⏳ Processing…'
+  setTimeout(() => {
+    const results = lines.map(bulkParse)
+    const list = document.getElementById('bulk-list')
+    list.innerHTML = results.map(r => `
+      <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--white);border-radius:10px;margin-bottom:6px;border:1px solid rgba(139,115,85,0.1)">
+        <span style="font-size:18px">${r.type==='income'?'💰':'💸'}</span>
+        <div style="flex:1;min-width:0">
+          <p style="font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r.line}</p>
+          <p style="font-size:11px;color:var(--muted)">${r.cat} · ৳ ${r.amt.toLocaleString()}</p>
+        </div>
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:13px;color:${r.type==='income'?'var(--leaf)':'var(--earth)'}">${r.type==='income'?'+':'−'}৳ ${r.amt.toLocaleString()}</span>
+      </div>`).join('')
+    document.getElementById('bulk-results').style.display = 'block'
+    btn.textContent = '⚡ Process All'
+  }, 800)
+}
+function bulkSaveAll() {
+  const b = event.target
+  b.textContent = '✅ All Saved!'
+  b.style.background = 'var(--leaf)'
+  setTimeout(() => { show('dashboard', document.querySelector('.pill-btn')); b.style.background = ''; b.textContent = '✅ Save All' }, 1200)
+}
+
+// ── History search ───────────────────────────────────────────────
+function filterHistory(q) {
+  document.querySelectorAll('#history-list .leaf-item').forEach(row => {
+    const t = (row.dataset.desc || '') + row.innerText.toLowerCase()
+    row.style.display = q && !t.includes(q.toLowerCase()) ? 'none' : ''
+  })
+}
+
+// ── Telegram token save (demo) ───────────────────────────────────
+function saveTgToken() {
+  const val = document.getElementById('tg-token-inp').value.trim()
+  if (!val) { alert('Paste a bot token first (from @BotFather)'); return }
+  const st = document.getElementById('tg-status')
+  st.style.display = 'block'
+  document.getElementById('tg-token-inp').value = ''
+}
+
+// ── Keyboard: Cmd+K / / ─────────────────────────────────────────
+document.addEventListener('keydown', e => {
+  if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+    e.preventDefault()
+    show('history', document.querySelectorAll('.pill-btn')[2])
+    setTimeout(() => document.querySelector('#panel-history input').focus(), 80)
+  }
+  if (e.key === '/' && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
+    e.preventDefault()
+    show('history', document.querySelectorAll('.pill-btn')[2])
+    setTimeout(() => document.querySelector('#panel-history input').focus(), 80)
+  }
+  if ((e.key === 'n' || e.key === 'N') && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
+    show('add', document.querySelectorAll('.pill-btn')[1])
+  }
+})
+</script>
+</body>
+</html>
