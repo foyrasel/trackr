@@ -494,62 +494,82 @@ export default function Dashboard({ refreshTrigger, userName }: DashboardProps) 
         </div>
       )}
 
-      {/* ─── 2. FOUR METRIC CARDS ─── */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        {/* Income */}
-        <div className="bg-white dark:bg-gray-900 rounded-2xl p-4 shadow-sm border border-gray-100 dark:border-gray-800">
-          <div className="flex items-center gap-2 mb-2.5">
-            <div className="w-8 h-8 rounded-xl bg-emerald-100 dark:bg-emerald-900/40 flex items-center justify-center">
-              <TrendingUp className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-            </div>
-            <span className="text-xs text-muted-foreground font-medium">Income</span>
-          </div>
-          <p className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white leading-none">
-            {currencySymbol}{data.totalIncome.toLocaleString()}
-          </p>
-          <p className="text-[11px] text-muted-foreground mt-1">
-            {data.transactionCount} transaction{data.transactionCount !== 1 ? 's' : ''}
-          </p>
-        </div>
-
-        {/* Expenses */}
-        <div className="bg-white dark:bg-gray-900 rounded-2xl p-4 shadow-sm border border-gray-100 dark:border-gray-800">
-          <div className="flex items-center gap-2 mb-2.5">
-            <div className="w-8 h-8 rounded-xl bg-rose-100 dark:bg-rose-900/40 flex items-center justify-center">
-              <TrendingDown className="w-4 h-4 text-rose-500 dark:text-rose-400" />
-            </div>
-            <span className="text-xs text-muted-foreground font-medium">Expenses</span>
-          </div>
-          <p className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white leading-none">
-            {currencySymbol}{data.totalExpense.toLocaleString()}
-          </p>
-          {data.averageMonthlyExpense > 0 ? (
-            <p className={`text-[11px] mt-1 font-medium ${diffFromAvg > 10 ? 'text-rose-500' : diffFromAvg < -10 ? 'text-emerald-500' : 'text-amber-500'}`}>
-              {diffFromAvg > 0 ? '↑' : '↓'}{Math.abs(diffFromAvg).toFixed(0)}% vs avg
+      {/* ─── 2. HERO NET POSITION ─── */}
+      {(data.totalIncome > 0 || data.totalExpense > 0) && (() => {
+        const netBalance = data.totalIncome - data.totalExpense
+        return (
+          <div className="rounded-2xl p-6 text-center" style={{ background: 'linear-gradient(135deg, rgba(6,95,70,0.07) 0%, rgba(16,185,129,0.04) 100%)', border: '1px solid rgba(6,95,70,0.1)' }}>
+            <p className="text-xs text-muted-foreground uppercase tracking-widest mb-2">
+              Net Position · {data.monthName}
             </p>
-          ) : (
-            <p className="text-[11px] text-muted-foreground mt-1">this month</p>
-          )}
-        </div>
-
-        {/* Daily Avg */}
-        <div className="bg-white dark:bg-gray-900 rounded-2xl p-4 shadow-sm border border-gray-100 dark:border-gray-800">
-          <div className="flex items-center gap-2 mb-2.5">
-            <div className="w-8 h-8 rounded-xl bg-amber-100 dark:bg-amber-900/40 flex items-center justify-center">
-              <Gauge className="w-4 h-4 text-amber-600 dark:text-amber-400" />
-            </div>
-            <span className="text-xs text-muted-foreground font-medium">Daily Avg</span>
-          </div>
-          <p className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white leading-none">
-            {currencySymbol}{data.avgDailySpend.toLocaleString()}
-          </p>
-          {data.isViewingCurrentMonth && data.projectedMonthEnd > 0 && (
-            <p className="text-[11px] text-muted-foreground mt-1">
-              ~{currencySymbol}{data.projectedMonthEnd.toLocaleString()} projected
+            <p className={`text-5xl font-bold tracking-tight leading-none mb-2 ${netBalance >= 0 ? 'text-emerald-800 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
+              {netBalance < 0 ? '−' : ''}{currencySymbol}{Math.abs(netBalance).toLocaleString()}
             </p>
-          )}
+            <p className="text-sm mb-4" style={{ color: savingsRate !== null && savingsRate > 0 ? '#10b981' : '#ef4444' }}>
+              {savingsRate !== null && savingsRate > 0
+                ? `💚 You saved ${savingsRate}% of income this month`
+                : data.totalExpense > data.totalIncome
+                  ? '⚠️ Spending exceeds income this month'
+                  : '—'}
+            </p>
+            <div className="flex justify-center gap-2 flex-wrap">
+              {data.totalIncome > 0 && (
+                <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300">
+                  <ArrowUpRight className="w-3 h-3" /> Income {currencySymbol}{data.totalIncome.toLocaleString()}
+                </span>
+              )}
+              {data.totalExpense > 0 && (
+                <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-rose-100 dark:bg-rose-900/40 text-rose-700 dark:text-rose-300">
+                  <ArrowDownRight className="w-3 h-3" /> Expenses {currencySymbol}{data.totalExpense.toLocaleString()}
+                </span>
+              )}
+              {netBalance > 0 && (
+                <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-300">
+                  🌱 Saved {currencySymbol}{netBalance.toLocaleString()}
+                </span>
+              )}
+            </div>
+          </div>
+        )
+      })()}
+
+      {/* ─── 3. QUICK STATS ROW ─── */}
+      <div className="grid grid-cols-3 gap-3">
+        <div className="bg-white dark:bg-gray-900 rounded-2xl p-4 border border-gray-100 dark:border-gray-800 text-center shadow-sm">
+          <p className="text-[11px] text-muted-foreground uppercase tracking-wider leading-none">Transactions</p>
+          <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1.5 leading-none">{data.transactionCount}</p>
+          <p className="text-[11px] text-muted-foreground mt-1">this month</p>
+        </div>
+        <div className="bg-white dark:bg-gray-900 rounded-2xl p-4 border border-gray-100 dark:border-gray-800 text-center shadow-sm">
+          <p className="text-[11px] text-muted-foreground uppercase tracking-wider leading-none">Daily Avg</p>
+          <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1.5 leading-none">
+            {currencySymbol}{data.avgDailySpend > 9999 ? `${(data.avgDailySpend / 1000).toFixed(1)}k` : data.avgDailySpend.toLocaleString()}
+          </p>
+          <p className="text-[11px] text-muted-foreground mt-1">per day</p>
+        </div>
+        <div className="bg-white dark:bg-gray-900 rounded-2xl p-4 border border-gray-100 dark:border-gray-800 text-center shadow-sm">
+          <p className="text-[11px] text-muted-foreground uppercase tracking-wider leading-none">Savings</p>
+          <p className={`text-2xl font-bold mt-1.5 leading-none ${savingsRate !== null && savingsRate >= 20 ? 'text-emerald-600 dark:text-emerald-400' : savingsRate !== null && savingsRate > 0 ? 'text-amber-500' : 'text-rose-500'}`}>
+            {savingsRate !== null ? `${savingsRate}%` : '—'}
+          </p>
+          <p className="text-[11px] text-muted-foreground mt-1">of income</p>
         </div>
       </div>
+
+      {/* ─── 4. AI INSIGHT HIGHLIGHT ─── */}
+      {data.smartInsights.length > 0 && (
+        <div className="rounded-2xl p-4" style={{ background: 'rgba(16,185,129,0.07)', border: '1px solid rgba(16,185,129,0.18)' }}>
+          <p className="text-sm text-emerald-800 dark:text-emerald-300 font-medium leading-relaxed">
+            🌿 <strong>Money Pulse:</strong> {data.smartInsights[0]}
+          </p>
+          {data.smartInsights[1] && (
+            <div className="mt-3 bg-white dark:bg-gray-900 rounded-xl p-3 flex gap-3 items-start" style={{ borderLeft: '3px solid #f59e0b' }}>
+              <span className="text-base shrink-0">⚡</span>
+              <p className="text-xs text-gray-700 dark:text-gray-200 leading-snug">{data.smartInsights[1]}</p>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ─── 3. BALANCE CARDS ─── */}
       <BalanceCards refreshTrigger={refreshTrigger} userName={userName} />
@@ -798,50 +818,53 @@ export default function Dashboard({ refreshTrigger, userName }: DashboardProps) 
             </Card>
           )}
 
-          {/* Card 3: Biggest Expenses */}
+          {/* Card 3: Biggest Expenses — leaf list style */}
           {data.topTransactions.length > 0 && (
-            <Card className="shadow-sm border-gray-100 dark:border-gray-800">
-              <CardHeader className="pb-2 pt-4 px-4">
-                <CardTitle className="text-sm font-semibold">Biggest Expenses</CardTitle>
-              </CardHeader>
-              <CardContent className="px-4 pb-4">
-                <div className="space-y-2">
-                  {data.topTransactions.slice(0, 4).map((txn, i) => (
-                    <div key={i} className="flex items-center gap-3">
-                      <div className="w-6 h-6 rounded-full bg-rose-100 dark:bg-rose-950/40 flex items-center justify-center flex-shrink-0">
-                        <span className="text-[10px] font-bold text-rose-600 dark:text-rose-400">{i + 1}</span>
+            <div className="rounded-2xl overflow-hidden border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm">
+              <div className="px-4 pt-4 pb-2 flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Biggest Expenses</h3>
+                <span className="text-[11px] text-muted-foreground">{data.monthShortName}</span>
+              </div>
+              <div className="divide-y divide-gray-50 dark:divide-gray-800">
+                {data.topTransactions.slice(0, 4).map((txn, i) => {
+                  const catEmojis: Record<string,string> = { Groceries:'🛒', 'Food & Dining':'🍛', Transport:'🛺', Utilities:'💡', Rent:'🏠', Healthcare:'🩺', Entertainment:'🎬', Shopping:'🛍️', Subscriptions:'📺', Education:'📚', 'Personal Care':'💆', Other:'📌', Salary:'💼', Freelance:'💻', Investment:'📈' }
+                  const emoji = catEmojis[txn.category] || '💳'
+                  return (
+                    <div key={i} className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
+                      <div className="w-9 h-9 rounded-xl flex items-center justify-center text-base flex-shrink-0" style={{ background: 'rgba(201,130,100,0.12)' }}>
+                        {emoji}
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className="text-xs font-medium truncate text-gray-900 dark:text-white">{txn.description}</p>
-                        <p className="text-[10px] text-muted-foreground">
+                        <p className="text-sm font-medium truncate text-gray-900 dark:text-white">{txn.description}</p>
+                        <p className="text-[11px] text-muted-foreground">
                           {txn.category} · {new Date(txn.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                         </p>
                       </div>
-                      <p className="text-xs font-bold text-gray-900 dark:text-white flex-shrink-0">
-                        {currencySymbol}{txn.amount.toLocaleString()}
+                      <p className="text-sm font-bold flex-shrink-0" style={{ color: '#8B7355' }}>
+                        −{currencySymbol}{txn.amount.toLocaleString()}
                       </p>
                     </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
+                  )
+                })}
+              </div>
+            </div>
           )}
         </div>
       </div>
 
-      {/* ─── 5. SMART INSIGHTS ─── */}
-      {data.smartInsights.length > 0 && (
-        <Card className="shadow-sm border-emerald-200 dark:border-emerald-900/50 bg-gradient-to-br from-emerald-50/30 via-white to-teal-50/20 dark:from-emerald-950/20 dark:via-gray-900 dark:to-teal-950/10">
+      {/* ─── 5. SMART INSIGHTS (remaining) ─── */}
+      {data.smartInsights.length > 2 && (
+        <Card className="shadow-sm border-emerald-100 dark:border-emerald-900/50">
           <CardHeader className="pb-2 pt-4 px-4">
             <CardTitle className="text-sm font-semibold flex items-center gap-2">
               <Sparkles className="w-4 h-4 text-emerald-500" />
-              Smart Insights
+              More Insights
             </CardTitle>
           </CardHeader>
           <CardContent className="px-4 pb-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-              {data.smartInsights.map((insight, i) => (
-                <div key={i} className="flex items-start gap-2 bg-white/70 dark:bg-gray-800/40 rounded-lg p-3 border border-emerald-100 dark:border-emerald-900/30">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {data.smartInsights.slice(2).map((insight, i) => (
+                <div key={i} className="flex items-start gap-2 bg-emerald-50/60 dark:bg-emerald-950/20 rounded-xl p-3 border border-emerald-100 dark:border-emerald-900/30">
                   <Lightbulb className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0 mt-0.5" />
                   <p className="text-xs text-gray-700 dark:text-gray-200 leading-snug">{insight}</p>
                 </div>
