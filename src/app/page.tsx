@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import AddTransaction from '@/components/tracker/AddTransaction'
-import Dashboard from '@/components/tracker/Dashboard'
+import TreeDashboard from '@/components/tracker/TreeDashboard'
 import TransactionList from '@/components/tracker/TransactionList'
 import BudgetPanel from '@/components/tracker/BudgetPanel'
 import LandingPage from '@/components/tracker/LandingPage'
@@ -638,7 +638,7 @@ export default function Home() {
         <main className="flex-1 px-4 md:px-6 pb-28 md:pb-8 pt-5">
           <TabsContent value="dashboard" className="mt-0">
             <ErrorBoundary label="Dashboard">
-              <Dashboard refreshTrigger={refreshTrigger} userName={userName} />
+              <TreeDashboard refreshTrigger={refreshTrigger} userName={userName} onTransactionAdded={handleRefreshData} />
             </ErrorBoundary>
           </TabsContent>
 
