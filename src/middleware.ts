@@ -36,6 +36,21 @@ export async function middleware(request: NextRequest) {
           { status: 401, headers: { 'Content-Type': 'application/json' } }
         )
       }
+
+      // Overwrite identity headers with the verified JWT values so a client
+      // can't impersonate another user by spoofing x-user-* headers.
+      const requestHeaders = new Headers(request.headers)
+      if (token.id) requestHeaders.set('x-user-id', String(token.id))
+      else requestHeaders.delete('x-user-id')
+      if (token.email) requestHeaders.set('x-user-email', token.email)
+      else requestHeaders.delete('x-user-email')
+      if (token.name) requestHeaders.set('x-user-name', token.name)
+      else requestHeaders.delete('x-user-name')
+
+      const response = NextResponse.next({ request: { headers: requestHeaders } })
+      response.headers.set('X-Response-Time', Date.now().toString())
+      response.headers.set('X-Request-Id', crypto.randomUUID())
+      return response
     }
   }
 
