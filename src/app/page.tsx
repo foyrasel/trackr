@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import AddTransaction from '@/components/tracker/AddTransaction'
-import TreeDashboard from '@/components/tracker/TreeDashboard'
+import Dashboard from '@/components/tracker/Dashboard'
 import TransactionList from '@/components/tracker/TransactionList'
 import BudgetPanel from '@/components/tracker/BudgetPanel'
 import LandingPage from '@/components/tracker/LandingPage'
@@ -16,12 +16,10 @@ import AccountSetup from '@/components/tracker/AccountSetup'
 import InsightsPanel from '@/components/tracker/InsightsPanel'
 import MorePanel from '@/components/tracker/MorePanel'
 import FeatureSetupScreen from '@/components/tracker/FeatureSetupScreen'
-import TermsScreen from '@/components/tracker/TermsScreen'
 import { CurrencyProvider, useCurrency } from '@/components/tracker/CurrencyContext'
 import { useRecurringExecution } from '@/hooks/use-recurring-exec'
-import { usePWA } from '@/hooks/use-pwa'
 import ErrorBoundary from '@/components/ErrorBoundary'
-import { LayoutDashboard, Plus, History, Lightbulb, Target, LogOut, Loader2, MoreHorizontal, Moon, Sun, Download } from 'lucide-react'
+import { LayoutDashboard, Plus, History, Lightbulb, Target, LogOut, Loader2, MoreHorizontal, Moon, Sun } from 'lucide-react'
 import TrackrLogo from '@/components/tracker/TrackrLogo'
 
 function CurrencyDisplay() {
@@ -56,23 +54,16 @@ export default function Home() {
   const [showOnboarding, setShowOnboarding] = useState(false)
   const [showAccountSetup, setShowAccountSetup] = useState(false)
   const [showFeatureSetup, setShowFeatureSetup] = useState(false)
-  const [showTerms, setShowTerms] = useState(false)
   const [mounted, setMounted] = useState(false)
 
   // Dark mode state
   const [isDarkMode, setIsDarkMode] = useState(false)
 
-  // PWA install
-  const { canInstall, isInstalled, install } = usePWA()
-
   const { data: session, status } = useSession()
 
-  // Mark as mounted + handle PWA shortcut URLs (?tab=add etc.)
+  // Mark as mounted
   useEffect(() => {
     setMounted(true)
-    const params = new URLSearchParams(window.location.search)
-    const tab = params.get('tab')
-    if (tab) setActiveTab(tab)
   }, [])
 
   // Fetch user settings (dark mode, language, currency) after login
@@ -190,12 +181,8 @@ export default function Home() {
       if (id) setUserId(id)
       setIsLoggedIn(true)
 
-      // Show terms if not yet accepted, else check onboarding
-      if (!localStorage.getItem('trackr_terms_accepted')) {
-        setShowTerms(true)
-      } else {
-        checkOnboardingStatus(name, email, id)
-      }
+      // Check onboarding status (now localStorage has id/email for reliable API calls)
+      checkOnboardingStatus(name, email, id)
     }
   }, [session, status, checkOnboardingStatus])
 
@@ -211,11 +198,8 @@ export default function Home() {
         if (savedEmail) setUserEmail(savedEmail)
         setIsLoggedIn(true)
 
-        if (!localStorage.getItem('trackr_terms_accepted')) {
-          setShowTerms(true)
-        } else {
-          checkOnboardingStatus(savedName, savedEmail, savedId)
-        }
+        // Check onboarding
+        checkOnboardingStatus(savedName, savedEmail, savedId)
       }
     }
   }, [status, checkOnboardingStatus])
@@ -249,29 +233,8 @@ export default function Home() {
       localStorage.setItem('trackr_user_id', id)
     }
 
-    // Show terms if not yet accepted
-    if (!localStorage.getItem('trackr_terms_accepted')) {
-      setShowTerms(true)
-      return
-    }
-
     // Check onboarding status
     checkOnboardingStatus(name, email, id)
-  }
-
-  const handleTermsAccept = () => {
-    localStorage.setItem('trackr_terms_accepted', new Date().toISOString())
-    setShowTerms(false)
-    checkOnboardingStatus(userName, userEmail, userId)
-  }
-
-  const handleTermsDecline = async () => {
-    setShowTerms(false)
-    setIsLoggedIn(false)
-    localStorage.removeItem('trackr_user_name')
-    localStorage.removeItem('trackr_user_email')
-    localStorage.removeItem('trackr_user_id')
-    try { await signOut({ redirect: false }) } catch {}
   }
 
   const handleOnboardingComplete = () => {
@@ -463,11 +426,6 @@ export default function Home() {
     return <LandingPage onLogin={handleLogin} />
   }
 
-  // Show terms & conditions for first-time users
-  if (showTerms) {
-    return <TermsScreen onAccept={handleTermsAccept} onDecline={handleTermsDecline} />
-  }
-
   // Show onboarding screen for first-time users
   if (showOnboarding) {
     return (
@@ -554,17 +512,6 @@ export default function Home() {
             <Plus className="w-4 h-4" />
             Add Transaction
           </button>
-
-          {/* Install app button — only shown when installable and not yet installed */}
-          {canInstall && !isInstalled && (
-            <button
-              onClick={install}
-              className="mt-2 w-full flex items-center justify-center gap-2 py-2 rounded-xl text-[12px] font-medium border border-dashed border-emerald-300 dark:border-emerald-700 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-colors"
-            >
-              <Download className="w-3.5 h-3.5" />
-              Install App
-            </button>
-          )}
         </div>
 
         {/* User + controls at bottom */}
@@ -638,7 +585,7 @@ export default function Home() {
         <main className="flex-1 px-4 md:px-6 pb-28 md:pb-8 pt-5">
           <TabsContent value="dashboard" className="mt-0">
             <ErrorBoundary label="Dashboard">
-              <TreeDashboard refreshTrigger={refreshTrigger} userName={userName} onTransactionAdded={handleRefreshData} />
+              <Dashboard refreshTrigger={refreshTrigger} userName={userName} />
             </ErrorBoundary>
           </TabsContent>
 

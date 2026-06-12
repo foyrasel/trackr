@@ -267,9 +267,9 @@ export default function FeatureSetupScreen({ userName, onComplete }: FeatureSetu
                   {card.key === 'telegram' && (
                     <div className="space-y-2">
                       <ol className="text-xs text-muted-foreground space-y-1 list-decimal list-inside">
-                        <li>Open Telegram → message <span className="font-mono font-semibold text-blue-600">@BotFather</span></li>
+                        <li>Open Telegram and message <span className="font-mono font-semibold text-blue-600">@BotFather</span></li>
                         <li>Send <span className="font-mono bg-white/70 dark:bg-gray-800/50 px-1 rounded">/newbot</span> and follow the steps</li>
-                        <li>Copy the API token → paste below → Trackr auto-connects it</li>
+                        <li>Copy the API token and paste below</li>
                       </ol>
                       <div className="flex gap-2">
                         <Input
@@ -280,11 +280,10 @@ export default function FeatureSetupScreen({ userName, onComplete }: FeatureSetu
                           className="flex-1 text-sm h-9 font-mono bg-white/80 dark:bg-gray-900/60"
                         />
                         <Button size="sm" className="h-9 bg-blue-600 hover:bg-blue-700 text-white px-4" onClick={saveTelegram} disabled={telegramSaving || !telegramToken.trim()}>
-                          {telegramSaving ? '…' : 'Connect'}
+                          {telegramSaving ? '…' : 'Save'}
                         </Button>
                         <Button size="sm" variant="ghost" className="h-9 px-2 text-muted-foreground" onClick={() => set('telegram', 'skipped')}>Skip</Button>
                       </div>
-                      <p className="text-[10px] text-muted-foreground">After saving, open your bot in Telegram and send <span className="font-mono">/start</span></p>
                     </div>
                   )}
                 </div>
