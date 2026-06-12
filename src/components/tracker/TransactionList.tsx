@@ -684,7 +684,7 @@ export default function TransactionList({ refreshTrigger, userName }: Transactio
       ) : (
         <div className="space-y-2">
           {/* Branches & leaves: months are branches on a trunk, transactions are leaves */}
-          <div className="max-h-[60vh] overflow-y-auto pr-1 relative">
+          <div className="overflow-y-auto pr-1 relative" style={{ maxHeight: '70vh' }}>
             {/* Trunk line */}
             <div className="absolute left-[11px] top-2 bottom-2 w-[2px] rounded-full" style={{ background: 'linear-gradient(to bottom, #8B7355, #8B735533)' }} aria-hidden="true" />
 
@@ -721,104 +721,74 @@ export default function TransactionList({ refreshTrigger, userName }: Transactio
                       style={{ background: tx.type === 'income' ? '#6BAD3D' : '#C9A87C' }}
                     />
                   </span>
-                <Card className={`flex-1 min-w-0 hover:shadow-sm transition-shadow group ${isSelected ? 'ring-2 ring-emerald-400 border-emerald-300' : ''}`}>
-                  <CardContent className="p-3 sm:p-4">
-                    <div className="flex items-start gap-3">
-                      {/* Checkbox (select mode) or Icon */}
-                      {selectMode ? (
-                        <button
-                          type="button"
-                          className="shrink-0 mt-0.5"
-                          onClick={() => toggleSelectTransaction(tx.id)}
-                        >
-                          {isSelected ? (
-                            <CheckSquare className="w-5 h-5 text-emerald-600" />
-                          ) : (
-                            <Square className="w-5 h-5 text-muted-foreground hover:text-emerald-600 transition-colors" />
-                          )}
-                        </button>
+                <div className={`flex-1 min-w-0 flex items-center gap-3 px-3 py-3 rounded-xl transition-colors group ${isSelected ? 'bg-emerald-50 dark:bg-emerald-950/30 ring-1 ring-emerald-300' : 'bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800/50'} border border-gray-100 dark:border-gray-800`}>
+                  {/* Checkbox (select mode) or Category Emoji */}
+                  {selectMode ? (
+                    <button
+                      type="button"
+                      className="shrink-0"
+                      onClick={() => toggleSelectTransaction(tx.id)}
+                    >
+                      {isSelected ? (
+                        <CheckSquare className="w-5 h-5 text-emerald-600" />
                       ) : (
-                        <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${
-                          tx.type === 'income' 
-                            ? 'bg-emerald-100 text-emerald-600' 
-                            : 'bg-red-100 text-red-600'
-                        }`}>
-                          {tx.type === 'income' 
-                            ? <ArrowUpRight className="w-5 h-5" /> 
-                            : <ArrowDownRight className="w-5 h-5" />
-                          }
-                        </div>
+                        <Square className="w-5 h-5 text-muted-foreground hover:text-emerald-600 transition-colors" />
                       )}
+                    </button>
+                  ) : (
+                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-base shrink-0 ${tx.type === 'income' ? 'bg-emerald-100 dark:bg-emerald-900/40' : 'bg-amber-50 dark:bg-amber-950/30'}`}>
+                      {(() => {
+                        const catEmojis: Record<string,string> = { Groceries:'🛒', 'Food & Dining':'🍛', Transport:'🛺', Utilities:'💡', Rent:'🏠', Healthcare:'🩺', Entertainment:'🎬', Shopping:'🛍️', Subscriptions:'📺', Education:'📚', 'Personal Care':'💆', Other:'📌', Salary:'💼', Freelance:'💻', Investment:'📈', Business:'🏢', 'Gadgets & Electronics':'📱', Insurance:'🛡️', Travel:'✈️', Gifts:'🎁', Charity:'🤲', 'Side Hustle':'⚡', 'Gift Received':'🎁', Refund:'↩️', 'Rental':'🏘️' }
+                        return catEmojis[tx.category] || (tx.type === 'income' ? '💰' : '💳')
+                      })()}
+                    </div>
+                  )}
 
-                      {/* Details */}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between gap-2">
-                          <p className="font-medium text-sm truncate">{tx.description}</p>
-                          <p className={`font-bold text-sm whitespace-nowrap ${
-                            tx.type === 'income' ? 'text-emerald-600' : 'text-red-600'
-                          }`}>
-                            {tx.type === 'income' ? '+' : '-'}{currencySymbol}{tx.amount.toLocaleString()}
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-2 mt-1 flex-wrap">
-                          <span className="text-xs text-muted-foreground">{tx.category}</span>
-                          <Badge variant="outline" className={`text-xs px-1.5 py-0 ${badge.color}`}>
-                            {badge.label}
-                          </Badge>
-                          <span className="text-xs text-muted-foreground capitalize">
-                            {tx.spendingType}
-                          </span>
-                          <span className="text-xs text-muted-foreground">
-                            {formatDate(tx.date)}
-                          </span>
-                          {tx.tags && (() => {
-                            try {
-                              const parsed: string[] = JSON.parse(tx.tags)
-                              return parsed.slice(0, 3).map(tag => (
-                                <span key={tag} className="text-[10px] bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 rounded-full px-1.5 py-0.5 font-medium">#{tag}</span>
-                              ))
-                            } catch { return null }
-                          })()}
-                          {tx.receiptUrl && (
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                setReceiptViewerUrl(tx.receiptUrl!)
-                              }}
-                              className="inline-flex items-center gap-0.5 text-xs text-emerald-600 hover:text-emerald-700 hover:underline cursor-pointer"
-                            >
-                              <Paperclip className="w-3 h-3" />
-                              Receipt
-                            </button>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Edit & Delete (hidden in select mode) */}
-                      {!selectMode && (
-                        <div className="flex items-center gap-0.5 shrink-0">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="text-muted-foreground hover:text-blue-600 h-8 w-8 p-0"
-                            onClick={() => handleEditOpen(tx)}
-                          >
-                            <Edit3 className="w-3.5 h-3.5" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="text-muted-foreground hover:text-destructive h-8 w-8 p-0"
-                            onClick={() => setDeleteId(tx.id)}
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </Button>
-                        </div>
+                  {/* Details */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="font-medium text-sm truncate text-gray-900 dark:text-white">{tx.description}</p>
+                      <p className={`font-mono text-sm font-medium whitespace-nowrap shrink-0 ${tx.type === 'income' ? 'text-emerald-600 dark:text-emerald-400' : 'text-gray-600 dark:text-gray-300'}`}>
+                        {tx.type === 'income' ? '+' : '−'}{currencySymbol}{tx.amount.toLocaleString()}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                      <span className="text-[11px] text-muted-foreground">{tx.category}</span>
+                      <span className="text-muted-foreground/40 text-[10px]">·</span>
+                      <span className="text-[11px] text-muted-foreground">
+                        {new Date(tx.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                      </span>
+                      <span className={`text-[10px] px-1.5 py-0 rounded-full font-medium ${badge.color}`}>
+                        {badge.label}
+                      </span>
+                      {tx.tags && (() => {
+                        try {
+                          const parsed: string[] = JSON.parse(tx.tags)
+                          return parsed.slice(0, 2).map(tag => (
+                            <span key={tag} className="text-[10px] bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 rounded-full px-1.5 py-0.5 font-medium">#{tag}</span>
+                          ))
+                        } catch { return null }
+                      })()}
+                      {tx.receiptUrl && (
+                        <button type="button" onClick={(e) => { e.stopPropagation(); setReceiptViewerUrl(tx.receiptUrl!) }} className="inline-flex items-center gap-0.5 text-[10px] text-emerald-600 hover:text-emerald-700">
+                          <Paperclip className="w-2.5 h-2.5" /> Receipt
+                        </button>
                       )}
                     </div>
-                  </CardContent>
-                </Card>
+                  </div>
+
+                  {/* Edit & Delete */}
+                  {!selectMode && (
+                    <div className="flex items-center gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-blue-600 h-7 w-7 p-0" onClick={() => handleEditOpen(tx)}>
+                        <Edit3 className="w-3 h-3" />
+                      </Button>
+                      <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-destructive h-7 w-7 p-0" onClick={() => setDeleteId(tx.id)}>
+                        <Trash2 className="w-3 h-3" />
+                      </Button>
+                    </div>
+                  )}
+                </div>
                 </div>
               )
             })}

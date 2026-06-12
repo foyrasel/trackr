@@ -46,9 +46,30 @@ const ENGLISH_EXAMPLES = [
   'Last Friday 50 on coffee',
 ]
 
+const CATEGORY_EMOJIS: Record<string, string> = {
+  'Groceries': '🛒', 'Food & Dining': '🍛', 'Transport': '🛺', 'Utilities': '💡',
+  'Rent': '🏠', 'Healthcare': '🩺', 'Entertainment': '🎬', 'Shopping': '🛍️',
+  'Personal Care': '💆', 'Education': '📚', 'Gadgets & Electronics': '📱',
+  'Insurance': '🛡️', 'Subscriptions': '📺', 'Travel': '✈️', 'Gifts': '🎁',
+  'Charity': '🤲', 'Other': '📌', 'Salary': '💼', 'Freelance': '💻',
+  'Business': '🏢', 'Investment': '📈', 'Rental': '🏘️', 'Side Hustle': '⚡',
+  'Gift Received': '🎁', 'Refund': '↩️',
+}
+
+const QUICK_EXPENSE_CATS = ['Groceries', 'Food & Dining', 'Transport', 'Utilities', 'Rent', 'Healthcare', 'Entertainment', 'Shopping']
+const QUICK_INCOME_CATS = ['Salary', 'Freelance', 'Business', 'Investment', 'Side Hustle', 'Gift Received', 'Refund', 'Other']
+
+const AUTO_CLASSIFICATION: Record<string, string> = {
+  Groceries: 'need', 'Food & Dining': 'want', Transport: 'need', Utilities: 'need',
+  Rent: 'need', Healthcare: 'need', Entertainment: 'want', Shopping: 'want',
+  'Personal Care': 'need', Education: 'need', 'Gadgets & Electronics': 'want',
+  Insurance: 'need', Subscriptions: 'want', Travel: 'want', Gifts: 'want',
+  Charity: 'want', Other: 'need',
+}
+
 export default function AddTransaction({ onTransactionAdded, userName }: AddTransactionProps) {
   const { currencySymbol } = useCurrency()
-  const [inputMode, setInputMode] = useState<'voice' | 'text' | 'bulk'>('voice')
+  const [inputMode, setInputMode] = useState<'quick' | 'voice' | 'text' | 'bulk'>('quick')
   const [language, setLanguage] = useState<'en' | 'bn' | 'hi'>('en')
   const [textInput, setTextInput] = useState('')
   const [isProcessing, setIsProcessing] = useState(false)
@@ -57,6 +78,13 @@ export default function AddTransaction({ onTransactionAdded, userName }: AddTran
   const [accounts, setAccounts] = useState<Account[]>([])
   const [lastAdded, setLastAdded] = useState<{ description: string; amount: number; type: string } | null>(null)
   const textInputRef = useRef<HTMLInputElement>(null)
+
+  // Quick add state
+  const [quickType, setQuickType] = useState<'expense' | 'income'>('expense')
+  const [quickAmount, setQuickAmount] = useState('')
+  const [quickCategory, setQuickCategory] = useState('')
+  const [quickNote, setQuickNote] = useState('')
+  const [quickSaving, setQuickSaving] = useState(false)
 
   // Bulk entry state
   const [bulkInput, setBulkInput] = useState('')
@@ -92,6 +120,42 @@ export default function AddTransaction({ onTransactionAdded, userName }: AddTran
   const handleTextSubmit = async () => {
     if (!textInput.trim()) return
     await processInput(textInput.trim())
+  }
+
+  const handleQuickSave = async () => {
+    const amount = parseFloat(quickAmount)
+    if (!amount || amount <= 0 || !quickCategory) return
+    setQuickSaving(true)
+    try {
+      const headers = getAuthHeaders()
+      headers['Content-Type'] = 'application/json'
+      const res = await fetch('/api/transactions', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          type: quickType,
+          amount,
+          description: quickNote.trim() || quickCategory,
+          category: quickCategory,
+          classification: quickType === 'income' ? 'income' : (AUTO_CLASSIFICATION[quickCategory] || 'need'),
+          spendingType: 'cash',
+          date: new Date().toISOString(),
+        }),
+      })
+      if (res.ok) {
+        setQuickAmount('')
+        setQuickNote('')
+        setQuickCategory('')
+        toast({ title: `${quickType === 'income' ? 'Income' : 'Expense'} saved!` })
+        onTransactionAdded()
+      } else {
+        toast({ title: 'Failed to save', variant: 'destructive' })
+      }
+    } catch {
+      toast({ title: 'Failed to save', variant: 'destructive' })
+    } finally {
+      setQuickSaving(false)
+    }
   }
 
   const processInput = async (text: string) => {
@@ -264,45 +328,123 @@ export default function AddTransaction({ onTransactionAdded, userName }: AddTran
   const examples = language === 'bn' ? BANGLA_EXAMPLES : ENGLISH_EXAMPLES
 
   return (
-    <div className="space-y-4">
-      {/* Mode Toggle */}
-      <div className="flex justify-center">
-        <div className="inline-flex rounded-lg border bg-card p-1 gap-1">
-          <button
-            onClick={() => setInputMode('voice')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${
-              inputMode === 'voice'
-                ? 'bg-emerald-500 text-white shadow-sm'
-                : 'text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            <Mic className="w-4 h-4" />
-            {language === 'bn' ? 'ভয়েস' : 'Voice'}
-          </button>
-          <button
-            onClick={() => setInputMode('text')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${
-              inputMode === 'text'
-                ? 'bg-emerald-500 text-white shadow-sm'
-                : 'text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            <Type className="w-4 h-4" />
-            {language === 'bn' ? 'টেক্সট' : 'Text'}
-          </button>
-          <button
-            onClick={() => { setInputMode('bulk'); setBulkRows([]); setBulkInput('') }}
-            className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${
-              inputMode === 'bulk'
-                ? 'bg-emerald-500 text-white shadow-sm'
-                : 'text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            <Layers className="w-4 h-4" />
-            Bulk
-          </button>
-        </div>
+    <div className="space-y-4 max-w-xl mx-auto">
+      {/* ─── Mode selector ─── */}
+      <div className="flex gap-2">
+        <button
+          onClick={() => setInputMode('quick')}
+          className={`flex-1 py-2 rounded-xl text-xs font-semibold border-2 transition-all ${inputMode === 'quick' ? 'bg-emerald-600 border-emerald-600 text-white' : 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-muted-foreground hover:border-emerald-300'}`}
+        >
+          ⚡ Quick Add
+        </button>
+        <button
+          onClick={() => setInputMode('bulk')}
+          className={`flex-1 py-2 rounded-xl text-xs font-semibold border-2 transition-all ${inputMode === 'bulk' ? 'bg-emerald-600 border-emerald-600 text-white' : 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-muted-foreground hover:border-emerald-300'}`}
+        >
+          📋 Bulk
+        </button>
+        <button
+          onClick={() => setInputMode('text')}
+          className={`flex-1 py-2 rounded-xl text-xs font-semibold border-2 transition-all ${inputMode === 'text' ? 'bg-emerald-600 border-emerald-600 text-white' : 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-muted-foreground hover:border-emerald-300'}`}
+        >
+          🤖 AI Parse
+        </button>
+        <button
+          onClick={() => setInputMode('voice')}
+          className={`flex-1 py-2 rounded-xl text-xs font-semibold border-2 transition-all ${inputMode === 'voice' ? 'bg-emerald-600 border-emerald-600 text-white' : 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-muted-foreground hover:border-emerald-300'}`}
+        >
+          🎤 Voice
+        </button>
       </div>
+
+      {/* ─── QUICK ADD mode ─── */}
+      {inputMode === 'quick' && !categorizedData && (
+        <div className="bg-white dark:bg-gray-900 rounded-2xl p-6 border border-gray-100 dark:border-gray-800 shadow-sm space-y-5">
+          {/* Type toggle */}
+          <div className="flex gap-2">
+            <button
+              onClick={() => { setQuickType('expense'); setQuickCategory('') }}
+              className={`flex-1 py-2.5 rounded-xl text-sm font-semibold border-2 transition-all ${quickType === 'expense' ? 'bg-rose-50 dark:bg-rose-950/30 border-rose-300 dark:border-rose-700 text-rose-700 dark:text-rose-300' : 'border-gray-200 dark:border-gray-700 text-muted-foreground hover:bg-gray-50 dark:hover:bg-gray-800'}`}
+            >
+              💸 Expense
+            </button>
+            <button
+              onClick={() => { setQuickType('income'); setQuickCategory('') }}
+              className={`flex-1 py-2.5 rounded-xl text-sm font-semibold border-2 transition-all ${quickType === 'income' ? 'bg-emerald-50 dark:bg-emerald-950/30 border-emerald-300 dark:border-emerald-700 text-emerald-700 dark:text-emerald-300' : 'border-gray-200 dark:border-gray-700 text-muted-foreground hover:bg-gray-50 dark:hover:bg-gray-800'}`}
+            >
+              💰 Income
+            </button>
+          </div>
+
+          {/* Amount input */}
+          <div>
+            <p className="text-[11px] text-muted-foreground uppercase tracking-wider mb-2">Amount</p>
+            <div className="flex items-center gap-2">
+              <span className="text-3xl font-bold" style={{ color: '#065f46' }}>{currencySymbol}</span>
+              <input
+                type="number"
+                inputMode="decimal"
+                placeholder="0"
+                value={quickAmount}
+                onChange={e => setQuickAmount(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter' && quickAmount && quickCategory) handleQuickSave() }}
+                className="flex-1 text-4xl font-bold bg-transparent border-none outline-none text-gray-900 dark:text-white placeholder-gray-200 dark:placeholder-gray-700"
+                style={{ fontFamily: 'inherit' }}
+                autoFocus
+              />
+            </div>
+            <div className="h-px bg-gray-200 dark:bg-gray-700 mt-2" />
+          </div>
+
+          {/* Category grid */}
+          <div>
+            <p className="text-[11px] text-muted-foreground uppercase tracking-wider mb-2">Category</p>
+            <div className="grid grid-cols-4 gap-2">
+              {(quickType === 'expense' ? QUICK_EXPENSE_CATS : QUICK_INCOME_CATS).map(cat => (
+                <button
+                  key={cat}
+                  onClick={() => setQuickCategory(cat)}
+                  className={`flex flex-col items-center gap-1 py-2.5 px-1 rounded-xl text-[10px] font-medium leading-tight text-center transition-all border-2 ${quickCategory === cat ? 'border-emerald-400 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300' : 'border-transparent bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:border-emerald-200 hover:bg-emerald-50/50 dark:hover:bg-emerald-950/20'}`}
+                >
+                  <span className="text-xl">{CATEGORY_EMOJIS[cat] || '📌'}</span>
+                  <span className="leading-tight">{cat.split(' ')[0]}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Note input */}
+          <div>
+            <p className="text-[11px] text-muted-foreground uppercase tracking-wider mb-2">Note (optional)</p>
+            <input
+              type="text"
+              placeholder={`e.g. ${quickType === 'expense' ? 'Lunch with friends' : 'Monthly salary'}`}
+              value={quickNote}
+              onChange={e => setQuickNote(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter' && quickAmount && quickCategory) handleQuickSave() }}
+              className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-sm outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 dark:focus:ring-emerald-900/40 transition-all"
+            />
+          </div>
+
+          {/* Actions */}
+          <div className="flex gap-3">
+            <button
+              onClick={() => { setQuickAmount(''); setQuickNote(''); setQuickCategory('') }}
+              className="flex-1 py-2.5 rounded-xl border-2 border-gray-200 dark:border-gray-700 text-sm font-semibold text-muted-foreground hover:bg-gray-50 dark:hover:bg-gray-800 transition-all"
+            >
+              Clear
+            </button>
+            <button
+              onClick={handleQuickSave}
+              disabled={!quickAmount || !quickCategory || quickSaving}
+              className="flex-[2] py-2.5 rounded-xl text-sm font-semibold text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              style={{ background: '#065f46' }}
+            >
+              {quickSaving ? '⏳ Saving...' : `Add ${quickType === 'income' ? 'Income' : 'Expense'}`}
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Last added context banner */}
       {lastAdded && !categorizedData && (

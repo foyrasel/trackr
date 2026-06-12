@@ -246,13 +246,21 @@ export default function BudgetPanel({ refreshTrigger, userName }: BudgetPanelPro
     <div className="space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Target className="w-5 h-5 text-emerald-500" />
-          <h2 className="text-lg font-bold">Monthly Budget</h2>
-          <Badge variant="outline" className="text-xs bg-emerald-50 text-emerald-700 border-emerald-200">
+        <div>
+          <h2 className="text-xl font-bold flex items-center gap-2" style={{ color: '#065f46' }}>
+            🌿 Budget Branches
+          </h2>
+          <p className="text-xs text-muted-foreground mt-0.5">
             {new Date(currentMonth + '-01').toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
-          </Badge>
+          </p>
         </div>
+        <button
+          onClick={() => setShowAddForm(!showAddForm)}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold text-white transition-all"
+          style={{ background: '#065f46' }}
+        >
+          + Add
+        </button>
       </div>
 
       {/* Overall Budget Progress */}
@@ -348,28 +356,19 @@ export default function BudgetPanel({ refreshTrigger, userName }: BudgetPanelPro
       )}
 
       {/* AI Suggestion Button */}
-      <div className="flex gap-2">
-        <Button
-          onClick={fetchSuggestions}
-          disabled={suggestionsLoading}
-          variant="outline"
-          className="flex-1 border-emerald-200 text-emerald-700 hover:bg-emerald-50"
-        >
-          {suggestionsLoading ? (
-            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-          ) : (
-            <Sparkles className="w-4 h-4 mr-2" />
-          )}
-          AI Budget Suggestions
-        </Button>
-        <Button
-          onClick={() => setShowAddForm(!showAddForm)}
-          variant="outline"
-          className="border-emerald-200"
-        >
-          <Plus className="w-4 h-4" />
-        </Button>
-      </div>
+      <Button
+        onClick={fetchSuggestions}
+        disabled={suggestionsLoading}
+        variant="outline"
+        className="w-full border-emerald-200 text-emerald-700 hover:bg-emerald-50"
+      >
+        {suggestionsLoading ? (
+          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+        ) : (
+          <Sparkles className="w-4 h-4 mr-2" />
+        )}
+        AI Budget Suggestions
+      </Button>
 
       {/* AI Suggestions Panel */}
       {showSuggestions && (
