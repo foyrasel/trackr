@@ -2,12 +2,13 @@
 
 import React, { useState, useEffect, useCallback } from 'react'
 import { useSession, signOut } from 'next-auth/react'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Tabs, TabsContent } from '@/components/ui/tabs'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import AddTransaction from '@/components/tracker/AddTransaction'
 import Dashboard from '@/components/tracker/Dashboard'
+import QuickSearch from '@/components/tracker/QuickSearch'
 import TransactionList from '@/components/tracker/TransactionList'
 import BudgetPanel from '@/components/tracker/BudgetPanel'
 import LandingPage from '@/components/tracker/LandingPage'
@@ -16,10 +17,12 @@ import AccountSetup from '@/components/tracker/AccountSetup'
 import InsightsPanel from '@/components/tracker/InsightsPanel'
 import MorePanel from '@/components/tracker/MorePanel'
 import FeatureSetupScreen from '@/components/tracker/FeatureSetupScreen'
+import TermsScreen from '@/components/tracker/TermsScreen'
 import { CurrencyProvider, useCurrency } from '@/components/tracker/CurrencyContext'
 import { useRecurringExecution } from '@/hooks/use-recurring-exec'
+import { usePWA } from '@/hooks/use-pwa'
 import ErrorBoundary from '@/components/ErrorBoundary'
-import { LayoutDashboard, Plus, History, Lightbulb, Target, LogOut, Loader2, MoreHorizontal, Moon, Sun } from 'lucide-react'
+import { LayoutDashboard, Plus, History, Lightbulb, Target, LogOut, Loader2, MoreHorizontal, Moon, Sun, Download, Search } from 'lucide-react'
 import TrackrLogo from '@/components/tracker/TrackrLogo'
 
 function CurrencyDisplay() {
@@ -54,16 +57,26 @@ export default function Home() {
   const [showOnboarding, setShowOnboarding] = useState(false)
   const [showAccountSetup, setShowAccountSetup] = useState(false)
   const [showFeatureSetup, setShowFeatureSetup] = useState(false)
+  const [showTerms, setShowTerms] = useState(false)
   const [mounted, setMounted] = useState(false)
 
   // Dark mode state
   const [isDarkMode, setIsDarkMode] = useState(false)
 
+  // PWA install
+  const { canInstall, isInstalled, install } = usePWA()
+
+  // Global quick search (Cmd+K or /)
+  const [searchOpen, setSearchOpen] = useState(false)
+
   const { data: session, status } = useSession()
 
-  // Mark as mounted
+  // Mark as mounted + handle PWA shortcut URLs (?tab=add etc.)
   useEffect(() => {
     setMounted(true)
+    const params = new URLSearchParams(window.location.search)
+    const tab = params.get('tab')
+    if (tab) setActiveTab(tab)
   }, [])
 
   // Fetch user settings (dark mode, language, currency) after login
@@ -181,8 +194,12 @@ export default function Home() {
       if (id) setUserId(id)
       setIsLoggedIn(true)
 
-      // Check onboarding status (now localStorage has id/email for reliable API calls)
-      checkOnboardingStatus(name, email, id)
+      // Show terms if not yet accepted, else check onboarding
+      if (!localStorage.getItem('trackr_terms_accepted')) {
+        setShowTerms(true)
+      } else {
+        checkOnboardingStatus(name, email, id)
+      }
     }
   }, [session, status, checkOnboardingStatus])
 
@@ -198,8 +215,11 @@ export default function Home() {
         if (savedEmail) setUserEmail(savedEmail)
         setIsLoggedIn(true)
 
-        // Check onboarding
-        checkOnboardingStatus(savedName, savedEmail, savedId)
+        if (!localStorage.getItem('trackr_terms_accepted')) {
+          setShowTerms(true)
+        } else {
+          checkOnboardingStatus(savedName, savedEmail, savedId)
+        }
       }
     }
   }, [status, checkOnboardingStatus])
@@ -233,8 +253,29 @@ export default function Home() {
       localStorage.setItem('trackr_user_id', id)
     }
 
+    // Show terms if not yet accepted
+    if (!localStorage.getItem('trackr_terms_accepted')) {
+      setShowTerms(true)
+      return
+    }
+
     // Check onboarding status
     checkOnboardingStatus(name, email, id)
+  }
+
+  const handleTermsAccept = () => {
+    localStorage.setItem('trackr_terms_accepted', new Date().toISOString())
+    setShowTerms(false)
+    checkOnboardingStatus(userName, userEmail, userId)
+  }
+
+  const handleTermsDecline = async () => {
+    setShowTerms(false)
+    setIsLoggedIn(false)
+    localStorage.removeItem('trackr_user_name')
+    localStorage.removeItem('trackr_user_email')
+    localStorage.removeItem('trackr_user_id')
+    try { await signOut({ redirect: false }) } catch {}
   }
 
   const handleOnboardingComplete = () => {
@@ -360,13 +401,22 @@ export default function Home() {
   // Auto-execute due recurring transactions once per session
   useRecurringExecution(isLoggedIn ? userName : undefined, handleRefreshData)
 
-  // Keyboard shortcut: N = new transaction
+  // Keyboard shortcuts: N = new transaction, / or Cmd+K = search
   useEffect(() => {
     if (!isLoggedIn) return
     const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault()
+        setSearchOpen(p => !p)
+        return
+      }
       const tag = (e.target as HTMLElement).tagName
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
       if (e.key === 'n' || e.key === 'N') setActiveTab('add')
+      if (e.key === '/') {
+        e.preventDefault()
+        setSearchOpen(true)
+      }
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
@@ -426,6 +476,11 @@ export default function Home() {
     return <LandingPage onLogin={handleLogin} />
   }
 
+  // Show terms & conditions for first-time users
+  if (showTerms) {
+    return <TermsScreen onAccept={handleTermsAccept} onDecline={handleTermsDecline} />
+  }
+
   // Show onboarding screen for first-time users
   if (showOnboarding) {
     return (
@@ -453,143 +508,84 @@ export default function Home() {
     .toUpperCase()
     .slice(0, 2)
 
-  const NAV_ITEMS = [
-    { tab: 'dashboard', label: 'Dashboard', Icon: LayoutDashboard },
-    { tab: 'budget',    label: 'Budget',    Icon: Target },
-    { tab: 'history',   label: 'History',   Icon: History },
-    { tab: 'insights',  label: 'Insights',  Icon: Lightbulb },
-    { tab: 'more',      label: 'Settings',  Icon: MoreHorizontal },
+  const NAV_PILLS = [
+    { tab: 'dashboard', label: 'Home',     Icon: LayoutDashboard },
+    { tab: 'history',   label: 'History',  Icon: History },
+    { tab: 'budget',    label: 'Budget',   Icon: Target },
+    { tab: 'insights',  label: 'Insights', Icon: Lightbulb },
+    { tab: 'more',      label: 'Settings', Icon: MoreHorizontal },
   ] as const
 
   return (
     <CurrencyProvider>
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
 
-      {/* ── FIXED LEFT SIDEBAR (desktop only) ── */}
-      <aside className="hidden md:flex flex-col fixed inset-y-0 left-0 w-56 lg:w-60 bg-white dark:bg-gray-900 border-r border-gray-100 dark:border-gray-800 z-40">
+      {/* ── STICKY TOP HEADER ── */}
+      <header className="sticky top-0 z-40 bg-white/97 dark:bg-gray-950/97 backdrop-blur-xl border-b border-gray-100 dark:border-gray-800/70 shadow-sm shadow-black/[0.02]">
+        <div className="max-w-5xl mx-auto px-4 h-14 flex items-center gap-3">
 
-        {/* Logo */}
-        <button
-          onClick={() => setActiveTab('dashboard')}
-          className="flex items-center gap-2.5 px-4 py-4 border-b border-gray-100 dark:border-gray-800 hover:opacity-80 transition-opacity"
-        >
-          <TrackrLogo size={34} />
-          <div className="text-left">
-            <h1 className="text-[14px] font-extrabold leading-none tracking-tight text-gray-900 dark:text-white">Trackr</h1>
-            <p className="text-[10px] text-muted-foreground leading-none mt-0.5">AI expense tracker</p>
-          </div>
-        </button>
+          {/* Logo */}
+          <button onClick={() => setActiveTab('dashboard')} className="flex items-center gap-2 shrink-0 hover:opacity-80 transition-opacity">
+            <TrackrLogo size={28} />
+            <span className="hidden sm:block text-[14px] font-extrabold text-gray-900 dark:text-white tracking-tight">Trackr</span>
+          </button>
 
-        {/* Nav items */}
-        <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
-          {NAV_ITEMS.map(({ tab, label, Icon }) => (
+          {/* Pill nav — centered, scrollable on small screens */}
+          <nav className="flex-1 flex justify-center overflow-x-auto no-scrollbar" role="navigation" aria-label="Main navigation">
+            <div className="flex items-center gap-0.5 bg-gray-100 dark:bg-gray-800/70 rounded-2xl p-1 shrink-0">
+              {NAV_PILLS.map(({ tab, label, Icon }) => (
+                <button
+                  key={tab}
+                  onClick={() => setActiveTab(tab)}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-medium transition-all whitespace-nowrap ${
+                    activeTab === tab
+                      ? 'bg-white dark:bg-gray-900 text-emerald-700 dark:text-emerald-400 shadow-sm font-semibold'
+                      : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
+                  }`}
+                >
+                  <Icon className="w-3.5 h-3.5 shrink-0" />
+                  <span className="hidden sm:inline">{label}</span>
+                </button>
+              ))}
+            </div>
+          </nav>
+
+          {/* Right: search + dark mode + avatar */}
+          <div className="flex items-center gap-1.5 shrink-0">
             <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13px] font-medium transition-all text-left ${
-                activeTab === tab
-                  ? 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400'
-                  : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800/60 hover:text-gray-800 dark:hover:text-gray-200'
-              }`}
+              onClick={() => setSearchOpen(true)}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-[11px] text-gray-400 dark:text-gray-500 border border-gray-200 dark:border-gray-700 hover:border-emerald-300 dark:hover:border-emerald-700 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+              aria-label="Search"
             >
-              <Icon className={`w-[17px] h-[17px] shrink-0 ${activeTab === tab ? 'text-emerald-600 dark:text-emerald-400' : ''}`} />
-              {label}
-              {activeTab === tab && <span className="ml-auto w-1.5 h-1.5 rounded-full bg-emerald-500" />}
+              <Search className="w-3.5 h-3.5" />
+              <kbd className="hidden md:inline font-mono text-[9px]">⌘K</kbd>
             </button>
-          ))}
-        </nav>
-
-        {/* Add Transaction button */}
-        <div className="px-3 pb-3">
-          <button
-            onClick={() => setActiveTab('add')}
-            className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-[13px] font-semibold transition-all shadow-sm active:scale-95 ${
-              activeTab === 'add'
-                ? 'bg-gradient-to-br from-emerald-600 to-teal-600 text-white shadow-emerald-500/30'
-                : 'bg-gradient-to-br from-emerald-500 to-teal-500 text-white shadow-emerald-500/20 hover:opacity-90'
-            }`}
-          >
-            <Plus className="w-4 h-4" />
-            Add Transaction
-          </button>
-        </div>
-
-        {/* User + controls at bottom */}
-        <div className="px-3 pb-4 border-t border-gray-100 dark:border-gray-800 pt-3 space-y-1">
-          <button
-            onClick={() => setActiveTab('more')}
-            className="w-full flex items-center gap-2.5 px-2 py-2 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors text-left"
-          >
-            <Avatar className="h-8 w-8 shrink-0">
-              {userImage && <AvatarImage src={userImage} alt={userName} />}
-              <AvatarFallback className="text-[11px] font-bold bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300">{userInitials || '?'}</AvatarFallback>
-            </Avatar>
-            <div className="min-w-0 flex-1">
-              <p className="text-xs font-semibold text-gray-900 dark:text-white truncate">{userName}</p>
-              <p className="text-[10px] text-muted-foreground truncate">{userEmail || 'Demo user'}</p>
-            </div>
-          </button>
-          <div className="flex gap-1">
-            <Button variant="ghost" size="sm" onClick={handleToggleDarkMode} className="flex-1 h-8 text-[11px] gap-1.5 text-muted-foreground hover:text-gray-700 dark:hover:text-gray-200 justify-center">
-              {isDarkMode ? <><Sun className="w-3.5 h-3.5" />Light</> : <><Moon className="w-3.5 h-3.5" />Dark</>}
-            </Button>
-            <Button variant="ghost" size="sm" onClick={handleLogout} className="h-8 w-8 p-0 text-muted-foreground hover:text-red-500">
-              <LogOut className="w-3.5 h-3.5" />
-            </Button>
-          </div>
-        </div>
-      </aside>
-
-      {/* ── MAIN AREA (offset for sidebar on desktop) ── */}
-      <div className="flex flex-col flex-1 min-h-screen md:ml-56 lg:ml-60">
-
-        {/* Slim top bar */}
-        <header className="sticky top-0 z-30 bg-white/97 dark:bg-gray-950/97 backdrop-blur-xl border-b border-gray-100 dark:border-gray-800/70 shadow-sm shadow-black/[0.02]">
-          <div className="px-4 md:px-6 h-14 flex items-center justify-between gap-4">
-
-            {/* Mobile: logo */}
-            <button onClick={() => setActiveTab('dashboard')} className="flex md:hidden items-center gap-2 hover:opacity-80 transition-opacity">
-              <TrackrLogo size={30} />
-              <span className="text-sm font-extrabold text-gray-900 dark:text-white">Trackr</span>
+            <button onClick={handleToggleDarkMode} className="h-8 w-8 flex items-center justify-center rounded-xl text-gray-400 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors" aria-label="Toggle dark mode">
+              {isDarkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
             </button>
-
-            {/* Desktop: current page title */}
-            <div className="hidden md:block">
-              <p className="text-[15px] font-bold text-gray-900 dark:text-white capitalize leading-none">
-                {activeTab === 'dashboard' ? 'Dashboard' : activeTab === 'add' ? 'Add Transaction' : NAV_ITEMS.find(n => n.tab === activeTab)?.label ?? activeTab}
-              </p>
-              <p className="text-[11px] text-muted-foreground leading-none mt-0.5">
-                {userName ? `Hi, ${userName.split(' ')[0]} 👋` : 'Welcome'}
-              </p>
-            </div>
-
-            {/* Mobile controls */}
-            <div className="flex md:hidden items-center gap-1">
-              <Button variant="ghost" size="sm" onClick={handleToggleDarkMode} className="h-9 w-9 p-0 rounded-xl text-muted-foreground">
-                {isDarkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-              </Button>
-              <Avatar className="h-8 w-8 cursor-pointer" onClick={() => setActiveTab('more')}>
+            <button onClick={() => setActiveTab('more')} className="shrink-0" aria-label="Profile">
+              <Avatar className="h-7 w-7">
                 {userImage && <AvatarImage src={userImage} alt={userName} />}
-                <AvatarFallback className="text-[11px] font-bold bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300">{userInitials || '?'}</AvatarFallback>
+                <AvatarFallback className="text-[10px] font-bold bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300">{userInitials || '?'}</AvatarFallback>
               </Avatar>
-              <Button variant="ghost" size="sm" onClick={handleLogout} className="h-9 w-9 p-0 rounded-xl text-muted-foreground hover:text-red-500">
-                <LogOut className="w-4 h-4" />
-              </Button>
-            </div>
+            </button>
+            <button onClick={handleLogout} className="h-8 w-8 flex items-center justify-center rounded-xl text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors" aria-label="Sign out">
+              <LogOut className="w-3.5 h-3.5" />
+            </button>
           </div>
-        </header>
+        </div>
+      </header>
 
-      {/* Single Tabs component wrapping both content and navigation */}
+      {/* ── MAIN CONTENT ── */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        {/* Main Content — full remaining width */}
-        <main className="flex-1 px-4 md:px-6 pb-28 md:pb-8 pt-5">
+        <main className="max-w-5xl mx-auto px-4 md:px-6 pt-5 pb-28">
           <TabsContent value="dashboard" className="mt-0">
             <ErrorBoundary label="Dashboard">
               <Dashboard refreshTrigger={refreshTrigger} userName={userName} />
             </ErrorBoundary>
           </TabsContent>
 
-          <TabsContent value="add" className="mt-0 max-w-xl">
+          <TabsContent value="add" className="mt-0 max-w-xl mx-auto">
             <ErrorBoundary label="Add Transaction">
               <AddTransaction onTransactionAdded={handleTransactionAdded} userName={userName} />
             </ErrorBoundary>
@@ -613,7 +609,7 @@ export default function Home() {
             </ErrorBoundary>
           </TabsContent>
 
-          <TabsContent value="more" className="mt-0 max-w-xl">
+          <TabsContent value="more" className="mt-0 max-w-xl mx-auto">
             <ErrorBoundary label="Settings">
               <MorePanel
                 userName={userName}
@@ -624,63 +620,33 @@ export default function Home() {
             </ErrorBoundary>
           </TabsContent>
         </main>
-
-        {/* Bottom Navigation — mobile only */}
-        <nav className="fixed bottom-0 left-0 right-0 z-50 md:hidden">
-          <div className="bg-white/97 dark:bg-gray-950/97 backdrop-blur-xl border-t border-gray-100/80 dark:border-gray-800/60 shadow-[0_-4px_24px_rgba(0,0,0,0.06)]">
-            <div className="w-full max-w-2xl mx-auto">
-              <TabsList className="w-full h-[62px] bg-transparent justify-around p-0 shadow-none rounded-none">
-                <TabsTrigger
-                  value="dashboard"
-                  className="group flex-col gap-0.5 data-[state=active]:text-emerald-600 dark:data-[state=active]:text-emerald-400 data-[state=active]:shadow-none data-[state=active]:bg-transparent text-gray-400 dark:text-gray-500 px-1 pb-2 pt-2.5 flex-1 h-full rounded-none relative"
-                >
-                  <LayoutDashboard className="w-[22px] h-[22px]" />
-                  <span className="text-[10px] font-medium leading-none">Home</span>
-                  <span className="absolute bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-emerald-500 opacity-0 group-data-[state=active]:opacity-100 transition-opacity" />
-                </TabsTrigger>
-
-                <TabsTrigger
-                  value="budget"
-                  className="group flex-col gap-0.5 data-[state=active]:text-emerald-600 dark:data-[state=active]:text-emerald-400 data-[state=active]:shadow-none data-[state=active]:bg-transparent text-gray-400 dark:text-gray-500 px-1 pb-2 pt-2.5 flex-1 h-full rounded-none relative"
-                >
-                  <Target className="w-[22px] h-[22px]" />
-                  <span className="text-[10px] font-medium leading-none">Budget</span>
-                  <span className="absolute bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-emerald-500 opacity-0 group-data-[state=active]:opacity-100 transition-opacity" />
-                </TabsTrigger>
-
-                <TabsTrigger
-                  value="add"
-                  className="flex-col items-center justify-end data-[state=active]:shadow-none data-[state=active]:bg-transparent px-1 pb-2 pt-0 flex-1 h-full rounded-none relative gap-0.5"
-                >
-                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-500 flex items-center justify-center -mt-5 shadow-lg shadow-emerald-500/35 active:scale-95 transition-transform">
-                    <Plus className="w-[26px] h-[26px] text-white stroke-[2.5]" />
-                  </div>
-                  <span className="text-[10px] font-medium leading-none text-gray-400 data-[state=active]:text-emerald-600 dark:data-[state=active]:text-emerald-400">Add</span>
-                </TabsTrigger>
-
-                <TabsTrigger
-                  value="history"
-                  className="group flex-col gap-0.5 data-[state=active]:text-emerald-600 dark:data-[state=active]:text-emerald-400 data-[state=active]:shadow-none data-[state=active]:bg-transparent text-gray-400 dark:text-gray-500 px-1 pb-2 pt-2.5 flex-1 h-full rounded-none relative"
-                >
-                  <History className="w-[22px] h-[22px]" />
-                  <span className="text-[10px] font-medium leading-none">History</span>
-                  <span className="absolute bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-emerald-500 opacity-0 group-data-[state=active]:opacity-100 transition-opacity" />
-                </TabsTrigger>
-
-                <TabsTrigger
-                  value="more"
-                  className="group flex-col gap-0.5 data-[state=active]:text-emerald-600 dark:data-[state=active]:text-emerald-400 data-[state=active]:shadow-none data-[state=active]:bg-transparent text-gray-400 dark:text-gray-500 px-1 pb-2 pt-2.5 flex-1 h-full rounded-none relative"
-                >
-                  <MoreHorizontal className="w-[22px] h-[22px]" />
-                  <span className="text-[10px] font-medium leading-none">More</span>
-                  <span className="absolute bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-emerald-500 opacity-0 group-data-[state=active]:opacity-100 transition-opacity" />
-                </TabsTrigger>
-              </TabsList>
-            </div>
-          </div>
-        </nav>
       </Tabs>
-      </div>
+
+      {/* ── FLOATING ACTION BUTTON ── */}
+      <button
+        onClick={() => setActiveTab('add')}
+        aria-label="Add transaction"
+        className={`fixed z-50 w-14 h-14 rounded-full flex items-center justify-center text-white shadow-lg transition-all duration-200 hover:scale-105 active:scale-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-500 ${
+          activeTab === 'add'
+            ? 'bg-gradient-to-br from-emerald-600 to-teal-600 shadow-emerald-500/40'
+            : 'bg-gradient-to-br from-emerald-500 to-teal-500 shadow-emerald-500/30 hover:shadow-emerald-500/50'
+        }`}
+        style={{ bottom: 'max(1.5rem, env(safe-area-inset-bottom, 1.5rem))', right: '1.5rem' }}
+      >
+        <Plus className="w-6 h-6 stroke-[2.5]" />
+      </button>
+
+      {/* ── INSTALL APP BANNER (PWA) ── */}
+      {canInstall && !isInstalled && (
+        <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-40 flex items-center gap-3 px-4 py-2.5 bg-emerald-600 text-white text-xs font-medium rounded-2xl shadow-lg shadow-emerald-500/30 whitespace-nowrap">
+          <Download className="w-3.5 h-3.5 shrink-0" />
+          <span>Install Trackr as an app</span>
+          <button onClick={install} className="ml-1 px-3 py-1 bg-white/20 rounded-xl hover:bg-white/30 transition-colors font-semibold">Install</button>
+        </div>
+      )}
+
+      {/* ── GLOBAL SEARCH ── */}
+      <QuickSearch open={searchOpen} onClose={() => setSearchOpen(false)} userName={userName} />
     </div>
     </CurrencyProvider>
   )

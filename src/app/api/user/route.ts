@@ -65,6 +65,26 @@ export async function PUT(request: NextRequest) {
       data: updateData,
     })
 
+    // Auto-register Telegram webhook when token is saved
+    if (telegramToken) {
+      const baseUrl = process.env.NEXTAUTH_URL || process.env.VERCEL_URL && `https://${process.env.VERCEL_URL}`
+      if (baseUrl) {
+        const webhookUrl = `${baseUrl}/api/telegram/webhook/${user.id}`
+        fetch(`https://api.telegram.org/bot${telegramToken}/setWebhook`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url: webhookUrl, allowed_updates: ['message'] }),
+        }).catch(() => {})
+      }
+    }
+    // Delete webhook when token is cleared
+    if (telegramToken === null || telegramToken === '') {
+      const dbUser = await db.user.findUnique({ where: { id: user.id }, select: { telegramToken: true } })
+      if (dbUser?.telegramToken) {
+        fetch(`https://api.telegram.org/bot${dbUser.telegramToken}/deleteWebhook`).catch(() => {})
+      }
+    }
+
     return NextResponse.json({
       id: updated.id,
       name: updated.name,

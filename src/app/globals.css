@@ -137,3 +137,81 @@
     line-height: 1.5;
   }
 }
+
+/* ─── Living Tree design system ─────────────────────────────────────────── */
+
+@layer utilities {
+  .font-display {
+    font-family: var(--font-fraunces), Georgia, serif;
+  }
+  .font-narrative {
+    font-family: var(--font-jakarta), system-ui, sans-serif;
+  }
+  .font-data {
+    font-family: var(--font-plex-mono), ui-monospace, monospace;
+  }
+}
+
+/* Idle: trunk sways gently from the root */
+@keyframes tree-sway {
+  0%, 100% { transform: rotate(-0.5deg); }
+  50%      { transform: rotate(0.5deg); }
+}
+
+/* Idle: leaves breathe */
+@keyframes leaf-breathe {
+  0%, 100% { transform: scale(1); opacity: 0.9; }
+  50%      { transform: scale(1.02); opacity: 1; }
+}
+
+/* Transaction input: pulse ring expands outward */
+@keyframes tree-pulse-ring {
+  0%   { transform: scale(0.6); opacity: 0.7; }
+  100% { transform: scale(1.6); opacity: 0; }
+}
+
+/* Transaction input: individual leaf flutter */
+@keyframes leaf-flutter {
+  0%   { transform: translateY(0) rotate(0deg); }
+  40%  { transform: translateY(-8px) rotate(-5deg); }
+  100% { transform: translateY(0) rotate(0deg); }
+}
+
+/* Milestone elements fade in */
+@keyframes milestone-in {
+  from { opacity: 0; transform: scale(0.6); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+.tree-sway {
+  animation: tree-sway 6s ease-in-out infinite;
+  transform-origin: 50% 100%;
+}
+.leaf-breathe {
+  animation: leaf-breathe 6s ease-in-out infinite;
+  transform-origin: center;
+}
+.tree-pulse-ring {
+  animation: tree-pulse-ring 600ms ease-out forwards;
+}
+.leaf-flutter {
+  animation: leaf-flutter 500ms ease-out;
+}
+.milestone-in {
+  animation: milestone-in 700ms ease-out forwards;
+}
+
+/* Accessibility: respect reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .tree-sway,
+  .leaf-breathe,
+  .tree-pulse-ring,
+  .leaf-flutter,
+  .milestone-in {
+    animation: none;
+  }
+}
+
+/* Hide scrollbar while keeping scroll functionality */
+.no-scrollbar { scrollbar-width: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; }
