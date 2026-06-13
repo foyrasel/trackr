@@ -56,8 +56,13 @@ export async function POST(request: NextRequest) {
         await db.verificationToken.create({
           data: { email, token: verificationCode, expires: new Date(Date.now() + 10 * 60 * 1000) },
         })
-        try { await sendVerificationEmail(email, name, verificationCode) } catch {}
-        return NextResponse.json({ userId: existingUser.id, email, message: 'Verification email sent.' }, { status: 201 })
+        const sent = await sendVerificationEmail(email, name, verificationCode).catch(() => false)
+        return NextResponse.json(
+          sent
+            ? { userId: existingUser.id, email, message: 'Verification email sent.' }
+            : { userId: existingUser.id, email, verificationCode, message: 'Email delivery is unavailable — use the code shown below.' },
+          { status: 201 }
+        )
       }
 
       return NextResponse.json({ error: 'An account with this email already exists' }, { status: 409 })
@@ -104,10 +109,16 @@ export async function POST(request: NextRequest) {
     await db.verificationToken.create({
       data: { email, token: verificationCode, expires: new Date(Date.now() + 10 * 60 * 1000) },
     })
-    try { await sendVerificationEmail(email, name, verificationCode) } catch (emailErr) {
+    const sent = await sendVerificationEmail(email, name, verificationCode).catch((emailErr) => {
       console.error('[register] Email send failed:', emailErr)
-    }
-    return NextResponse.json({ userId: user.id, email, message: 'Verification email sent.' }, { status: 201 })
+      return false
+    })
+    return NextResponse.json(
+      sent
+        ? { userId: user.id, email, message: 'Verification email sent.' }
+        : { userId: user.id, email, verificationCode, message: 'Email delivery is unavailable — use the code shown below.' },
+      { status: 201 }
+    )
   } catch (error) {
     console.error('Error registering user:', error)
     return NextResponse.json({ error: 'Failed to create account' }, { status: 500 })

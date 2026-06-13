@@ -26,16 +26,23 @@ export function isEmailEnabled(): boolean {
   return !!process.env.RESEND_API_KEY
 }
 
-/** Send an email verification code to a new user. */
-export async function sendVerificationEmail(to: string, name: string, code: string): Promise<void> {
+/**
+ * Send an email verification code to a new user.
+ * Returns true only if the email was actually accepted for delivery.
+ * Returns false when no provider is configured OR the provider rejected the
+ * send (e.g. Resend sandbox can only email the account owner) — callers then
+ * surface the code on-screen so the user is never locked out.
+ */
+export async function sendVerificationEmail(to: string, name: string, code: string): Promise<boolean> {
   const resend = getResend()
-  if (!resend) return // demo mode — caller returns the code in the response instead
+  if (!resend) return false // demo mode — caller returns the code in the response instead
 
-  await resend.emails.send({
-    from: FROM_EMAIL,
-    to,
-    subject: `${code} is your Trackr verification code`,
-    html: `
+  try {
+    const { error } = await resend.emails.send({
+      from: FROM_EMAIL,
+      to,
+      subject: `${code} is your Trackr verification code`,
+      html: `
       <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px 24px">
         <div style="display:flex;align-items:center;gap:12px;margin-bottom:32px">
           <div style="width:40px;height:40px;border-radius:10px;background:linear-gradient(135deg,#10b981,#0d9488);display:flex;align-items:center;justify-content:center">
@@ -52,19 +59,29 @@ export async function sendVerificationEmail(to: string, name: string, code: stri
         <p style="color:#9ca3af;font-size:13px;margin:0">If you didn't create a Trackr account, you can safely ignore this email.</p>
       </div>
     `,
-  })
+    })
+    if (error) {
+      console.error('[email] Resend rejected verification email:', error)
+      return false
+    }
+    return true
+  } catch (err) {
+    console.error('[email] Failed to send verification email:', err)
+    return false
+  }
 }
 
-/** Send a password reset code. */
-export async function sendPasswordResetEmail(to: string, code: string): Promise<void> {
+/** Send a password reset code. Returns true only if actually delivered. */
+export async function sendPasswordResetEmail(to: string, code: string): Promise<boolean> {
   const resend = getResend()
-  if (!resend) return // demo mode — caller returns the code in the response instead
+  if (!resend) return false // demo mode — caller returns the code in the response instead
 
-  await resend.emails.send({
-    from: FROM_EMAIL,
-    to,
-    subject: `${code} is your Trackr password reset code`,
-    html: `
+  try {
+    const { error } = await resend.emails.send({
+      from: FROM_EMAIL,
+      to,
+      subject: `${code} is your Trackr password reset code`,
+      html: `
       <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px 24px">
         <div style="display:flex;align-items:center;gap:12px;margin-bottom:32px">
           <div style="width:40px;height:40px;border-radius:10px;background:linear-gradient(135deg,#10b981,#0d9488);display:flex;align-items:center;justify-content:center">
@@ -81,5 +98,14 @@ export async function sendPasswordResetEmail(to: string, code: string): Promise<
         <p style="color:#9ca3af;font-size:13px;margin:0">If you didn't request a password reset, you can safely ignore this email.</p>
       </div>
     `,
-  })
+    })
+    if (error) {
+      console.error('[email] Resend rejected password reset email:', error)
+      return false
+    }
+    return true
+  } catch (err) {
+    console.error('[email] Failed to send password reset email:', err)
+    return false
+  }
 }
