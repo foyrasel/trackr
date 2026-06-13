@@ -372,33 +372,36 @@ function extractBasicInfo(text: string): {
     else if (/investment|dividend|stock|শেয়ার/i.test(preprocessed)) category = 'Investment'
     else if (/refund|রিফান্ড|cashback/i.test(preprocessed)) category = 'Refund'
   } else {
-    if (/বাজার|মুদি|bazar|grocerie|মাছ|মাংস|সবজি|চাল|ডাল/i.test(preprocessed)) category = 'Groceries'
-    else if (/রেস্তোরাঁ|রেস্টুরেন্ট|খাবার|lunch|dinner|breakfast|cafe|coffee|food|dining|বিরিয়ানি/i.test(preprocessed)) category = 'Food & Dining'
-    else if (/ভাড়া|rent|বাসা|flat|ফ্ল্যাট|apartment/i.test(preprocessed)) category = 'Rent'
-    else if (/রিকশা|বাস|সিএনজি|transport|rickshaw|metro|uber|পাঠাও|petrol|fuel/i.test(preprocessed)) category = 'Transport'
-    else if (/বিদ্যুৎ|গ্যাস|পানি|bill|electric|water|wifi|internet|recharge/i.test(preprocessed)) category = 'Utilities'
-    else if (/ডাক্তার|ওষুধ|চিকিৎসা|doctor|health|medicine|hospital|pharmacy|dental/i.test(preprocessed)) category = 'Healthcare'
-    else if (/শিক্ষা|স্কুল|কলেজ|education|school|university|course|tuition|book/i.test(preprocessed)) category = 'Education'
-    else if (/subscription|সাবস্ক্রিপশন|netflix|spotify|youtube|membership/i.test(preprocessed)) category = 'Subscriptions'
-    else if (/মুভি|সিনেমা|movie|entertainment|game|party|concert/i.test(preprocessed)) category = 'Entertainment'
-    else if (/gadget|phone|laptop|tablet|computer|headphone|charger|camera|smartwatch|earbuds|iphone|samsung|tech/i.test(preprocessed)) category = 'Gadgets & Electronics'
-    else if (/কেনাকাটা|শপিং|shopping|bought|কাপড়|clothes|shoes|ব্যাগ|bag/i.test(preprocessed)) category = 'Shopping'
-    else if (/salon|parlor|beauty|hair|makeup|spa|grooming/i.test(preprocessed)) category = 'Personal Care'
-    else if (/insurance|বীমা|premium/i.test(preprocessed)) category = 'Insurance'
-    else if (/travel|hotel|flight|ticket|visa|tour|vacation/i.test(preprocessed)) category = 'Travel'
-    else if (/gift|উপহার|birthday|wedding/i.test(preprocessed)) category = 'Gifts'
-    else if (/charity|donation|দান|জাকাত/i.test(preprocessed)) category = 'Charity'
+    // Common grocery items — fruits, vegetables, staples, proteins, dairy (English + Bangla)
+    if (/বাজার|মুদি|bazar|grocer|মাছ|মাংস|সবজি|শাক|তরকারি|চাল|ডাল|আলু|পেঁয়াজ|ডিম|দুধ|চিনি|তেল|আটা|মুরগি|রসুন|আদা|টমেটো|\b(grocery|groceries|supermarket|mango|banana|apple|orange|grape|watermelon|melon|guava|papaya|pineapple|strawberr|berry|lemon|lime|coconut|fruit|vegetable|vegitable|veggie|potato|onion|tomato|carrot|cabbage|cauliflower|brinjal|eggplant|spinach|cucumber|pumpkin|garlic|ginger|chil(?:li|i)|lettuce|broccoli|rice|flour|atta|wheat|lentil|dal|pulse|sugar|salt|cooking ?oil|ghee|spice|turmeric|fish|meat|chicken|beef|mutton|pork|egg|prawn|shrimp|hilsa|milk|yogurt|yoghurt|curd|cheese|butter|paneer|bread|biscuit|noodle|pasta|cereal|honey|snack|chips)(?:e?s)?\b/i.test(preprocessed)) category = 'Groceries'
+    else if (/রেস্তোরাঁ|রেস্টুরেন্ট|খাবার|lunch|dinner|breakfast|cafe|coffee|restaurant|food|dining|বিরিয়ানি|pizza|burger|kebab|biryani|zomato|swiggy|foodpanda|takeout|takeaway/i.test(preprocessed)) category = 'Food & Dining'
+    else if (/ভাড়া|rent|বাসা|flat|ফ্ল্যাট|apartment|mortgage/i.test(preprocessed)) category = 'Rent'
+    else if (/রিকশা|বাস|সিএনজি|transport|rickshaw|metro|uber|ola|পাঠাও|pathao|petrol|diesel|fuel|taxi|cab|auto|train|\b(bus|fare|toll|parking)(?:s)?\b/i.test(preprocessed)) category = 'Transport'
+    else if (/বিদ্যুৎ|গ্যাস|পানি|bill|electric|water|wifi|internet|recharge|\b(gas|broadband|utility)(?:ies|s)?\b/i.test(preprocessed)) category = 'Utilities'
+    else if (/ডাক্তার|ওষুধ|চিকিৎসা|doctor|health|medicine|hospital|pharmacy|dental|clinic|\b(pill|syrup|capsule|ointment|bandage|vaccine|injection|checkup|mask)(?:s)?\b/i.test(preprocessed)) category = 'Healthcare'
+    else if (/শিক্ষা|স্কুল|কলেজ|education|school|university|college|course|tuition|\b(book|notebook|pen|pencil|stationery|exam|fee)(?:s)?\b/i.test(preprocessed)) category = 'Education'
+    else if (/subscription|সাবস্ক্রিপশন|netflix|spotify|youtube|membership|prime|hotstar|disney|patreon/i.test(preprocessed)) category = 'Subscriptions'
+    else if (/মুভি|সিনেমা|movie|cinema|entertainment|\b(game|party|concert|show|ticket)(?:s)?\b/i.test(preprocessed)) category = 'Entertainment'
+    else if (/gadget|phone|laptop|tablet|computer|headphone|charger|camera|smartwatch|earbud|iphone|samsung|tech|\b(battery|batteries|cable|adapter|powerbank|power ?bank|bulb|led|mouse|keyboard|monitor|speaker|router|ssd|hdd|usb|pendrive|tv|television|fridge|refrigerator|microwave|oven|appliance|electronic)(?:s)?\b/i.test(preprocessed)) category = 'Gadgets & Electronics'
+    else if (/কেনাকাটা|শপিং|shopping|bought|কাপড়|clothes|shoes|ব্যাগ|\b(bag|shirt|tshirt|t-shirt|pant|trouser|jean|dress|skirt|jacket|coat|sweater|saree|sari|kurta|panjabi|punjabi|salwar|watch|jewelry|jewellery|ring|necklace|bracelet|sunglass|belt|wallet|purse|sandal|slipper|sneaker|toy|furniture|sofa|chair|table|mattress|pillow|curtain|utensil)(?:s)?\b/i.test(preprocessed)) category = 'Shopping'
+    else if (/salon|parlor|parlour|beauty|hair|makeup|spa|grooming|\b(soap|shampoo|toothpaste|toothbrush|razor|blade|deodorant|perfume|lotion|moisturizer|cream|cosmetic|lipstick|sanitary|diaper|tissue|facewash|sunscreen)(?:s)?\b/i.test(preprocessed)) category = 'Personal Care'
+    else if (/insurance|বীমা|premium|policy/i.test(preprocessed)) category = 'Insurance'
+    else if (/travel|hotel|flight|visa|tour|vacation|trip|airbnb|booking/i.test(preprocessed)) category = 'Travel'
+    else if (/gift|উপহার|birthday|wedding|anniversary/i.test(preprocessed)) category = 'Gifts'
+    else if (/charity|donation|দান|জাকাত|zakat|fund/i.test(preprocessed)) category = 'Charity'
     else if (/loan|লোন|কিস্তি|emi|ঋণ|কর্জ/i.test(preprocessed)) category = 'Other'
     else if (/saving|সঞ্চয়|deposit/i.test(preprocessed)) category = 'Other'
   }
 
+  // Classification derived from category, with explicit luxury keywords winning
   let classification = 'need'
   if (isIncome) {
     classification = 'income'
+  } else if (/luxury|designer|premium|branded/i.test(preprocessed)) {
+    classification = 'ego'
   } else {
-    if (/luxury|designer|premium|branded|spa/i.test(preprocessed)) classification = 'ego'
-    else if (/movie|entertainment|subscription|restaurant|dining|shopping|travel|party/i.test(preprocessed)) classification = 'want'
-    else if (/rent|grocerie|electric|water|doctor|medicine|education|transport|insurance|loan|emi/i.test(preprocessed)) classification = 'need'
+    const WANT_CATS = ['Food & Dining', 'Entertainment', 'Shopping', 'Subscriptions', 'Travel', 'Personal Care', 'Gifts', 'Gadgets & Electronics']
+    classification = WANT_CATS.includes(category) ? 'want' : 'need'
   }
 
   let description = text

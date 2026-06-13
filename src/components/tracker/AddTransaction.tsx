@@ -290,7 +290,7 @@ export default function AddTransaction({ onTransactionAdded, userName }: AddTran
   }
 
   const handleBulkSaveAll = async () => {
-    const ready = bulkRows.filter(r => r.status === 'done' && r.data)
+    const ready = bulkRows.filter(r => r.status === 'done' && r.data && r.data.amount > 0)
     if (!ready.length) return
     setIsBulkSaving(true)
     let saved = 0
@@ -614,13 +614,28 @@ export default function AddTransaction({ onTransactionAdded, userName }: AddTran
                               <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${row.data.type === 'income' ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'}`}>
                                 {row.data.type}
                               </span>
-                              <span className="font-bold text-[15px]">{currencySymbol}{row.data.amount.toLocaleString()}</span>
+                              {row.data.amount > 0 ? (
+                                <span className="font-bold text-[15px]">{currencySymbol}{row.data.amount.toLocaleString()}</span>
+                              ) : (
+                                <span className="flex items-center gap-1">
+                                  <span className="text-[13px] text-muted-foreground">{currencySymbol}</span>
+                                  <input
+                                    type="number"
+                                    inputMode="decimal"
+                                    autoFocus
+                                    placeholder="Add amount"
+                                    className="w-24 rounded border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/30 px-2 py-0.5 text-[13px] font-semibold focus:outline-none focus:ring-2 focus:ring-amber-400/50"
+                                    onChange={e => updateBulkRow(row.id, { amount: parseFloat(e.target.value) || 0 })}
+                                  />
+                                </span>
+                              )}
                               <span className="text-muted-foreground truncate">{row.data.description}</span>
                             </div>
                             <div className="flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
                               <span className="px-1.5 py-0.5 rounded bg-muted">{row.data.category}</span>
                               <span>{row.data.date}</span>
                               <span className="capitalize">{row.data.classification}</span>
+                              {row.data.amount <= 0 && <span className="text-amber-600 dark:text-amber-400 font-medium">⚠ needs amount</span>}
                             </div>
                           </div>
                         ) : row.status === 'error' ? (
@@ -650,15 +665,15 @@ export default function AddTransaction({ onTransactionAdded, userName }: AddTran
                   </button>
                   <div className="flex items-center gap-2">
                     <span className="text-xs text-muted-foreground">
-                      {bulkRows.filter(r => r.status === 'done').length} of {bulkRows.length} ready
+                      {bulkRows.filter(r => r.status === 'done' && r.data && r.data.amount > 0).length} of {bulkRows.length} ready
                     </span>
                     <Button
                       onClick={handleBulkSaveAll}
-                      disabled={isBulkSaving || bulkRows.filter(r => r.status === 'done').length === 0}
+                      disabled={isBulkSaving || bulkRows.filter(r => r.status === 'done' && r.data && r.data.amount > 0).length === 0}
                       className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2"
                     >
                       {isBulkSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
-                      {isBulkSaving ? 'Saving…' : `Save ${bulkRows.filter(r => r.status === 'done').length}`}
+                      {isBulkSaving ? 'Saving…' : `Save ${bulkRows.filter(r => r.status === 'done' && r.data && r.data.amount > 0).length}`}
                     </Button>
                   </div>
                 </div>

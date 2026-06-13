@@ -74,9 +74,17 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { type, amount, description, category, spendingType, classification, date, isRecurring, receiptUrl, accountId, tags } = body
 
-    if (!type || !amount || !description || !category) {
+    if (!type || !description || !category) {
       return NextResponse.json(
-        { error: 'Missing required fields: type, amount, description, category' },
+        { error: 'Missing required fields: type, description, category' },
+        { status: 400 }
+      )
+    }
+
+    const numericAmount = parseFloat(amount)
+    if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
+      return NextResponse.json(
+        { error: 'Amount must be a number greater than zero' },
         { status: 400 }
       )
     }

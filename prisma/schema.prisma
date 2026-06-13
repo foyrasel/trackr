@@ -178,3 +178,13 @@ model LendBorrow {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }
+
+model Feedback {
+  id        String   @id @default(cuid())
+  userId    String?  // Optional — feedback may be anonymous
+  email     String?  // Contact email if the user wants a reply
+  category  String   @default("general") // "bug", "feature", "general", "praise"
+  rating    Int?     // Optional 1-5 star rating
+  message   String   // The feedback text
+  createdAt DateTime @default(now())
+}

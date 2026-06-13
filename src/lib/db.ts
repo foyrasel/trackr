@@ -243,6 +243,18 @@ async function runMigrations(url: string, authToken?: string) {
         createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
       )`,
     },
+    {
+      name: 'create_Feedback',
+      sql: `CREATE TABLE IF NOT EXISTS Feedback (
+        id TEXT PRIMARY KEY NOT NULL,
+        userId TEXT,
+        email TEXT,
+        category TEXT NOT NULL DEFAULT 'general',
+        rating INTEGER,
+        message TEXT NOT NULL,
+        createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )`,
+    },
     // Column additions for older databases created before these fields existed
     { name: 'add_password_column', sql: 'ALTER TABLE User ADD COLUMN password TEXT' },
     { name: 'add_emailVerified_column', sql: 'ALTER TABLE User ADD COLUMN emailVerified DATETIME' },

@@ -1151,6 +1151,12 @@ export default function MorePanel({
   // PWA install
   const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null)
 
+  // Feedback form state
+  const [feedbackCategory, setFeedbackCategory] = useState<'bug' | 'feature' | 'general' | 'praise'>('general')
+  const [feedbackMessage, setFeedbackMessage] = useState('')
+  const [feedbackRating, setFeedbackRating] = useState(0)
+  const [feedbackSaving, setFeedbackSaving] = useState(false)
+
   const getAuthHeaders = useCallback((contentType = true): Record<string, string> => {
     const headers: Record<string, string> = {}
     if (contentType) headers['Content-Type'] = 'application/json'
@@ -1258,6 +1264,39 @@ export default function MorePanel({
       toast({ title: 'Notifications enabled!' })
     } else {
       toast({ title: 'Notification permission denied', variant: 'destructive' })
+    }
+  }
+
+  const handleFeedbackSubmit = async () => {
+    const msg = feedbackMessage.trim()
+    if (!msg) {
+      toast({ title: 'Please write your feedback first', variant: 'destructive' })
+      return
+    }
+    setFeedbackSaving(true)
+    try {
+      const res = await fetch('/api/feedback', {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          category: feedbackCategory,
+          rating: feedbackRating || undefined,
+          message: msg,
+        }),
+      })
+      if (res.ok) {
+        toast({ title: 'Thanks for your feedback! 🌿' })
+        setFeedbackMessage('')
+        setFeedbackRating(0)
+        setFeedbackCategory('general')
+      } else {
+        const data = await res.json().catch(() => null)
+        toast({ title: data?.error || 'Could not submit feedback', variant: 'destructive' })
+      }
+    } catch {
+      toast({ title: 'Could not submit feedback', variant: 'destructive' })
+    } finally {
+      setFeedbackSaving(false)
     }
   }
 
@@ -1601,6 +1640,73 @@ export default function MorePanel({
               </div>
             </button>
           ))}
+        </div>
+      </div>
+
+      {/* ── 6. Feedback ── */}
+      <div>
+        <h3 className="text-base font-bold mb-1" style={{ color: '#065f46' }}>💬 Send Feedback</h3>
+        <p className="text-[11px] text-muted-foreground mb-3">Found a bug or have an idea? We&apos;d love to hear from you.</p>
+        <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-4 space-y-3">
+          {/* Category chips */}
+          <div className="flex flex-wrap gap-1.5">
+            {([
+              { id: 'bug', label: '🐛 Bug' },
+              { id: 'feature', label: '✨ Idea' },
+              { id: 'general', label: '💭 General' },
+              { id: 'praise', label: '❤️ Praise' },
+            ] as const).map(opt => (
+              <button
+                key={opt.id}
+                onClick={() => setFeedbackCategory(opt.id)}
+                className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                  feedbackCategory === opt.id
+                    ? 'bg-emerald-600 text-white'
+                    : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Star rating */}
+          <div className="flex items-center gap-1">
+            {[1, 2, 3, 4, 5].map(star => (
+              <button
+                key={star}
+                onClick={() => setFeedbackRating(star === feedbackRating ? 0 : star)}
+                className="text-xl leading-none transition-transform hover:scale-110"
+                aria-label={`Rate ${star} star${star > 1 ? 's' : ''}`}
+              >
+                <span className={star <= feedbackRating ? 'opacity-100' : 'opacity-30'}>⭐</span>
+              </button>
+            ))}
+            {feedbackRating > 0 && (
+              <span className="ml-1 text-xs text-muted-foreground">{feedbackRating}/5</span>
+            )}
+          </div>
+
+          {/* Message */}
+          <textarea
+            value={feedbackMessage}
+            onChange={e => setFeedbackMessage(e.target.value)}
+            maxLength={2000}
+            placeholder="Tell us what's on your mind…"
+            className="w-full min-h-[88px] rounded-xl border border-gray-200 dark:border-gray-700 bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-emerald-500/40 resize-y"
+          />
+
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] text-muted-foreground">{feedbackMessage.length}/2000</span>
+            <button
+              onClick={handleFeedbackSubmit}
+              disabled={feedbackSaving || !feedbackMessage.trim()}
+              className="px-4 py-2 rounded-xl text-sm font-semibold text-white disabled:opacity-50 transition-opacity"
+              style={{ background: '#065f46' }}
+            >
+              {feedbackSaving ? 'Sending…' : 'Send Feedback'}
+            </button>
+          </div>
         </div>
       </div>
 
