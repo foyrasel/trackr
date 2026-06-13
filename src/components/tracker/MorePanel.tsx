@@ -787,6 +787,22 @@ const LANGUAGES = [
   { code: 'hi', label: 'हिन्दी (Hindi)', flag: '🇮🇳' },
 ]
 
+interface SecurityEvent {
+  id: string
+  type: string
+  ip: string
+  path: string
+  ua?: string | null
+  createdAt: string
+}
+
+interface SecuritySummary {
+  total: number
+  rateLimits: number
+  botBlocks: number
+  honeypots: number
+}
+
 function SettingsPanel({
   userName,
   onBack,
@@ -802,6 +818,10 @@ function SettingsPanel({
   const [hasGeminiKey, setHasGeminiKey] = useState(false)
   const [showGeminiKey, setShowGeminiKey] = useState(false)
   const [geminiKeyStatus, setGeminiKeyStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
+  const [securityEvents, setSecurityEvents] = useState<SecurityEvent[]>([])
+  const [securitySummary, setSecuritySummary] = useState<SecuritySummary | null>(null)
+  const [securityOpen, setSecurityOpen] = useState(false)
+  const [securityLoading, setSecurityLoading] = useState(false)
 
   // Check for PWA install prompt on mount (only runs client-side)
   useEffect(() => {
@@ -836,6 +856,20 @@ function SettingsPanel({
     }
     load()
   }, [userName])
+
+  const loadSecurityEvents = async () => {
+    setSecurityLoading(true)
+    try {
+      const res = await fetch('/api/security/log')
+      if (res.ok) {
+        const data = await res.json()
+        setSecurityEvents(data.events ?? [])
+        setSecuritySummary(data.summary ?? null)
+      }
+    } catch {} finally {
+      setSecurityLoading(false)
+    }
+  }
 
   const handleEnableNotifications = async () => {
     const granted = await requestPermission()
@@ -1095,6 +1129,88 @@ function SettingsPanel({
             </a>
             {' '}— free 1,500 requests/day
           </p>
+        </CardContent>
+      </Card>
+
+      {/* Security Monitor */}
+      <Card>
+        <CardContent className="p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="text-lg">🛡️</span>
+              <div>
+                <p className="font-semibold text-sm">Security Monitor</p>
+                <p className="text-xs text-muted-foreground">Blocked bots &amp; rate-limit hits</p>
+              </div>
+            </div>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                if (!securityOpen) { setSecurityOpen(true); loadSecurityEvents() }
+                else setSecurityOpen(false)
+              }}
+            >
+              {securityOpen ? 'Hide' : 'View'}
+            </Button>
+          </div>
+
+          {securityOpen && (
+            <div className="space-y-3">
+              {securityLoading ? (
+                <p className="text-xs text-muted-foreground text-center py-2">Loading…</p>
+              ) : (
+                <>
+                  {securitySummary && (
+                    <div className="grid grid-cols-3 gap-2 text-center">
+                      <div className="rounded-lg bg-red-50 dark:bg-red-950/30 p-2">
+                        <p className="text-lg font-bold text-red-600">{securitySummary.rateLimits}</p>
+                        <p className="text-[10px] text-muted-foreground">Rate limits</p>
+                      </div>
+                      <div className="rounded-lg bg-orange-50 dark:bg-orange-950/30 p-2">
+                        <p className="text-lg font-bold text-orange-600">{securitySummary.botBlocks}</p>
+                        <p className="text-[10px] text-muted-foreground">Bot blocks</p>
+                      </div>
+                      <div className="rounded-lg bg-yellow-50 dark:bg-yellow-950/30 p-2">
+                        <p className="text-lg font-bold text-yellow-600">{securitySummary.honeypots}</p>
+                        <p className="text-[10px] text-muted-foreground">Honeypots</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {securityEvents.length === 0 ? (
+                    <p className="text-xs text-muted-foreground text-center py-2">No attacks detected yet. All clear!</p>
+                  ) : (
+                    <div className="space-y-1 max-h-60 overflow-y-auto">
+                      {securityEvents.map(ev => (
+                        <div key={ev.id} className="flex items-start gap-2 text-xs border-b pb-1 last:border-0">
+                          <span className="shrink-0 mt-0.5">
+                            {ev.type === 'rate_limit' ? '🚫' : ev.type === 'bot_ua' ? '🤖' : '🪤'}
+                          </span>
+                          <div className="min-w-0 flex-1">
+                            <span className="font-medium">
+                              {ev.type === 'rate_limit' ? 'Rate limit' : ev.type === 'bot_ua' ? 'Bot blocked' : 'Honeypot'}
+                            </span>
+                            {' · '}
+                            <span className="text-muted-foreground">{ev.path}</span>
+                            {' · '}
+                            <span className="font-mono text-muted-foreground">{ev.ip}</span>
+                          </div>
+                          <span className="shrink-0 text-muted-foreground">
+                            {new Date(ev.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  <Button size="sm" variant="ghost" className="w-full text-xs" onClick={loadSecurityEvents}>
+                    Refresh
+                  </Button>
+                </>
+              )}
+            </div>
+          )}
         </CardContent>
       </Card>
 

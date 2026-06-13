@@ -188,3 +188,12 @@ model Feedback {
   message   String   // The feedback text
   createdAt DateTime @default(now())
 }
+
+model SecurityLog {
+  id        String   @id @default(cuid())
+  type      String   // "rate_limit" | "bot_ua" | "honeypot"
+  ip        String   // Originating IP (first x-forwarded-for value)
+  path      String   // Request path that was blocked
+  ua        String?  // User-Agent header (may be empty for bots)
+  createdAt DateTime @default(now())
+}

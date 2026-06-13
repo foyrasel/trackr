@@ -9,6 +9,7 @@ const PUBLIC_API_PATHS = [
   '/api/seed-demo',
   '/api/health',
   '/api/debug-env',
+  '/api/security/log', // internal logging endpoint — protected by x-internal-key, not JWT
 ]
 
 // ---------------------------------------------------------------------------
@@ -115,6 +116,26 @@ const RATE_LIMIT_RULES: Array<{ path: string; limit: number; windowMs: number }>
 ]
 
 // ---------------------------------------------------------------------------
+// Fire-and-forget security event logger (non-blocking)
+// ---------------------------------------------------------------------------
+function logSecurityEvent(
+  request: NextRequest,
+  type: 'rate_limit' | 'bot_ua' | 'honeypot',
+  ip: string,
+): void {
+  const origin = request.nextUrl.origin
+  const ua = request.headers.get('user-agent') ?? undefined
+  fetch(`${origin}/api/security/log`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-internal-key': process.env.NEXTAUTH_SECRET ?? '',
+    },
+    body: JSON.stringify({ type, ip, path: request.nextUrl.pathname, ua }),
+  }).catch(() => {}) // intentional fire-and-forget
+}
+
+// ---------------------------------------------------------------------------
 
 export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname
@@ -141,6 +162,7 @@ export async function middleware(request: NextRequest) {
   // ------------------------------------------------------------------
   const isSensitivePublic = RATE_LIMIT_RULES.some(r => pathname.startsWith(r.path))
   if (isSensitivePublic && isSuspiciousUA(ua)) {
+    logSecurityEvent(request, 'bot_ua', ip)
     return new NextResponse(
       JSON.stringify({ error: 'Forbidden' }),
       { status: 403, headers: { 'Content-Type': 'application/json' } }
@@ -154,6 +176,7 @@ export async function middleware(request: NextRequest) {
     if (pathname.startsWith(rule.path)) {
       const key = `${rule.path}::${ip}`
       if (!checkRateLimit(key, rule.limit, rule.windowMs)) {
+        logSecurityEvent(request, 'rate_limit', ip)
         const retryAfterSecs = Math.ceil(rule.windowMs / 1000)
         const res = rateLimitResponse(retryAfterSecs)
         addSecurityHeaders(res)
