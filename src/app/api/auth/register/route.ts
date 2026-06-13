@@ -10,7 +10,12 @@ function generateVerificationCode(): string {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { name, email, password } = body
+    const { name, email, password, _h } = body
+
+    // Honeypot: bots fill hidden fields, real browsers leave them empty
+    if (_h) {
+      return NextResponse.json({ userId: 'bot', email, message: 'Verification email sent.' }, { status: 201 })
+    }
 
     if (!email || !password || !name) {
       return NextResponse.json(

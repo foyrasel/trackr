@@ -59,6 +59,7 @@ export default function AuthModal({ isOpen, onClose, defaultMode = 'login', onLo
   const [success, setSuccess] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [googleAvailable, setGoogleAvailable] = useState(true)
+  const [honeypot, setHoneypot] = useState('')
 
   // Check if Google OAuth is configured
   useEffect(() => {
@@ -159,7 +160,7 @@ export default function AuthModal({ isOpen, onClose, defaultMode = 'login', onLo
       const response = await fetch('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: name.trim(), email: email.trim(), password }),
+        body: JSON.stringify({ name: name.trim(), email: email.trim(), password, _h: honeypot }),
       })
       const data = await response.json()
       if (response.ok) {
@@ -558,6 +559,18 @@ export default function AuthModal({ isOpen, onClose, defaultMode = 'login', onLo
                       >
                         {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                       </button>
+                    </div>
+
+                    {/* Honeypot — hidden from real users, bots fill it in */}
+                    <div style={{ position: 'absolute', left: '-9999px', top: '-9999px' }} aria-hidden="true" tabIndex={-1}>
+                      <input
+                        type="text"
+                        name="website"
+                        autoComplete="off"
+                        value={honeypot}
+                        onChange={(e) => setHoneypot(e.target.value)}
+                        tabIndex={-1}
+                      />
                     </div>
 
                     {/* Primary button */}
