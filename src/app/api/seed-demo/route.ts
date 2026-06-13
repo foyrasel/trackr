@@ -13,17 +13,20 @@ function randomChoice<T>(arr: T[]): T {
 // ─── User 1: Corporate Employee ───
 async function seedCorporateUser(userId: string) {
   const now = new Date()
-  
-  // Create accounts
-  await db.account.createMany({
-    data: [
-      { userId, name: 'HDFC Salary Account', type: 'debit', balance: 45000, color: '#004B87', icon: '🏦', isDefault: true },
-      { userId, name: 'SBI Savings', type: 'debit', balance: 120000, color: '#1a237e', icon: '🏦', isDefault: false },
-      { userId, name: 'HDFC Credit Card', type: 'credit', balance: 35000, color: '#004B87', icon: '💳', isDefault: false },
-      { userId, name: 'Cash', type: 'cash', balance: 5000, color: '#10b981', icon: '💵', isDefault: false },
-      { userId, name: 'GPay', type: 'mobile', balance: 8000, color: '#4285f4', icon: '📱', isDefault: false },
-    ],
-  })
+
+  // Create accounts only if none exist yet
+  const existingAccounts = await db.account.count({ where: { userId } })
+  if (existingAccounts === 0) {
+    await db.account.createMany({
+      data: [
+        { userId, name: 'HDFC Salary Account', type: 'debit', balance: 45000, color: '#004B87', icon: '🏦', isDefault: true },
+        { userId, name: 'SBI Savings', type: 'debit', balance: 120000, color: '#1a237e', icon: '🏦', isDefault: false },
+        { userId, name: 'HDFC Credit Card', type: 'credit', balance: 35000, color: '#004B87', icon: '💳', isDefault: false },
+        { userId, name: 'Cash', type: 'cash', balance: 5000, color: '#10b981', icon: '💵', isDefault: false },
+        { userId, name: 'GPay', type: 'mobile', balance: 8000, color: '#4285f4', icon: '📱', isDefault: false },
+      ],
+    })
+  }
 
   const transactions: any[] = []
   const SPENDING_TYPES = ['debit', 'credit', 'mobile', 'cash']
@@ -153,15 +156,18 @@ async function seedCorporateUser(userId: string) {
 // ─── User 2: Government Employee ───
 async function seedGovtUser(userId: string) {
   const now = new Date()
-  
-  await db.account.createMany({
-    data: [
-      { userId, name: 'SBI Salary Account', type: 'debit', balance: 85000, color: '#1a237e', icon: '🏦', isDefault: true },
-      { userId, name: 'Post Office Savings', type: 'debit', balance: 200000, color: '#f59e0b', icon: '🏦', isDefault: false },
-      { userId, name: 'Cash', type: 'cash', balance: 3000, color: '#10b981', icon: '💵', isDefault: false },
-      { userId, name: 'PhonePe', type: 'mobile', balance: 5000, color: '#5f259f', icon: '📱', isDefault: false },
-    ],
-  })
+
+  const existingAccounts = await db.account.count({ where: { userId } })
+  if (existingAccounts === 0) {
+    await db.account.createMany({
+      data: [
+        { userId, name: 'SBI Salary Account', type: 'debit', balance: 85000, color: '#1a237e', icon: '🏦', isDefault: true },
+        { userId, name: 'Post Office Savings', type: 'debit', balance: 200000, color: '#f59e0b', icon: '🏦', isDefault: false },
+        { userId, name: 'Cash', type: 'cash', balance: 3000, color: '#10b981', icon: '💵', isDefault: false },
+        { userId, name: 'PhonePe', type: 'mobile', balance: 5000, color: '#5f259f', icon: '📱', isDefault: false },
+      ],
+    })
+  }
 
   const transactions: any[] = []
   
@@ -280,6 +286,59 @@ async function seedGovtUser(userId: string) {
   return pastOnly.length
 }
 
+// ─── Seed Goals, Reminders, LendBorrow, Recurring for a user ───
+async function seedExtras(userId: string) {
+  const now = new Date()
+  const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1)
+  const threeMonths = new Date(now.getFullYear(), now.getMonth() + 3, 1)
+
+  const existingGoals = await db.goal.count({ where: { userId } })
+  if (existingGoals === 0) {
+    await db.goal.createMany({
+      data: [
+        { userId, name: 'Emergency Fund', targetAmount: 300000, savedAmount: 85000, icon: '🛡️', color: '#10b981', deadline: threeMonths },
+        { userId, name: 'New Laptop', targetAmount: 150000, savedAmount: 60000, icon: '💻', color: '#3b82f6', deadline: new Date(now.getFullYear(), now.getMonth() + 5, 1) },
+        { userId, name: 'Goa Trip', targetAmount: 50000, savedAmount: 22000, icon: '✈️', color: '#f59e0b', deadline: new Date(now.getFullYear(), now.getMonth() + 2, 1) },
+      ],
+    })
+  }
+
+  const existingReminders = await db.reminder.count({ where: { userId } })
+  if (existingReminders === 0) {
+    await db.reminder.createMany({
+      data: [
+        { userId, title: 'Pay Credit Card Bill', amount: 35000, category: 'Utilities', dueDate: new Date(now.getFullYear(), now.getMonth(), 25), remindDays: 5, isRecurring: true, frequency: 'monthly' },
+        { userId, title: 'JioFiber Renewal', amount: 999, category: 'Utilities', dueDate: nextMonth, remindDays: 3, isRecurring: true, frequency: 'monthly' },
+        { userId, title: 'Car Insurance Premium', amount: 18500, category: 'Insurance', dueDate: new Date(now.getFullYear() + 1, 0, 15), remindDays: 14 },
+      ],
+    })
+  }
+
+  const existingLendBorrow = await db.lendBorrow.count({ where: { userId } })
+  if (existingLendBorrow === 0) {
+    await db.lendBorrow.createMany({
+      data: [
+        { userId, type: 'lend', amount: 5000, person: 'Rahul', description: 'Split for dinner + movie', date: new Date(now.getFullYear(), now.getMonth() - 1, 15), dueDate: nextMonth },
+        { userId, type: 'borrow', amount: 2000, person: 'Priya', description: 'Borrowed for cab', date: new Date(now.getFullYear(), now.getMonth(), 5) },
+        { userId, type: 'lend', amount: 10000, person: 'Amit', description: 'Emergency medical', date: new Date(now.getFullYear(), now.getMonth() - 2, 3), isSettled: true, settledDate: new Date(now.getFullYear(), now.getMonth() - 1, 3) },
+      ],
+    })
+  }
+
+  const existingRecurring = await db.recurringTransaction.count({ where: { userId } })
+  if (existingRecurring === 0) {
+    await db.recurringTransaction.createMany({
+      data: [
+        { userId, type: 'income', amount: 95000, description: 'HDFC Monthly Salary', category: 'Salary', classification: 'savings', spendingType: 'debit', frequency: 'monthly', dayOfMonth: 1 },
+        { userId, type: 'expense', amount: 25000, description: 'Apartment Rent', category: 'Rent', classification: 'need', spendingType: 'debit', frequency: 'monthly', dayOfMonth: 1 },
+        { userId, type: 'expense', amount: 649, description: 'Netflix', category: 'Subscriptions', classification: 'want', spendingType: 'credit', frequency: 'monthly', dayOfMonth: 5 },
+        { userId, type: 'expense', amount: 119, description: 'Spotify Premium', category: 'Subscriptions', classification: 'want', spendingType: 'credit', frequency: 'monthly', dayOfMonth: 5 },
+        { userId, type: 'expense', amount: 3500, description: 'Gym Membership', category: 'Healthcare', classification: 'want', spendingType: 'credit', frequency: 'monthly', dayOfMonth: 3 },
+      ],
+    })
+  }
+}
+
 export async function GET() {
   try {
     const results: Array<{ email: string; password: string; transactionCount: number }> = []
@@ -309,6 +368,7 @@ export async function GET() {
       } else {
         results.push({ email: 'corporate@test.com', password: 'password123', transactionCount: existingTxnCount })
       }
+      await seedExtras(corpUser.id)
     }
 
     // ── User 2: Government Employee ──
