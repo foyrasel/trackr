@@ -18,6 +18,186 @@ const CATEGORIES = {
 const SPENDING_TYPES = ['cash', 'debit', 'credit']
 const CLASSIFICATIONS = ['need', 'want', 'ego', 'savings', 'debt']
 
+// ─────────────────────────────────────────────────────────────
+// Offline category identification (used when no AI key is set).
+// A priority-ordered keyword lexicon + a fuzzy (edit-distance) matcher
+// so that even misspelled product names are categorised correctly.
+// ─────────────────────────────────────────────────────────────
+type LexEntry = { category: string; en: string[]; bn?: string[] }
+
+const EXPENSE_LEXICON: LexEntry[] = [
+  {
+    category: 'Groceries',
+    en: [
+      'grocery', 'groceries', 'supermarket', 'market', 'kirana',
+      // fruits
+      'mango', 'banana', 'apple', 'orange', 'grape', 'watermelon', 'melon', 'guava', 'papaya', 'pineapple', 'strawberry', 'berry', 'lemon', 'lime', 'coconut', 'fruit', 'pomegranate', 'cherry', 'peach',
+      // vegetables
+      'vegetable', 'vegitable', 'veggie', 'potato', 'onion', 'tomato', 'carrot', 'cabbage', 'cauliflower', 'brinjal', 'eggplant', 'spinach', 'cucumber', 'pumpkin', 'garlic', 'ginger', 'chili', 'chilli', 'pepper', 'lettuce', 'broccoli', 'bean', 'okra', 'radish', 'mushroom', 'coriander',
+      // staples & pantry
+      'rice', 'flour', 'atta', 'maida', 'wheat', 'lentil', 'dal', 'pulse', 'sugar', 'salt', 'oil', 'ghee', 'spice', 'turmeric', 'semolina', 'oats', 'noodle', 'pasta', 'cereal', 'vermicelli', 'bread', 'biscuit', 'jam', 'honey', 'tea', 'snack', 'chips', 'sauce', 'ketchup', 'pickle', 'chocolate', 'candy', 'juice',
+      // proteins
+      'fish', 'meat', 'chicken', 'beef', 'mutton', 'pork', 'egg', 'prawn', 'shrimp', 'hilsa',
+      // dairy
+      'milk', 'yogurt', 'yoghurt', 'curd', 'cheese', 'butter', 'paneer', 'cream',
+      // household / cleaning consumables
+      'detergent', 'dishwash', 'dishwasher', 'cleaner', 'cleaning', 'bleach', 'phenyl', 'harpic', 'surf', 'disinfectant', 'dettol', 'toiletpaper', 'napkin', 'broom', 'mop', 'freshener', 'repellent', 'matchbox', 'handwash', 'softener',
+    ],
+    bn: ['বাজার', 'মুদি', 'মাছ', 'মাংস', 'সবজি', 'শাক', 'তরকারি', 'চাল', 'ডাল', 'আলু', 'পেঁয়াজ', 'ডিম', 'দুধ', 'চিনি', 'তেল', 'আটা', 'মুরগি', 'রসুন', 'আদা', 'টমেটো', 'সাবান', 'ডিটারজেন্ট'],
+  },
+  {
+    category: 'Food & Dining',
+    en: ['restaurant', 'cafe', 'coffee', 'lunch', 'dinner', 'breakfast', 'brunch', 'food', 'dining', 'pizza', 'burger', 'kebab', 'biryani', 'biriyani', 'sandwich', 'momo', 'shawarma', 'fries', 'dessert', 'icecream', 'ice cream', 'cake', 'pastry', 'zomato', 'swiggy', 'foodpanda', 'ubereats', 'takeout', 'takeaway', 'meal', 'buffet', 'barbeque'],
+    bn: ['রেস্তোরাঁ', 'রেস্টুরেন্ট', 'খাবার', 'বিরিয়ানি'],
+  },
+  {
+    category: 'Rent',
+    en: ['rent', 'flat', 'apartment', 'mortgage', 'lease', 'hostel'],
+    bn: ['ভাড়া', 'বাসা', 'ফ্ল্যাট'],
+  },
+  {
+    category: 'Transport',
+    en: ['transport', 'rickshaw', 'metro', 'uber', 'ola', 'pathao', 'petrol', 'diesel', 'fuel', 'taxi', 'cab', 'train', 'bus', 'fare', 'toll', 'parking', 'cng', 'tram', 'ferry', 'scooter', 'auto', 'ride'],
+    bn: ['রিকশা', 'বাস', 'সিএনজি', 'পাঠাও'],
+  },
+  {
+    category: 'Utilities',
+    en: ['bill', 'electricity', 'electric', 'water', 'wifi', 'internet', 'recharge', 'gas', 'broadband', 'utility', 'postpaid', 'prepaid', 'dth'],
+    bn: ['বিদ্যুৎ', 'গ্যাস', 'পানি'],
+  },
+  {
+    category: 'Healthcare',
+    en: ['doctor', 'health', 'medicine', 'medical', 'hospital', 'pharmacy', 'dental', 'dentist', 'clinic', 'pill', 'syrup', 'capsule', 'ointment', 'bandage', 'vaccine', 'injection', 'checkup', 'mask', 'surgery', 'therapy', 'prescription'],
+    bn: ['ডাক্তার', 'ওষুধ', 'চিকিৎসা'],
+  },
+  {
+    category: 'Education',
+    en: ['education', 'school', 'university', 'college', 'course', 'tuition', 'book', 'notebook', 'pencil', 'stationery', 'exam', 'coaching', 'seminar', 'workshop', 'admission', 'semester', 'textbook', 'fees'],
+    bn: ['শিক্ষা', 'স্কুল', 'কলেজ'],
+  },
+  {
+    category: 'Subscriptions',
+    en: ['subscription', 'netflix', 'spotify', 'youtube', 'membership', 'prime', 'hotstar', 'disney', 'patreon', 'icloud', 'chatgpt'],
+    bn: ['সাবস্ক্রিপশন'],
+  },
+  {
+    category: 'Entertainment',
+    en: ['movie', 'cinema', 'entertainment', 'game', 'gaming', 'party', 'concert', 'show', 'theatre', 'theater', 'amusement', 'arcade', 'bowling', 'nightclub', 'playstation', 'xbox'],
+    bn: ['মুভি', 'সিনেমা'],
+  },
+  {
+    category: 'Gadgets & Electronics',
+    en: ['gadget', 'phone', 'smartphone', 'laptop', 'tablet', 'computer', 'headphone', 'earphone', 'earbud', 'charger', 'camera', 'smartwatch', 'iphone', 'android', 'samsung', 'xiaomi', 'battery', 'cable', 'adapter', 'powerbank', 'power bank', 'bulb', 'light', 'mouse', 'keyboard', 'monitor', 'speaker', 'router', 'ssd', 'hdd', 'usb', 'pendrive', 'television', 'fridge', 'refrigerator', 'microwave', 'oven', 'appliance', 'electronic', 'printer', 'console'],
+  },
+  {
+    category: 'Shopping',
+    en: ['shopping', 'clothes', 'clothing', 'shoe', 'bag', 'shirt', 'tshirt', 't-shirt', 'pant', 'trouser', 'jean', 'dress', 'skirt', 'jacket', 'coat', 'sweater', 'hoodie', 'saree', 'sari', 'kurta', 'panjabi', 'punjabi', 'salwar', 'kameez', 'lehenga', 'watch', 'jewelry', 'jewellery', 'ring', 'necklace', 'bracelet', 'earring', 'sunglass', 'belt', 'wallet', 'purse', 'sandal', 'slipper', 'sneaker', 'toy', 'furniture', 'sofa', 'chair', 'table', 'mattress', 'pillow', 'curtain', 'utensil', 'bedsheet', 'blanket'],
+    bn: ['কেনাকাটা', 'শপিং', 'কাপড়', 'ব্যাগ'],
+  },
+  {
+    category: 'Personal Care',
+    en: ['salon', 'parlor', 'parlour', 'beauty', 'hair', 'haircut', 'makeup', 'spa', 'grooming', 'soap', 'shampoo', 'conditioner', 'toothpaste', 'toothbrush', 'razor', 'blade', 'shave', 'deodorant', 'perfume', 'lotion', 'moisturizer', 'cosmetic', 'lipstick', 'nail', 'sanitary', 'diaper', 'tissue', 'facewash', 'sunscreen', 'comb', 'towel', 'manicure', 'pedicure', 'wax'],
+  },
+  {
+    category: 'Insurance',
+    en: ['insurance', 'premium', 'policy', 'lic'],
+    bn: ['বীমা'],
+  },
+  {
+    category: 'Travel',
+    en: ['travel', 'hotel', 'flight', 'airfare', 'visa', 'tour', 'vacation', 'trip', 'airbnb', 'booking', 'resort', 'holiday', 'passport', 'airline', 'cruise'],
+  },
+  {
+    category: 'Gifts',
+    en: ['gift', 'birthday', 'wedding', 'anniversary'],
+    bn: ['উপহার'],
+  },
+  {
+    category: 'Charity',
+    en: ['charity', 'donation', 'zakat', 'sadaqah', 'relief'],
+    bn: ['দান', 'জাকাত'],
+  },
+]
+
+const INCOME_LEXICON: LexEntry[] = [
+  { category: 'Salary', en: ['salary', 'paycheck', 'payroll', 'wage', 'stipend'], bn: ['বেতন', 'ব্যতন'] },
+  { category: 'Freelance', en: ['freelance', 'freelancing', 'upwork', 'fiverr', 'gig'], bn: ['ফ্রিল্যান্স'] },
+  { category: 'Business', en: ['business', 'profit', 'sales', 'revenue'], bn: ['ব্যবসা', 'বিক্রি'] },
+  { category: 'Investment', en: ['investment', 'dividend', 'stock', 'shares', 'interest', 'crypto'], bn: ['শেয়ার'] },
+  { category: 'Rental', en: ['rental', 'tenant'], bn: [] },
+  { category: 'Side Hustle', en: ['hustle', 'commission', 'bonus', 'tips', 'parttime'], bn: [] },
+  { category: 'Gift Received', en: ['eidi', 'salami'], bn: ['সালামি'] },
+  { category: 'Refund', en: ['refund', 'cashback', 'reimbursement'], bn: ['রিফান্ড'] },
+]
+
+function escapeReg(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+// Exact match: word boundaries with optional plural for English; substring for Bangla.
+function exactCategory(text: string, lexicon: LexEntry[]): string | null {
+  for (const entry of lexicon) {
+    if (entry.bn && entry.bn.some(w => w && text.includes(w))) return entry.category
+    if (entry.en.length) {
+      const pattern = new RegExp(`\\b(?:${entry.en.map(escapeReg).join('|')})(?:e?s)?\\b`, 'i')
+      if (pattern.test(text)) return entry.category
+    }
+  }
+  return null
+}
+
+// Bounded Levenshtein edit distance — returns max+1 as soon as it exceeds max.
+function editDistance(a: string, b: string, max: number): number {
+  const al = a.length, bl = b.length
+  if (Math.abs(al - bl) > max) return max + 1
+  let prev = Array.from({ length: bl + 1 }, (_, j) => j)
+  for (let i = 1; i <= al; i++) {
+    const cur = new Array(bl + 1)
+    cur[0] = i
+    let rowMin = cur[0]
+    for (let j = 1; j <= bl; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1
+      cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + cost)
+      if (cur[j] < rowMin) rowMin = cur[j]
+    }
+    if (rowMin > max) return max + 1
+    prev = cur
+  }
+  return prev[bl]
+}
+
+// Fuzzy match: tokenise the input and find the closest keyword within an
+// edit-distance threshold, so misspelled items ("vegitables", "detergant",
+// "battary") still resolve. Ties break toward higher lexicon priority.
+function fuzzyCategory(text: string, lexicon: LexEntry[]): string | null {
+  const tokens = (text.toLowerCase().match(/[a-z]{4,}/g) || [])
+  if (!tokens.length) return null
+  let bestCat: string | null = null
+  let bestDist = Infinity
+  let bestPrio = Infinity
+  lexicon.forEach((entry, prio) => {
+    for (const kw of entry.en) {
+      if (/[^a-z]/.test(kw) || kw.length < 4) continue // skip phrases/short words
+      const maxd = kw.length <= 5 ? 1 : 2
+      for (const tok of tokens) {
+        if (Math.abs(tok.length - kw.length) > maxd) continue
+        if (tok === kw) continue // exact would have matched already
+        const d = editDistance(tok, kw, maxd)
+        if (d <= maxd && (d < bestDist || (d === bestDist && prio < bestPrio))) {
+          bestCat = entry.category
+          bestDist = d
+          bestPrio = prio
+        }
+      }
+    }
+  })
+  return bestCat
+}
+
+function detectCategory(text: string, lexicon: LexEntry[]): string {
+  return exactCategory(text, lexicon) ?? fuzzyCategory(text, lexicon) ?? 'Other'
+}
+
 const BANGLA_CORRECTIONS: Record<string, string> = {
   'টাকার': 'টাকা', 'টাকাে': 'টাকা', 'খরচা': 'খরচ', 'খরোচ': 'খরচ',
   'বাজাৰ': 'বাজার', 'ভাড়ায়': 'ভাড়া', 'ব্যতন': 'বেতন', 'রিক্সা': 'রিকশা',
@@ -154,6 +334,22 @@ You MUST respond with ONLY a valid JSON object (no markdown, no explanation) wit
 - "spendingType": string (must be one of: ${SPENDING_TYPES.join(', ')}) - default "cash" if not mentioned
 - "classification": string (for expenses: ${CLASSIFICATIONS.join(', ')}; for income use "income")
 - "date": string or null (if user mentions a date like "yesterday"/"গতকাল"/"3 days ago", return YYYY-MM-DD; otherwise null)
+
+Category guide (always pick the closest; use "Other" only as a last resort):
+- Groceries: food & kitchen items AND household consumables — fruits, vegetables, rice, fish, meat, egg, milk, oil, spices, snacks, AND cleaning/household supplies (detergent, dishwash, soap for home, tissue, broom)
+- Food & Dining: prepared/restaurant food, cafe, coffee, takeout (Zomato/Swiggy/foodpanda)
+- Transport: rickshaw, bus, uber/pathao, taxi, fuel/petrol, parking, train fare
+- Utilities: electricity, water, gas, internet/wifi, mobile recharge, bills
+- Healthcare: doctor, medicine, pharmacy, hospital, dental, lab tests
+- Education: school/college fees, tuition, courses, books, stationery
+- Entertainment: movies, games, concerts, parties, shows
+- Shopping: clothes, shoes, accessories, furniture, toys, household goods (non-consumable)
+- Personal Care: salon, haircut, cosmetics, shampoo, skincare, toiletries for the body
+- Gadgets & Electronics: phone, laptop, chargers, batteries, cables, appliances
+- Subscriptions: Netflix, Spotify, memberships, recurring digital services
+- Insurance / Travel / Rent / Gifts / Charity: as named
+
+IMPORTANT: Users often misspell item names (e.g. "vegitables"=vegetables, "detergant"=detergent, "battary"=battery, "tomato"="tometo"). Infer the intended product and categorise it correctly — never fall back to "Other" just because of a typo.
 
 Classification guide:
 - "need": Essential expenses (rent, groceries, utilities, healthcare, education, transport)
@@ -364,33 +560,13 @@ function extractBasicInfo(text: string): {
     else if (/লাখ|lakh/i.test(preprocessed) && amount < 100) amount = amount * 100000
   }
 
-  let category = 'Other'
-  if (isIncome) {
-    if (/বেতন|ব্যতন|salary|paycheck|wage/i.test(preprocessed)) category = 'Salary'
-    else if (/freelance|ফ্রিল্যান্স/i.test(preprocessed)) category = 'Freelance'
-    else if (/ব্যবসা|business|profit|বিক্রি/i.test(preprocessed)) category = 'Business'
-    else if (/investment|dividend|stock|শেয়ার/i.test(preprocessed)) category = 'Investment'
-    else if (/refund|রিফান্ড|cashback/i.test(preprocessed)) category = 'Refund'
+  // Identify the category from the keyword lexicon (exact + fuzzy/typo-tolerant).
+  // Debt/savings keywords map to "Other" since they aren't standalone categories.
+  let category: string
+  if (/loan|লোন|কিস্তি|emi|ঋণ|কর্জ|saving|সঞ্চয়|deposit/i.test(preprocessed)) {
+    category = 'Other'
   } else {
-    // Common grocery items — fruits, vegetables, staples, proteins, dairy (English + Bangla)
-    if (/বাজার|মুদি|bazar|grocer|মাছ|মাংস|সবজি|শাক|তরকারি|চাল|ডাল|আলু|পেঁয়াজ|ডিম|দুধ|চিনি|তেল|আটা|মুরগি|রসুন|আদা|টমেটো|\b(grocery|groceries|supermarket|mango|banana|apple|orange|grape|watermelon|melon|guava|papaya|pineapple|strawberr|berry|lemon|lime|coconut|fruit|vegetable|vegitable|veggie|potato|onion|tomato|carrot|cabbage|cauliflower|brinjal|eggplant|spinach|cucumber|pumpkin|garlic|ginger|chil(?:li|i)|lettuce|broccoli|rice|flour|atta|wheat|lentil|dal|pulse|sugar|salt|cooking ?oil|ghee|spice|turmeric|fish|meat|chicken|beef|mutton|pork|egg|prawn|shrimp|hilsa|milk|yogurt|yoghurt|curd|cheese|butter|paneer|bread|biscuit|noodle|pasta|cereal|honey|snack|chips)(?:e?s)?\b/i.test(preprocessed)) category = 'Groceries'
-    else if (/রেস্তোরাঁ|রেস্টুরেন্ট|খাবার|lunch|dinner|breakfast|cafe|coffee|restaurant|food|dining|বিরিয়ানি|pizza|burger|kebab|biryani|zomato|swiggy|foodpanda|takeout|takeaway/i.test(preprocessed)) category = 'Food & Dining'
-    else if (/ভাড়া|rent|বাসা|flat|ফ্ল্যাট|apartment|mortgage/i.test(preprocessed)) category = 'Rent'
-    else if (/রিকশা|বাস|সিএনজি|transport|rickshaw|metro|uber|ola|পাঠাও|pathao|petrol|diesel|fuel|taxi|cab|auto|train|\b(bus|fare|toll|parking)(?:s)?\b/i.test(preprocessed)) category = 'Transport'
-    else if (/বিদ্যুৎ|গ্যাস|পানি|bill|electric|water|wifi|internet|recharge|\b(gas|broadband|utility)(?:ies|s)?\b/i.test(preprocessed)) category = 'Utilities'
-    else if (/ডাক্তার|ওষুধ|চিকিৎসা|doctor|health|medicine|hospital|pharmacy|dental|clinic|\b(pill|syrup|capsule|ointment|bandage|vaccine|injection|checkup|mask)(?:s)?\b/i.test(preprocessed)) category = 'Healthcare'
-    else if (/শিক্ষা|স্কুল|কলেজ|education|school|university|college|course|tuition|\b(book|notebook|pen|pencil|stationery|exam|fee)(?:s)?\b/i.test(preprocessed)) category = 'Education'
-    else if (/subscription|সাবস্ক্রিপশন|netflix|spotify|youtube|membership|prime|hotstar|disney|patreon/i.test(preprocessed)) category = 'Subscriptions'
-    else if (/মুভি|সিনেমা|movie|cinema|entertainment|\b(game|party|concert|show|ticket)(?:s)?\b/i.test(preprocessed)) category = 'Entertainment'
-    else if (/gadget|phone|laptop|tablet|computer|headphone|charger|camera|smartwatch|earbud|iphone|samsung|tech|\b(battery|batteries|cable|adapter|powerbank|power ?bank|bulb|led|mouse|keyboard|monitor|speaker|router|ssd|hdd|usb|pendrive|tv|television|fridge|refrigerator|microwave|oven|appliance|electronic)(?:s)?\b/i.test(preprocessed)) category = 'Gadgets & Electronics'
-    else if (/কেনাকাটা|শপিং|shopping|bought|কাপড়|clothes|shoes|ব্যাগ|\b(bag|shirt|tshirt|t-shirt|pant|trouser|jean|dress|skirt|jacket|coat|sweater|saree|sari|kurta|panjabi|punjabi|salwar|watch|jewelry|jewellery|ring|necklace|bracelet|sunglass|belt|wallet|purse|sandal|slipper|sneaker|toy|furniture|sofa|chair|table|mattress|pillow|curtain|utensil)(?:s)?\b/i.test(preprocessed)) category = 'Shopping'
-    else if (/salon|parlor|parlour|beauty|hair|makeup|spa|grooming|\b(soap|shampoo|toothpaste|toothbrush|razor|blade|deodorant|perfume|lotion|moisturizer|cream|cosmetic|lipstick|sanitary|diaper|tissue|facewash|sunscreen)(?:s)?\b/i.test(preprocessed)) category = 'Personal Care'
-    else if (/insurance|বীমা|premium|policy/i.test(preprocessed)) category = 'Insurance'
-    else if (/travel|hotel|flight|visa|tour|vacation|trip|airbnb|booking/i.test(preprocessed)) category = 'Travel'
-    else if (/gift|উপহার|birthday|wedding|anniversary/i.test(preprocessed)) category = 'Gifts'
-    else if (/charity|donation|দান|জাকাত|zakat|fund/i.test(preprocessed)) category = 'Charity'
-    else if (/loan|লোন|কিস্তি|emi|ঋণ|কর্জ/i.test(preprocessed)) category = 'Other'
-    else if (/saving|সঞ্চয়|deposit/i.test(preprocessed)) category = 'Other'
+    category = detectCategory(preprocessed, isIncome ? INCOME_LEXICON : EXPENSE_LEXICON)
   }
 
   // Classification derived from category, with explicit luxury keywords winning
